@@ -4,3 +4,4 @@ dist/
 .claude/cost-kit/verif-front/
 test-results/
 playwright-report/
+.claude/worktrees/

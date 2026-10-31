@@ -20,5 +20,20 @@ test('le fichier construit s’exécute en file:// sans requête réseau', async
   expect(await page.locator('html').getAttribute('lang')).toBe('fr');
 
   expect(errors).toEqual([]);
-  expect(requests.filter((u) => !u.startsWith('file:'))).toEqual([]);
+  // Hors du document lui-même : ni réseau, ni fichier voisin (tout est en ligne).
+  expect(requests.filter((u) => u !== url)).toEqual([]);
+});
+
+test('la CSP du fichier construit bloque une connexion sortante', async ({ page }) => {
+  await page.goto(url);
+  // `.invalid` ne se résout jamais : le rejet du fetch ne prouve rien, seul l'événement CSP compte.
+  const directive = await page.evaluate(
+    () =>
+      new Promise<string | null>((done) => {
+        document.addEventListener('securitypolicyviolation', (e) => done(e.effectiveDirective));
+        setTimeout(() => done(null), 3000);
+        fetch('https://csp-test.invalid/').catch(() => undefined);
+      }),
+  );
+  expect(directive).toBe('connect-src');
 });

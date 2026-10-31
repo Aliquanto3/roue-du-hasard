@@ -6,6 +6,8 @@ const CSP = [
   "script-src 'unsafe-inline'",
   "style-src 'unsafe-inline'",
   "connect-src 'none'",
+  "base-uri 'none'",
+  "form-action 'none'",
 ].join('; ');
 
 /** CSP injectée au build seulement : le serveur de dev a besoin de HMR (websocket). */
