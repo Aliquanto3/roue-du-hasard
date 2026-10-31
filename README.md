@@ -89,3 +89,7 @@ npm run test:e2e:chromium   # parcours E2E (construit dist/ et dist-harnais/)
 Détails techniques : le tirage utilise `crypto.getRandomValues` avec rejet d'échantillonnage (jamais `Math.random`), l'export est un fichier JSON versionné, et une politique de sécurité du contenu bloque les connexions sortantes.
 
 Le harnais de la roue se lance avec `npm run harnais` (`http://localhost:5199/?n=10`). La spécification est dans `docs/spec.md`.
+
+## Licence
+
+Apache 2.0 : voir le fichier [LICENSE](LICENSE).
