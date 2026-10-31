@@ -1,4 +1,5 @@
 import { creerActions, creerMagasin } from './actions';
+import { retirerDernierGagnant } from './domain/etat';
 import { couleursParDefaut } from './domain/palette';
 import { creerPersistance } from './domain/persistance';
 import { restaurer, sauvegarder } from './domain/sauvegarde';
@@ -97,7 +98,10 @@ export function render(root: HTMLElement): Roue {
   let avise = false;
   const sauver = (): void => {
     sauvegardePlanifiee = false;
-    if (!sauvegarder(persistance, magasin.lire()) && !avise) {
+    // Annonce ouverte : le retrait du gagnant (F19) est sauvegardé tout de suite, car l'annonce ne l'est pas.
+    // Sans effet si l'option est décochée ou le gagnant déjà retiré ; « Annuler » le remet grâce à la trace.
+    const etat = annonce.ouverte() ? retirerDernierGagnant(magasin.lire()) : magasin.lire();
+    if (!sauvegarder(persistance, etat) && !avise) {
       avise = true;
       donnees.avertirSansSauvegarde();
     }

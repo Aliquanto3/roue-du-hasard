@@ -145,6 +145,32 @@ test('rechargement : liste, couleurs, cadeaux, historique et options retrouvés,
   expect(erreurs).toEqual([]);
 });
 
+test('rechargement pendant l’annonce, gagnants retirés : le gagnant est sorti, « Annuler » le remet', async ({ page }) => {
+  const erreurs = await ouvrir(page);
+  await ajouterNoms(page, 'Ana\nBob\nChloé');
+  await page.getByLabel('Retirer les gagnants de la roue').check();
+  await lancerEtVerifier(page);
+  const gagnant = (await page.locator('.annonce__nom').textContent()) ?? '';
+  await page.reload();
+  await expect(page.locator('#app')).toHaveAttribute('data-ready', 'true');
+  await expect(dialogue(page)).toHaveCount(0);
+  expect(await noms(page)).toEqual(['Ana', 'Bob', 'Chloé'].filter((n) => n !== gagnant));
+  await expect(page.locator('.historique__table tbody tr')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Annuler le dernier tirage' }).click();
+  expect(await noms(page)).toEqual(['Ana', 'Bob', 'Chloé']);
+  await expect(page.locator('.historique__table tbody tr')).toHaveCount(0);
+  expect(erreurs).toEqual([]);
+});
+
+test('rechargement pendant l’annonce, option décochée : le gagnant reste dans la roue', async ({ page }) => {
+  await ouvrir(page);
+  await ajouterNoms(page, 'Ana\nBob\nChloé');
+  await lancerEtVerifier(page);
+  await page.reload();
+  await expect(page.locator('#app')).toHaveAttribute('data-ready', 'true');
+  expect(await noms(page)).toEqual(['Ana', 'Bob', 'Chloé']);
+});
+
 test('stockage bloqué : l’application fonctionne et un avis invite à exporter', async ({ page }) => {
   await page.addInitScript(() => {
     Object.defineProperty(window, 'localStorage', {
