@@ -70,9 +70,28 @@ describe("couleursParDefaut", () => {
     expect(couleursParDefaut(1)).toEqual(["#E69F00"]);
     expect(couleursParDefaut(2)).toHaveLength(2);
   });
-  it("suit l'ordre du tableau, sauf la fin ajustée", () => {
-    // n = 3 : jaune-orange (11,7) refermerait le cercle sous le seuil, d'où le bleu.
-    expect(indicesParDefaut(3)).toEqual([0, 1, 6]);
+  it("n = 2 à 7 : couleurs toutes différentes, voisines admises bouclage compris", () => {
+    const attendu: Record<number, number[]> = {
+      2: [0, 1],
+      3: [0, 1, 6],
+      4: [0, 1, 2, 6],
+      5: [0, 1, 2, 5, 6],
+      6: [0, 1, 2, 4, 5, 6],
+      7: [0, 1, 2, 3, 4, 5, 6],
+    };
+    for (let n = 2; n <= 7; n++) {
+      const idx = indicesParDefaut(n);
+      expect(idx, `n=${n}`).toEqual(attendu[n]);
+      expect(new Set(idx).size, `n=${n}`).toBe(n);
+      expect(new Set(couleursParDefaut(n)).size, `n=${n}`).toBe(n);
+      idx.forEach((a, i) => {
+        expect(VOISINES_ADMISES[a], `n=${n} secteur ${i}`).toContain(idx[(i + 1) % n]);
+      });
+    }
+  });
+  it("suit l'ordre du tableau, sauf la fin ajustée (n > 7)", () => {
+    // n = 8 : le cycle répété (7 → 0 puis 0 → 0) est ajusté en fin.
+    expect(indicesParDefaut(8)).toHaveLength(8);
     expect(indicesParDefaut(200).slice(0, 190)).toEqual(
       Array.from({ length: 190 }, (_, i) => i % 7),
     );

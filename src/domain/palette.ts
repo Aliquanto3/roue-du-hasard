@@ -60,14 +60,27 @@ function completer(seq: number[], restant: number): boolean {
   return false;
 }
 
+/** Anneaux de 2 à 7 secteurs, tous de couleurs différentes (spec §5), bouclage compris. */
+const ANNEAUX_DISTINCTS: Readonly<Record<number, readonly number[]>> = {
+  2: [0, 1],
+  3: [0, 1, 6],
+  4: [0, 1, 2, 6],
+  5: [0, 1, 2, 5, 6],
+  6: [0, 1, 2, 4, 5, 6],
+  7: [0, 1, 2, 3, 4, 5, 6],
+};
+
 /**
- * Indices de palette de n secteurs consécutifs. Le motif est suivi le plus
+ * Indices de palette de n secteurs consécutifs. De 2 à 7 secteurs, toutes les
+ * couleurs sont différentes ; au-delà elles se répètent. Le motif est suivi le plus
  * longtemps possible ; seule la fin (quelques secteurs) est ajustée pour que
  * le dernier et le premier respectent aussi le seuil. O(n).
  */
 export function indicesParDefaut(n: number): number[] {
   if (!Number.isInteger(n) || n <= 0) return [];
   if (n === 1) return [0];
+  const anneau = ANNEAUX_DISTINCTS[n];
+  if (anneau) return [...anneau];
   const base: number[] = [];
   for (let i = 0; i < n; i++) base.push(MOTIF[i % MOTIF.length] as number);
   for (let queue = 0; queue <= Math.min(n - 1, 12); queue++) {
