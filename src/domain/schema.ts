@@ -19,6 +19,7 @@ export type ResultatImport =
 
 const COULEUR = /^#[0-9a-fA-F]{6}$/;
 const ID = /^p\d{1,9}$/;
+const PROCHAIN_ID_MAX = 999_999_999;
 
 /** Sérialise l'état (même format pour le fichier exporté et la sauvegarde automatique). */
 export function exporter(etat: Etat): string {
@@ -32,11 +33,13 @@ export function exporter(etat: Etat): string {
       participantId: t.participantId,
       nom: t.nom,
       cadeau: t.cadeau,
+      cadeauSupprime: t.cadeauSupprime,
       heure: t.heure,
-      retrait: t.retrait === null ? null : { position: t.retrait.position, couleur: t.retrait.couleur },
+      retrait: t.retrait === null ? null : { couleur: t.retrait.couleur },
     })),
     retirerGagnants: etat.retirerGagnants,
     sonCoupe: etat.sonCoupe,
+    prochainId: etat.prochainId,
   });
 }
 
@@ -99,7 +102,7 @@ function lireParticipant(v: unknown): Participant {
 function lireRetrait(v: unknown): Retrait | null {
   if (v === null) return null;
   const o = objet(v);
-  return { position: entier(champ(o, "position"), 0, MAX_ELEMENTS), couleur: couleur(champ(o, "couleur")) };
+  return { couleur: couleur(champ(o, "couleur")) };
 }
 
 function lireTirage(v: unknown): Tirage {
@@ -112,6 +115,7 @@ function lireTirage(v: unknown): Tirage {
     participantId: idValide(champ(o, "participantId")),
     nom: texte(champ(o, "nom")),
     cadeau: cadeau === null ? null : texte(cadeau),
+    cadeauSupprime: booleen(champ(o, "cadeauSupprime")),
     heure,
     retrait: lireRetrait(champ(o, "retrait")),
   };
@@ -134,7 +138,7 @@ function construire(racine: Record<string, unknown>): Etat {
     historique,
     retirerGagnants: booleen(champ(racine, "retirerGagnants")),
     sonCoupe: booleen(champ(racine, "sonCoupe")),
-    prochainId: max + 1,
+    prochainId: entier(champ(racine, "prochainId"), max + 1, PROCHAIN_ID_MAX),
   };
 }
 

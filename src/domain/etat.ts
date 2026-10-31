@@ -8,9 +8,8 @@ export interface Participant {
   readonly couleur: string | null;
 }
 
-/** Trace du retrait d'un gagnant (F19), pour le remettre à sa position d'origine. */
+/** Trace du retrait d'un gagnant (F19). Sa place se déduit de son id : voir `reinserer`. */
 export interface Retrait {
-  readonly position: number;
   readonly couleur: string | null;
 }
 
@@ -19,6 +18,8 @@ export interface Tirage {
   readonly participantId: string;
   readonly nom: string;
   readonly cadeau: string | null;
+  /** Le cadeau a été supprimé de la liste : annuler ce tirage n'a plus rien à rendre. */
+  readonly cadeauSupprime: boolean;
   /** Horodatage ISO 8601. */
   readonly heure: string;
   readonly retrait: Retrait | null;
@@ -120,13 +121,31 @@ export function renommerCadeau(etat: Etat, index: number, brut: string): Etat {
   return { ...etat, cadeaux: etat.cadeaux.map((c, i) => (i === index ? nom : c)) };
 }
 
-/** Supprime un cadeau ; s'il était déjà attribué, le compteur d'attributions baisse d'autant. */
+/**
+ * Marque le tirage qui a reçu le cadeau `index`. Les `attribues` premiers cadeaux correspondent,
+ * dans l'ordre, aux derniers tirages dont le cadeau existe encore. Après un effacement de
+ * l'historique, le tirage peut ne plus exister : rien à marquer.
+ */
+function marquerCadeauSupprime(etat: Etat, index: number): readonly Tirage[] {
+  let rang = etat.attribues - 1 - index;
+  for (let i = etat.historique.length - 1; i >= 0; i--) {
+    const t = etat.historique[i];
+    if (!t || t.cadeau === null || t.cadeauSupprime) continue;
+    if (rang === 0) return etat.historique.map((h, j) => (j === i ? { ...h, cadeauSupprime: true } : h));
+    rang -= 1;
+  }
+  return etat.historique;
+}
+
+/** Supprime un cadeau ; s'il était déjà attribué, le compteur baisse et son tirage n'a plus à le rendre. */
 export function supprimerCadeau(etat: Etat, index: number): Etat {
   if (index < 0 || index >= etat.cadeaux.length) return etat;
+  const dejaAttribue = index < etat.attribues;
   return {
     ...etat,
     cadeaux: etat.cadeaux.filter((_, i) => i !== index),
-    attribues: index < etat.attribues ? etat.attribues - 1 : etat.attribues,
+    attribues: dejaAttribue ? etat.attribues - 1 : etat.attribues,
+    historique: dejaAttribue ? marquerCadeauSupprime(etat, index) : etat.historique,
   };
 }
 
@@ -171,6 +190,7 @@ export function enregistrerTirage(etat: Etat, participantId: string, heure: Date
     participantId: gagnant.id,
     nom: gagnant.nom,
     cadeau,
+    cadeauSupprime: false,
     heure: typeof heure === "string" ? heure : heure.toISOString(),
     retrait: null,
   };
@@ -191,7 +211,7 @@ export function retirerDernierGagnant(etat: Etat): Etat {
   const position = etat.participants.findIndex((p) => p.id === dernier.participantId);
   const gagnant = etat.participants[position];
   if (!gagnant) return etat;
-  const trace: Tirage = { ...dernier, retrait: { position, couleur: gagnant.couleur } };
+  const trace: Tirage = { ...dernier, retrait: { couleur: gagnant.couleur } };
   return {
     ...etat,
     participants: etat.participants.filter((_, i) => i !== position),
@@ -206,21 +226,35 @@ export function attribuerSansRotation(etat: Etat, heure: Date | string): Etat {
   return retirerDernierGagnant(enregistrerTirage(etat, seul.id, heure));
 }
 
-/** Annule le dernier tirage : rend le cadeau et remet le gagnant retiré à sa position d'origine. */
+const numeroParticipant = (id: string): number => Number(id.slice(1));
+
+/**
+ * Remet un participant à sa place d'origine. Aucune opération ne réordonne la liste et les ids
+ * croissent à chaque ajout : la liste suit l'ordre des ids, quels que soient les ajouts et
+ * suppressions intervenus depuis le retrait. Une future fonction de tri devra revoir ce point.
+ */
+function reinserer(participants: readonly Participant[], remis: Participant): readonly Participant[] {
+  const numero = numeroParticipant(remis.id);
+  const suivant = participants.findIndex((p) => numeroParticipant(p.id) > numero);
+  if (suivant < 0) return [...participants, remis];
+  return [...participants.slice(0, suivant), remis, ...participants.slice(suivant)];
+}
+
+/** Annule le dernier tirage : rend le cadeau s'il existe encore et remet le gagnant retiré à sa place. */
 export function annulerDernierTirage(etat: Etat): Etat {
   const dernier = etat.historique[etat.historique.length - 1];
   if (!dernier) return etat;
   let participants = etat.participants;
   if (dernier.retrait && !participants.some((p) => p.id === dernier.participantId)) {
-    const position = Math.min(dernier.retrait.position, participants.length);
     const remis: Participant = { id: dernier.participantId, nom: dernier.nom, couleur: dernier.retrait.couleur };
-    participants = [...participants.slice(0, position), remis, ...participants.slice(position)];
+    participants = reinserer(participants, remis);
   }
+  const rendCadeau = dernier.cadeau !== null && !dernier.cadeauSupprime && etat.attribues > 0;
   return {
     ...etat,
     participants,
     historique: etat.historique.slice(0, -1),
-    attribues: dernier.cadeau !== null && etat.attribues > 0 ? etat.attribues - 1 : etat.attribues,
+    attribues: rendCadeau ? etat.attribues - 1 : etat.attribues,
   };
 }
 

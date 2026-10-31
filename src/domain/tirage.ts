@@ -5,6 +5,9 @@
  * l'angle 0 (le haut) et les secteurs suivants en sens horaire. `angleArret` renvoie l'angle,
  * mesuré dans le repère de la roue, du point qui doit se trouver sous le pointeur à l'arrêt :
  * la rotation finale à appliquer à la roue (horaire) est donc `rotationFinale(angle)`.
+ *
+ * Deux repères à ne pas confondre : `indexSousPointeur` prend un angle de la roue, et
+ * `indexApresRotation` la rotation appliquée à la roue (celle de `rotationFinale`, tours compris).
  */
 
 /** Source d'entiers uniformes sur [0, 2^32). */
@@ -48,6 +51,11 @@ export function angleArret(index: number, n: number, source: Source = sourceCryp
 export function indexSousPointeur(angle: number, n: number): number {
   const a = ((angle % 360) + 360) % 360;
   return Math.min(n - 1, Math.floor(a / (360 / n)));
+}
+
+/** Secteur sous le pointeur quand la roue a tourné de `rotation` degrés en sens horaire. */
+export function indexApresRotation(rotation: number, n: number): number {
+  return indexSousPointeur(-rotation, n);
 }
 
 /** Rotation horaire de la roue amenant `angle` sous le pointeur. */

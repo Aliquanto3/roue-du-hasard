@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { MARGE_SECTEUR, angleArret, indexSousPointeur, rotationFinale, sourceCrypto, tirerIndex } from "./tirage";
+import {
+  MARGE_SECTEUR,
+  angleArret,
+  indexApresRotation,
+  indexSousPointeur,
+  rotationFinale,
+  sourceCrypto,
+  tirerIndex,
+} from "./tirage";
 
 /** Générateur déterministe mulberry32 (uint32). */
 function graine(seed: number): () => number {
@@ -108,5 +116,22 @@ describe("angleArret / indexSousPointeur", () => {
     expect(rotationFinale(0)).toBe(0);
     expect(rotationFinale(90)).toBe(270);
     expect(rotationFinale(450)).toBe(270);
+  });
+
+  it("indexApresRotation : une roue tournée de 90° sur 4 secteurs montre le dernier", () => {
+    expect(indexApresRotation(0, 4)).toBe(0);
+    expect(indexApresRotation(90, 4)).toBe(3);
+    expect(indexApresRotation(270, 4)).toBe(1);
+  });
+
+  it("composition complète : tirage, angle, rotation avec tours, secteur sous le pointeur", () => {
+    const source = graine(7);
+    for (const n of [2, 3, 7, 10, 200, 1000, 5000]) {
+      for (let essai = 0; essai < 200; essai++) {
+        const index = tirerIndex(n, source);
+        const rotation = rotationFinale(angleArret(index, n, source)) + 360 * (4 + (essai % 3));
+        expect(indexApresRotation(rotation, n)).toBe(index);
+      }
+    }
   });
 });

@@ -23,6 +23,7 @@ import {
   supprimerCadeau,
   type Etat,
 } from "./etat";
+import { exporter, importer } from "./schema";
 
 const H = "2026-10-31T10:00:00.000Z";
 const noms = (e: Etat) => e.participants.map((p) => p.nom);
@@ -108,6 +109,81 @@ describe("cadeaux", () => {
     expect(supprimerCadeau(e, 0).attribues).toBe(1);
     expect(supprimerCadeau(e, 2).attribues).toBe(2);
   });
+  describe("annuler après suppression d'un cadeau attribué", () => {
+    const deuxTirages = () => {
+      const e = collerCadeaux(coller(etatInitial(), "P\nQ\nR"), "A\nB\nC");
+      return enregistrerTirage(enregistrerTirage(e, "p1", H), "p2", H);
+    };
+    it("cadeau du tirage annulé supprimé : le premier cadeau n'est pas redistribué", () => {
+      const a = annulerDernierTirage(supprimerCadeau(deuxTirages(), 1));
+      expect(a.attribues).toBe(1);
+      expect(libelleCadeau(a)?.nom).toBe("C");
+    });
+    it("cadeau d'un tirage antérieur supprimé : le cadeau annulé redevient le prochain", () => {
+      const a = annulerDernierTirage(supprimerCadeau(deuxTirages(), 0));
+      expect(a.attribues).toBe(0);
+      expect(libelleCadeau(a)?.nom).toBe("B");
+    });
+    it("distingue deux cadeaux de même nom", () => {
+      let e = collerCadeaux(coller(etatInitial(), "P\nQ"), "X\nX\nY");
+      e = enregistrerTirage(enregistrerTirage(e, "p1", H), "p2", H);
+      const a = annulerDernierTirage(supprimerCadeau(e, 1));
+      expect(a.attribues).toBe(1);
+      expect(libelleCadeau(a)?.nom).toBe("Y");
+    });
+    it("un renommage ne change rien à la restitution", () => {
+      const a = annulerDernierTirage(renommerCadeau(deuxTirages(), 1, "Bis"));
+      expect(libelleCadeau(a)?.nom).toBe("Bis");
+    });
+  });
+  it("après effacement de l'historique, les cadeaux attribués le restent", () => {
+    const e = collerCadeaux(coller(etatInitial(), "P\nQ"), "A\nB\nC");
+    const efface = effacerHistorique(enregistrerTirage(enregistrerTirage(e, "p1", H), "p2", H));
+    expect(annulerDernierTirage(efface)).toBe(efface);
+    expect(libelleCadeau(efface)?.nom).toBe("C");
+    const sansTrace = supprimerCadeau(efface, 0);
+    expect(libelleCadeau(sansTrace)?.nom).toBe("C");
+    const suivant = annulerDernierTirage(enregistrerTirage(sansTrace, "p1", H));
+    expect(libelleCadeau(suivant)?.nom).toBe("C");
+  });
+  it("après recommencement, annuler ne fait jamais passer le compteur sous zéro", () => {
+    const e = collerCadeaux(coller(etatInitial(), "P\nQ"), "A\nB");
+    let r = recommencerAttributions(enregistrerTirage(enregistrerTirage(e, "p1", H), "p2", H));
+    r = annulerDernierTirage(enregistrerTirage(r, "p1", H));
+    expect(r.attribues).toBe(0);
+    r = annulerDernierTirage(r);
+    expect(r.attribues).toBe(0);
+    expect(r.historique).toHaveLength(1);
+    expect(libelleCadeau(r)?.nom).toBe("A");
+  });
+  it("invariant sur des suites aléatoires : le début de la liste suit les tirages vivants", () => {
+    let graine = 12345;
+    const alea = (n: number): number => {
+      graine = (Math.imul(graine, 1664525) + 1013904223) >>> 0;
+      return Math.floor((graine / 2 ** 32) * n);
+    };
+    for (let essai = 0; essai < 200; essai++) {
+      let e = definirRetirerGagnants(coller(etatInitial(), "P\nQ\nR\nS\nT\nU"), essai % 2 === 0);
+      e = collerCadeaux(e, "C1\nC2\nC3\nC4\nC5\nC6");
+      for (let pas = 0; pas < 30; pas++) {
+        const op = alea(4);
+        if (op === 0 && e.participants.length > 0) {
+          const p = e.participants[alea(e.participants.length)];
+          if (p) e = retirerDernierGagnant(enregistrerTirage(e, p.id, H));
+        } else if (op === 1) e = annulerDernierTirage(e);
+        else if (op === 2 && e.cadeaux.length > 0) e = supprimerCadeau(e, alea(e.cadeaux.length));
+        else if (op === 3 && e.participants.length > 0) {
+          const p = e.participants[alea(e.participants.length)];
+          if (p) e = supprimer(e, p.id);
+        }
+        const vivants = e.historique.filter((t) => t.cadeau !== null && !t.cadeauSupprime).map((t) => t.cadeau);
+        expect(e.cadeaux.slice(0, e.attribues)).toEqual(vivants);
+        const ids = e.participants.map((p) => Number(p.id.slice(1)));
+        expect(ids).toEqual([...ids].sort((a, b) => a - b));
+        expect(importer(exporter(e))).toEqual({ ok: true, etat: e });
+      }
+    }
+  });
 });
 
 describe("tirages et cadeaux", () => {
@@ -124,8 +200,8 @@ describe("tirages et cadeaux", () => {
     let e = enregistrerTirage(base(), "p2", new Date(H));
     e = enregistrerTirage(e, "p3", H);
     expect(e.historique).toEqual([
-      { ordre: 1, participantId: "p2", nom: "B", cadeau: "Bougie", heure: H, retrait: null },
-      { ordre: 2, participantId: "p3", nom: "C", cadeau: "Livre", heure: H, retrait: null },
+      { ordre: 1, participantId: "p2", nom: "B", cadeau: "Bougie", cadeauSupprime: false, heure: H, retrait: null },
+      { ordre: 2, participantId: "p3", nom: "C", cadeau: "Livre", cadeauSupprime: false, heure: H, retrait: null },
     ]);
     expect(e.attribues).toBe(2);
   });
@@ -144,6 +220,10 @@ describe("tirages et cadeaux", () => {
     expect(e.attribues).toBe(0);
     expect(raisonLancementInterdit(e)).toBeNull();
     expect(e.historique).toHaveLength(2);
+  });
+  it("cadeaux épuisés et moins de 2 noms : le récapitulatif F12 prime", () => {
+    const e = enregistrerTirage(collerCadeaux(coller(etatInitial(), "A"), "X"), "p1", H);
+    expect(raisonLancementInterdit(e)).toBe("cadeaux-epuises");
   });
   it("un tirage avec cadeaux épuisés ou participant inconnu est ignoré", () => {
     const e = enregistrerTirage(enregistrerTirage(base(), "p1", H), "p2", H);
@@ -182,7 +262,7 @@ describe("retrait des gagnants (F19)", () => {
     let e = definirCouleur(base(), "p3", "#112233");
     e = retirerDernierGagnant(enregistrerTirage(e, "p3", H));
     expect(noms(e)).toEqual(["A", "B", "D"]);
-    expect(e.historique[0]?.retrait).toEqual({ position: 2, couleur: "#112233" });
+    expect(e.historique[0]?.retrait).toEqual({ couleur: "#112233" });
     expect(retirerDernierGagnant(e)).toBe(e);
     const a = annulerDernierTirage(e);
     expect(a.participants).toEqual([
@@ -194,10 +274,20 @@ describe("retrait des gagnants (F19)", () => {
     expect(a.attribues).toBe(0);
     expect(a.historique).toEqual([]);
   });
-  it("annuler après retrait de voisins replace à l'index borné", () => {
+  it("annuler après retrait de voisins garde l'ordre d'origine", () => {
     let e = retirerDernierGagnant(enregistrerTirage(base(), "p4", H));
     e = supprimer(supprimer(e, "p1"), "p2");
     expect(annulerDernierTirage(e).participants.map((p) => p.id)).toEqual(["p3", "p4"]);
+  });
+  it("annuler après suppression d'un voisin placé avant : ordre d'origine, pas index périmé", () => {
+    let e = retirerDernierGagnant(enregistrerTirage(base(), "p2", H));
+    e = supprimer(e, "p1");
+    expect(annulerDernierTirage(e).participants.map((p) => p.id)).toEqual(["p2", "p3", "p4"]);
+  });
+  it("annuler après ajout d'un nom : le nouveau nom reste à la fin", () => {
+    let e = retirerDernierGagnant(enregistrerTirage(base(), "p2", H));
+    e = ajouter(e, "E");
+    expect(annulerDernierTirage(e).participants.map((p) => p.id)).toEqual(["p1", "p2", "p3", "p4", "p5"]);
   });
   it("option décochée : pas de retrait", () => {
     const e = definirRetirerGagnants(enregistrerTirage(base(), "p1", H), false);

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  ajouter,
   coller,
   collerCadeaux,
   definirCouleur,
@@ -7,6 +8,8 @@ import {
   definirSonCoupe,
   enregistrerTirage,
   etatInitial,
+  supprimer,
+  supprimerCadeau,
 } from "./etat";
 import { MAX_ELEMENTS, TAILLE_MAX_FICHIER, VERSION_SCHEMA, exporter, importer, valider } from "./schema";
 
@@ -41,6 +44,25 @@ describe("export / import", () => {
   it("restaure prochainId au-delà des ids connus", () => {
     const r = importer(exporter(exemple()));
     expect(r.ok && r.etat.prochainId).toBe(4);
+  });
+
+  it("garde prochainId à l'aller-retour : un id supprimé n'est jamais réutilisé", () => {
+    const e = supprimer(coller(etatInitial(), "A\nB\nC"), "p3");
+    const r = importer(exporter(e));
+    expect(r).toEqual({ ok: true, etat: e });
+    if (r.ok) expect(ajouter(r.etat, "D").participants.map((p) => p.id)).toEqual(["p1", "p2", "p4"]);
+  });
+
+  it("refuse un prochainId absent ou déjà utilisé", () => {
+    expect(code(fichier((o) => delete o["prochainId"]))).toBe("donnees-invalides");
+    expect(code(fichier((o) => (o["prochainId"] = 3)))).toBe("donnees-invalides");
+    expect(code(fichier((o) => (o["prochainId"] = 2 ** 53)))).toBe("donnees-invalides");
+  });
+
+  it("garde la marque d'un cadeau supprimé à l'aller-retour", () => {
+    const e = supprimerCadeau(exemple(), 0);
+    expect(e.historique[0]?.cadeauSupprime).toBe(true);
+    expect(importer(exporter(e))).toEqual({ ok: true, etat: e });
   });
 
   it("refuse un JSON illisible", () => {
@@ -112,17 +134,19 @@ describe("export / import", () => {
       participantId: "p1",
       nom: "A",
       cadeau: null,
+      cadeauSupprime: false,
       heure: "2026-10-31T10:00:00.000Z",
       retrait: null,
     };
     const avec = (m: Record<string, unknown>) => fichier((o) => (o["historique"] = [{ ...base, ...m }]));
     expect(code(avec({}))).toBeUndefined();
-    expect(code(avec({ retrait: { position: 0, couleur: "#000000" } }))).toBeUndefined();
+    expect(code(avec({ retrait: { couleur: "#000000" } }))).toBeUndefined();
     expect(code(avec({ ordre: 0 }))).toBe("donnees-invalides");
     expect(code(avec({ heure: "pas une date" }))).toBe("donnees-invalides");
     expect(code(avec({ heure: 5 }))).toBe("donnees-invalides");
     expect(code(avec({ cadeau: 5 }))).toBe("donnees-invalides");
-    expect(code(avec({ retrait: { position: -1, couleur: null } }))).toBe("donnees-invalides");
+    expect(code(avec({ cadeauSupprime: "non" }))).toBe("donnees-invalides");
+    expect(code(avec({ retrait: { couleur: "rouge" } }))).toBe("donnees-invalides");
     expect(code(avec({ retrait: 3 }))).toBe("donnees-invalides");
   });
 
@@ -142,7 +166,7 @@ describe("export / import", () => {
     if (r.ok) expect(Object.hasOwn(r.etat, "polluant")).toBe(false);
     const participant = '{"id":"p1","nom":"A","couleur":null,"__proto__":{"x":1}}';
     const r2 = importer(
-      `{"version":1,"participants":[${participant}],"cadeaux":[],"attribues":0,"historique":[],"retirerGagnants":false,"sonCoupe":false}`,
+      `{"version":1,"participants":[${participant}],"cadeaux":[],"attribues":0,"historique":[],"retirerGagnants":false,"sonCoupe":false,"prochainId":2}`,
     );
     expect(r2.ok && Object.keys(r2.etat.participants[0] as object)).toEqual(["id", "nom", "couleur"]);
   });
