@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { compterDoublons, decouper, longueur, normaliserNom, tronquer } from "./normalisation";
+import { compterDoublons, compterTronques, decouper, longueur, normaliserNom, tronquer } from "./normalisation";
+
+describe("compterTronques", () => {
+  it("compte les noms au-delà de 60 points de code, séparateurs compris", () => {
+    const long = "a".repeat(61);
+    expect(compterTronques(`${long}\nbob, ${"b".repeat(60)}; ${long}`)).toBe(2);
+    expect(compterTronques("")).toBe(0);
+  });
+});
 
 describe("decouper", () => {
   it("coupe sur retours à la ligne, virgules et points-virgules", () => {

@@ -1,11 +1,12 @@
 .roue {
-  width: min(100%, calc(100vh - 8rem));
-  width: min(100%, calc(100dvh - 8rem));
-  min-width: 200px;
-  margin-inline: auto;
+  width: 100%;
 }
 .roue__scene {
   position: relative;
+  /* `--taille-roue-max` (page.css) garde la roue entière dans la fenêtre ; repli pour le harnais. */
+  width: min(100%, max(8rem, var(--taille-roue-max, calc(100vh - 8rem))));
+  width: min(100%, max(8rem, var(--taille-roue-max, calc(100dvh - 8rem))));
+  margin-inline: auto;
   aspect-ratio: 1 / 1;
 }
 .roue__canvas {
@@ -25,6 +26,7 @@
   transform: translateX(-50%);
   max-width: 80%;
   padding: 0.25em 0.75em;
+  border: 1px solid #8e94c2;
   border-radius: 0.5em;
   background: #14162b;
   color: #fff;
@@ -40,17 +42,36 @@
 .roue__indice {
   margin: 0.5rem 0 0;
   text-align: center;
+  color: var(--texte-doux, inherit);
 }
 .roue__bouton {
   display: block;
-  min-height: 44px;
+  min-width: min(100%, 14rem);
+  min-height: 48px;
   margin: 0.75rem auto 0;
   padding: 0.5rem 1.5rem;
+  border: 3px solid var(--accent, #ffd166);
+  border-radius: 999px;
+  background: var(--accent, #ffd166);
+  color: var(--sur-accent, #14162b);
   font: inherit;
-  font-weight: 600;
+  font-size: 1.125rem;
+  font-weight: 700;
   cursor: pointer;
+  touch-action: manipulation;
 }
+.roue__bouton:hover:not([aria-disabled='true']) {
+  filter: brightness(1.08);
+}
+.roue__bouton:focus-visible {
+  outline: 4px solid var(--focus, #fff);
+  outline-offset: 4px;
+}
+/* Inactif : pas d'opacité (le contraste reste AA), mais un trait pointillé et le curseur interdit. */
 .roue__bouton[aria-disabled='true'] {
-  opacity: 0.6;
+  border-style: dashed;
+  border-color: var(--bord, #8e94c2);
+  background: transparent;
+  color: var(--texte-doux, inherit);
   cursor: not-allowed;
 }

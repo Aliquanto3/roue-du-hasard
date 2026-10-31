@@ -38,6 +38,15 @@ export function decouper(texte: string): string[] {
   return noms;
 }
 
+/** Nombre de noms d'un texte qui dépassent la longueur maximale et seront raccourcis (F3). */
+export function compterTronques(texte: string): number {
+  let tronques = 0;
+  for (const morceau of texte.split(SEPARATEURS)) {
+    if (longueur(morceau.trim()) > LONGUEUR_MAX_NOM) tronques += 1;
+  }
+  return tronques;
+}
+
 function cle(nom: string): string {
   return nom.normalize("NFC").toLocaleLowerCase("fr");
 }
