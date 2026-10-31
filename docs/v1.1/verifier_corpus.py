@@ -9,7 +9,9 @@ from __future__ import annotations
 import json
 import re
 import sys
+import unicodedata
 from collections import Counter
+from difflib import SequenceMatcher
 from pathlib import Path
 
 CORPUS = Path(__file__).with_name("corpus-commandes.jsonl")
@@ -52,6 +54,20 @@ VERROUILLEES = {"ajouter", "coller", "renommer", "supprimer", "definirCouleur",
                 "effacerHistorique", "annulerDernierTirage"}
 DESTRUCTIVES = {"effacerHistorique", "reinitialiserCouleurs"}
 LOTS = {"dev", "test"}
+# Couverture minimale par action cible (étapes attendues), dans chaque lot.
+MIN_ACTION_DEV = 2
+MIN_ACTION_TEST = 3
+# Quasi-doublons dev/test : similarité (difflib) des commandes normalisées.
+SEUIL_QUASI_DOUBLON = 0.85
+# Formes canoniques « verbe + nom » : une fois les noms de l'état retirés, il ne reste
+# que la structure imposée par l'action (seul le nom change d'une ligne à l'autre). Une
+# paire est tolérée si l'un des deux textes normalisés figure ici.
+GABARITS_CANONIQUES = re.compile(
+    r"^(supprime|retire|reinitialise la couleur de"
+    r"|mets? (et )?en( \w+)?|renomme en \w+|r?ajoute( \w+)?)$"
+)
+# Paires (id test, id dev) tolérées une à une, avec le motif.
+EXCEPTIONS_QUASI_DOUBLON: dict[tuple[str, str], str] = {}
 
 
 def etapes(attendu: dict) -> list[dict]:
@@ -79,6 +95,9 @@ def verifier_ligne(n: int, d: dict, erreurs: list[str]) -> list[str]:
         err("confirmation doit être un booléen")
 
     etat = d["etat"]
+    if not isinstance(etat, dict):
+        err("etat doit être un objet")
+        return []
     noms = etat.get("noms")
     if not isinstance(noms, list) or not all(isinstance(x, str) for x in noms):
         err("etat.noms doit être une liste de chaînes")
@@ -107,8 +126,11 @@ def verifier_ligne(n: int, d: dict, erreurs: list[str]) -> list[str]:
         cands = att.get("candidats")
         if set(att) != {"action", "candidats"}:
             err("clarifier ne porte que « candidats »")
-        if not isinstance(cands, list) or len(cands) < 2:
-            err("clarifier exige au moins 2 candidats")
+        mini = 2 if d["categorie"] == "homonymes" else 1
+        if not isinstance(cands, list) or len(cands) < mini:
+            err(f"clarifier exige au moins {mini} candidat(s) dans la catégorie {d['categorie']}")
+        elif not all(isinstance(x, str) for x in cands):
+            err("candidats : liste de chaînes attendue")
         else:
             dispo = Counter(noms)
             for nom, nb in Counter(cands).items():
@@ -166,15 +188,64 @@ def verifier_ligne(n: int, d: dict, erreurs: list[str]) -> list[str]:
     return liste
 
 
+def _sans_accents(texte: str) -> str:
+    return "".join(c for c in unicodedata.normalize("NFD", texte) if not unicodedata.combining(c))
+
+
+def _mots(texte: str) -> str:
+    return " ".join(re.sub(r"[^a-z0-9]+", " ", _sans_accents(texte.lower())).split())
+
+
+BRUIT = ("s il te plait", "s il vous plait", "stp", "svp", "euh", "heu")
+
+
+def normaliser_commande(commande: str, noms: list[str]) -> str:
+    """Minuscules, sans accents, sans hésitations, politesse ni noms de l'état."""
+    texte = f" {_mots(commande)} "
+    for nom in sorted({_mots(n) for n in noms if _mots(n)}, key=len, reverse=True):
+        texte = texte.replace(f" {nom} ", " ")
+    for bruit in BRUIT:
+        texte = texte.replace(f" {bruit} ", " ")
+    return " ".join(texte.split())
+
+
+def quasi_doublons(lignes: list[dict]) -> list[str]:
+    """Paires test/dev trop proches une fois les noms de l'état et le bruit retirés."""
+    erreurs: list[str] = []
+    dev = [(d["id"], normaliser_commande(d["commande"], d["etat"]["noms"])) for d in lignes if d["lot"] == "dev"]
+    brutes_dev = {d["commande"].strip().lower(): d["id"] for d in lignes if d["lot"] == "dev"}
+    for d in lignes:
+        if d["lot"] != "test":
+            continue
+        doublon = brutes_dev.get(d["commande"].strip().lower())
+        if doublon:
+            erreurs.append(f"commande « {d['commande']} » présente dans dev ({doublon}) et test ({d['id']})")
+        a = normaliser_commande(d["commande"], d["etat"]["noms"])
+        for id_dev, b in dev:
+            if (d["id"], id_dev) in EXCEPTIONS_QUASI_DOUBLON:
+                continue
+            if GABARITS_CANONIQUES.match(a) or GABARITS_CANONIQUES.match(b):
+                continue
+            ratio = SequenceMatcher(None, a, b).ratio()
+            if ratio >= SEUIL_QUASI_DOUBLON:
+                erreurs.append(
+                    f"quasi-doublon test/dev : {d['id']} « {d['commande']} » ~ {id_dev} "
+                    f"(similarité {ratio:.2f} sur « {a} » / « {b} »)"
+                )
+    return erreurs
+
+
 def main(chemin: Path) -> int:
     erreurs: list[str] = []
-    lignes = [l for l in chemin.read_text(encoding="utf-8").splitlines() if l.strip()]
+    lignes = [ligne for ligne in chemin.read_text(encoding="utf-8").splitlines() if ligne.strip()]
     ids: set[str] = set()
     par_cat: Counter[str] = Counter()
     par_action: Counter[str] = Counter()
+    action_lot: dict[str, Counter[str]] = {}
     par_lot: Counter[str] = Counter()
+    refuser_lot: Counter[str] = Counter()
     lot_cat: dict[str, Counter[str]] = {}
-    commandes_lot: dict[str, str] = {}
+    valides: list[dict] = []
 
     for n, brut in enumerate(lignes, 1):
         try:
@@ -185,19 +256,34 @@ def main(chemin: Path) -> int:
         if not isinstance(d, dict):
             erreurs.append(f"ligne {n} : objet JSON attendu")
             continue
-        if d.get("id") in ids:
-            erreurs.append(f"ligne {n} : id en double « {d.get('id')} »")
-        ids.add(d.get("id"))
+        id_ligne = str(d.get("id"))
+        if id_ligne in ids:
+            erreurs.append(f"ligne {n} : id en double « {id_ligne} »")
+        ids.add(id_ligne)
+        nb_erreurs = len(erreurs)
         actions = verifier_ligne(n, d, erreurs)
-        par_cat[d.get("categorie")] += 1
-        par_lot[d.get("lot")] += 1
-        lot_cat.setdefault(d.get("categorie"), Counter())[d.get("lot")] += 1
+        lot = str(d.get("lot"))
+        cat = str(d.get("categorie"))
+        par_cat[cat] += 1
+        par_lot[lot] += 1
+        lot_cat.setdefault(cat, Counter())[lot] += 1
         for a in actions:
             par_action[a] += 1
-        # Une même commande ne doit pas être répartie entre dev et test.
-        cle = d.get("commande", "").strip().lower()
-        if commandes_lot.setdefault(cle, d.get("lot")) != d.get("lot"):
-            erreurs.append(f"ligne {n} : commande « {d.get('commande')} » présente dans dev et test")
+            action_lot.setdefault(a, Counter())[lot] += 1
+        if actions == ["refuser"]:
+            refuser_lot[lot] += 1
+        etat = d.get("etat")
+        if (
+            len(erreurs) == nb_erreurs
+            and isinstance(d.get("commande"), str)
+            and isinstance(etat, dict)
+            and isinstance(etat.get("noms"), list)
+        ):
+            valides.append(d)
+
+    # Une même commande ne doit pas être répartie entre dev et test (doublon exact)
+    # et aucune paire dev/test ne doit être quasi identique.
+    erreurs.extend(quasi_doublons(valides))
 
     for cat in sorted(CATEGORIES):
         if par_cat[cat] == 0:
@@ -208,15 +294,28 @@ def main(chemin: Path) -> int:
         if par_cat[cat] and not (0.3 <= c["dev"] / par_cat[cat] <= 0.5):
             erreurs.append(f"catégorie {cat} : dev = {c['dev']}/{par_cat[cat]} (hors de 30 à 50 %)")
 
+    for a in sorted(set(ACTIONS) | {"refuser", "clarifier"}):
+        c = action_lot.get(a, Counter())
+        if c["dev"] < MIN_ACTION_DEV or c["test"] < MIN_ACTION_TEST:
+            erreurs.append(
+                f"action {a} : dev {c['dev']}, test {c['test']} "
+                f"(minimum {MIN_ACTION_DEV} et {MIN_ACTION_TEST})"
+            )
+
     total = sum(par_cat.values())
     print(f"{total} lignes ; lot dev {par_lot['dev']}, test {par_lot['test']}")
     print("\nPar catégorie (dev/test) :")
-    for cat in sorted(par_cat, key=str):
+    for cat in sorted(par_cat):
         c = lot_cat[cat]
         print(f"  {cat:26} {par_cat[cat]:3}  ({c['dev']}/{c['test']})")
-    print("\nPar action (étapes attendues) :")
+    print("\nPar action (étapes attendues ; dev/test) :")
     for a in sorted(par_action):
-        print(f"  {a:26} {par_action[a]:3}")
+        c = action_lot[a]
+        print(f"  {a:26} {par_action[a]:3}  ({c['dev']}/{c['test']})")
+    if total:
+        print("\nRéférence « moteur qui refuse tout » (part de lignes attendues en refuser) :")
+        for lot in sorted(par_lot):
+            print(f"  {lot:5} {refuser_lot[lot]}/{par_lot[lot]} = {refuser_lot[lot] / par_lot[lot]:.0%}")
 
     if erreurs:
         print(f"\n{len(erreurs)} erreur(s) :", file=sys.stderr)
