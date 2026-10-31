@@ -1,10 +1,12 @@
-/** Export et import JSON versionnés (F15). L'import ne fait jamais confiance au contenu. */
+/**
+ * Export et import JSON versionnés (F15). L'import ne fait jamais confiance au contenu.
+ * Aucune limite de nombre d'éléments ni de taille ici : tout export doit se réimporter (F2, F15).
+ * La limite de taille de fichier vit dans `ui/echange.ts` (code `fichier-trop-gros`).
+ */
 import type { Etat, Participant, Retrait, Tirage } from "./etat";
 import { LONGUEUR_MAX_NOM, longueur } from "./normalisation";
 
 export const VERSION_SCHEMA = 1;
-export const TAILLE_MAX_FICHIER = 5_000_000;
-export const MAX_ELEMENTS = 100_000;
 
 export type CodeErreurImport =
   | "fichier-trop-gros"
@@ -60,7 +62,7 @@ function champ(o: Record<string, unknown>, nom: string): unknown {
 }
 
 function tableau(v: unknown): unknown[] {
-  if (!Array.isArray(v) || v.length > MAX_ELEMENTS) return refuser();
+  if (!Array.isArray(v)) return refuser();
   return v as unknown[];
 }
 
@@ -163,9 +165,6 @@ export function valider(donnees: unknown): ResultatImport {
 
 /** Importe un texte JSON ; ne lève jamais et ne modifie rien : l'appelant remplace l'état si `ok`. */
 export function importer(contenu: string): ResultatImport {
-  if (contenu.length > TAILLE_MAX_FICHIER) {
-    return { ok: false, code: "fichier-trop-gros" };
-  }
   let donnees: unknown;
   try {
     donnees = JSON.parse(contenu);
