@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="fr">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Aperçu palette</title>
+<style>
+  body { margin: 0; padding: 24px 16px; background: #14162B; color: #f4f4f8; font: 16px system-ui, sans-serif; }
+  h1 { font-size: 22px; margin: 0 0 4px; text-align: center; }
+  p { margin: 0 0 24px; text-align: center; color: #b9bbd0; }
+  main { display: grid; gap: 24px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); max-width: 1240px; margin: auto; }
+  figure { margin: 0; text-align: center; }
+  figcaption { margin-top: 8px; }
+  svg.w { width: 100%; max-width: 380px; height: auto; }
+</style>
+<h1>Palette Okabe-Ito, 7 noms</h1>
+<p>Vision normale et simulations de daltonisme (Machado 2009, sévérité 1).</p>
+<svg width="0" height="0" style="position:absolute">
+  <filter id="protan" color-interpolation-filters="linearRGB"><feColorMatrix values="0.152286 1.052583 -0.204868 0 0  0.114503 0.786281 0.099216 0 0  -0.003882 -0.048116 1.051998 0 0  0 0 0 1 0"/></filter>
+  <filter id="deutan" color-interpolation-filters="linearRGB"><feColorMatrix values="0.367322 0.860646 -0.227968 0 0  0.280085 0.672501 0.047413 0 0  -0.011820 0.042940 0.968881 0 0  0 0 0 1 0"/></filter>
+  <filter id="tritan" color-interpolation-filters="linearRGB"><feColorMatrix values="1.255528 -0.076749 -0.178779 0 0  -0.078411 0.930809 0.147602 0 0  0.004733 0.691367 0.303900 0 0  0 0 0 1 0"/></filter>
+</svg>
+<main id="m"></main>
+<script>
+const C = [['#E69F00','#111'],['#56B4E9','#111'],['#F0E442','#111'],['#CC79A7','#111'],['#009E73','#111'],['#D55E00','#111'],['#0072B2','#fff']];
+const N = ['Marie','Thomas','Léa','Karim','Sophie','Antoine','Inès'];
+const R = 190, c = 200;
+const pt = a => [c + R * Math.sin(a), c - R * Math.cos(a)];
+let s = '';
+C.forEach(([bg, fg], i) => {
+  const a = i * 2 * Math.PI / 7, b = (i + 1) * 2 * Math.PI / 7, [x1, y1] = pt(a), [x2, y2] = pt(b);
+  const mid = (i + .5) * 360 / 7;
+  s += `<path d="M${c} ${c}L${x1} ${y1}A${R} ${R} 0 0 1 ${x2} ${y2}Z" fill="${bg}" stroke="#14162B" stroke-width="5"/>`;
+  s += `<text transform="rotate(${mid - 90} ${c} ${c})" x="${c + R - 16}" y="${c + 7}" text-anchor="end" fill="${fg}" font-size="20" font-weight="600">${N[i]}</text>`;
+});
+s += `<circle cx="${c}" cy="${c}" r="20" fill="#14162B" stroke="#fff" stroke-width="3"/><path d="M${c - 13} 0H${c + 13}L${c} 30Z" fill="#fff" stroke="#14162B" stroke-width="2"/>`;
+const V = [['Vision normale', ''], ['Protanopie', 'protan'], ['Deutéranopie', 'deutan'], ['Tritanopie', 'tritan']];
+document.getElementById('m').innerHTML = V.map(([t, f]) =>
+  `<figure><svg class="w" viewBox="0 0 400 400" role="img" aria-label="${t}"><g ${f ? `filter="url(#${f})"` : ''}>${s}</g></svg><figcaption>${t}</figcaption></figure>`).join('');
+</script>
+</html>
