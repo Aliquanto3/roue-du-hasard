@@ -20,6 +20,9 @@ const { matrice, couleurs, minToutesPaires, minCycle } = matriceJson as {
   minCycle: number;
 };
 
+/** Seuil de la spec §5, écrit ici pour ne pas dépendre de la constante testée. */
+const SEUIL_SPEC = 17.95;
+
 function delta(hexA: string, hexB: string): number {
   return matrice[couleurs.indexOf(hexA)]![couleurs.indexOf(hexB)]!;
 }
@@ -30,7 +33,7 @@ function verifierVoisines(seq: string[]): void {
     const a = seq[i]!;
     const b = seq[(i + 1) % n]!;
     expect(a, `secteur ${i} / n=${n}`).not.toBe(b);
-    expect(delta(a, b), `${a}-${b} secteur ${i} / n=${n}`).toBeGreaterThanOrEqual(SEUIL_DELTA_E);
+    expect(delta(a, b), `${a}-${b} secteur ${i} / n=${n}`).toBeGreaterThanOrEqual(SEUIL_SPEC);
   }
 }
 
@@ -44,8 +47,9 @@ describe("fixture de mesure CVD", () => {
     expect(minCycle).toBeCloseTo(18.0, 1); // 17,96 mesuré
   });
   it("la table des voisines admises correspond exactement aux paires >= seuil", () => {
+    expect(SEUIL_DELTA_E).toBe(SEUIL_SPEC);
     const attendu = matrice.map((l, i) =>
-      l.flatMap((v, j) => (i !== j && v >= SEUIL_DELTA_E ? [j] : [])),
+      l.flatMap((v, j) => (i !== j && v >= SEUIL_SPEC ? [j] : [])),
     );
     expect(VOISINES_ADMISES.map((l) => [...l].sort((a, b) => a - b))).toEqual(attendu);
   });
@@ -66,9 +70,12 @@ describe("couleursParDefaut", () => {
     expect(couleursParDefaut(1)).toEqual(["#E69F00"]);
     expect(couleursParDefaut(2)).toHaveLength(2);
   });
-  it("commence par la palette dans l'ordre pour de petits n", () => {
-    expect(couleursParDefaut(3).length).toBe(3);
-    expect(couleursParDefaut(200)[0]).toBe("#E69F00");
+  it("suit l'ordre du tableau, sauf la fin ajustée", () => {
+    // n = 3 : jaune-orange (11,7) refermerait le cercle sous le seuil, d'où le bleu.
+    expect(indicesParDefaut(3)).toEqual([0, 1, 6]);
+    expect(indicesParDefaut(200).slice(0, 190)).toEqual(
+      Array.from({ length: 190 }, (_, i) => i % 7),
+    );
   });
   it("est déterministe", () => {
     expect(couleursParDefaut(37)).toEqual(couleursParDefaut(37));

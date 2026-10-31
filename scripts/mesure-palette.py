@@ -1,6 +1,6 @@
 """Mesure la matrice des DeltaE2000 CVD de la palette (spec 5).
 
-Usage : uv run --no-project --with coloraide python scripts/mesure-palette.py
+Usage : uv run --no-project --with coloraide==8.13.1 python scripts/mesure-palette.py
 Ecrit src/domain/palette-matrice.json (fixture de test, hors bundle).
 Pire cas des quatre visions (normale, protanopie, deuteranopie, tritanopie
 a severite 1) pour chaque paire.
