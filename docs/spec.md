@@ -57,7 +57,7 @@ Personas : **l'organisateur** (prépare la liste sur PC ou téléphone, peut ne 
 - **N4 Responsive** : sans défilement horizontal de 320 px à 3840 px de large, en portrait et en paysage. Roue et panneau côte à côte sur écran large, empilés sur téléphone, roue d'abord. Cibles tactiles d'au moins 44 px. Respect des zones sûres (`safe-area-inset`).
 - **N5 Navigateurs** : deux dernières versions de Chrome, Edge, Firefox, Safari (macOS et iOS), Chrome Android.
 - **N6 Accessibilité** : WCAG 2.2 AA. Parcours complet au clavier, focus visible, résultat annoncé par `aria-live`, aucun axe bloquant ou sérieux relevé par axe-core. La couleur n'est jamais la seule information : le nom est toujours lisible en toutes lettres (secteur ou bandeau). Avec `prefers-reduced-motion`, la rotation et les confettis sont remplacés par un fondu court vers le secteur gagnant.
-- **N7 Performance** : 60 images/s visées sur PC et 30 au minimum sur un téléphone moyen, jusqu'à 1 000 noms (roue pré-rendue dans un canvas hors écran, redessinée seulement à l'édition). Rendu net selon `devicePixelRatio`.
+- **N7 Performance** : 60 images/s visées sur PC et 30 au minimum sur un téléphone moyen, jusqu'à 100 noms ; au-delà, l'application reste utilisable sans garantie de fluidité (roue pré-rendue dans un canvas hors écran, redessinée seulement à l'édition). Rendu net selon `devicePixelRatio`.
 - **N8 Langue** : interface en français. Textes centralisés dans un seul module, sans système de traduction en V1.
 
 ## 5. Identité visuelle et couleurs
