@@ -1,9 +1,10 @@
 /**
  * Page de test de la roue, hors du fichier livré. Paramètres d'URL :
- * `n` (noms initiaux), `duree` (ms forcées), `source=milieu` (arrêt au milieu du secteur).
+ * `n` (noms initiaux), `duree` (ms forcées), `source=milieu` (arrêt au milieu du secteur), `relief=1` (rendu en relief).
  */
 import { indexApresRotation, tirerIndex, type Source } from '../../src/domain/tirage';
 import { creerRoue, type NomRoue, type ResultatLancer, type Roue } from '../../src/ui/roue';
+import { geometrie } from '../../src/ui/roue-geometrie';
 import { couleursSecteurs } from '../../src/ui/roue-rendu';
 
 const params = new URLSearchParams(location.search);
@@ -20,6 +21,7 @@ const roue: Roue = creerRoue(racine, {
   },
   source,
   dureeMs: duree ? Number(duree) : undefined,
+  relief: params.get('relief') === '1',
 });
 roue.ecouter('debut', () => journal.debuts++);
 roue.ecouter('fin', () => journal.fins++);
@@ -58,6 +60,16 @@ const harnais = {
     const { canvas } = roue;
     const x = Number(canvas.dataset['sondeX']);
     const y = Number(canvas.dataset['sondeY']);
+    const data = (canvas.getContext('2d') as CanvasRenderingContext2D).getImageData(x, y, 1, 1).data;
+    return [data[0] as number, data[1] as number, data[2] as number, data[3] as number];
+  },
+  /** Pixel du canvas au point (dx, dy), en rayons de la roue depuis son centre. */
+  pixelRelatif(dx: number, dy: number): [number, number, number, number] {
+    const { canvas } = roue;
+    const g = geometrie(canvas.getBoundingClientRect().width);
+    const k = canvas.width / g.taille;
+    const x = Math.round((g.centre + dx * g.rayon) * k);
+    const y = Math.round((g.centre + dy * g.rayon) * k);
     const data = (canvas.getContext('2d') as CanvasRenderingContext2D).getImageData(x, y, 1, 1).data;
     return [data[0] as number, data[1] as number, data[2] as number, data[3] as number];
   },

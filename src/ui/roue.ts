@@ -14,6 +14,7 @@ import {
   type ResultatLancer,
   type Vue,
 } from './roue-rotation';
+import { epaisseurJante, prerendreFixe } from './roue-relief';
 import './roue.css';
 
 export type { NomRoue } from './roue-rendu';
@@ -29,6 +30,8 @@ export interface OptionsRoue {
   source?: Source | undefined;
   /** Durée forcée, pour le harnais de test seulement. */
   dureeMs?: number | undefined;
+  /** Rendu en relief (F20) ; plat par défaut. */
+  relief?: boolean | undefined;
 }
 
 export interface Roue {
@@ -41,6 +44,9 @@ export interface Roue {
   readonly enRotation: boolean;
   /** Rotation au repos, dans [0, 360). */
   readonly rotation: number;
+  /** Active ou coupe le relief : redessine l'image pré-rendue, sans toucher à la rotation. */
+  definirRelief(actif: boolean): void;
+  readonly relief: boolean;
   readonly nombre: number;
   readonly peutLancer: boolean;
   readonly bouton: HTMLButtonElement;
@@ -82,6 +88,8 @@ export function creerRoue(conteneur: HTMLElement, options: OptionsRoue): Roue {
   bouton.textContent = TEXTS.roueLancer;
 
   const image = document.createElement('canvas');
+  const fixe = document.createElement('canvas');
+  let relief = options.relief ?? false;
   let noms: readonly NomRoue[] = [];
   let enAttente: readonly NomRoue[] | null = null;
   let tailleCss = 0;
@@ -127,14 +135,17 @@ export function creerRoue(conteneur: HTMLElement, options: OptionsRoue): Roue {
     vue = nouvelle;
     // Pendant un fondu, le bandeau suit l'image dominante : il ne révèle pas le gagnant d'avance.
     majBandeau(vue.fondu && vue.fondu.progression < 0.5 ? vue.fondu.depart : vue.rotation);
-    if (tailleCss > 0) dessinerImage(canvas, image, tailleCss, vue);
+    if (tailleCss > 0) dessinerImage(canvas, image, tailleCss, vue, relief ? fixe : null);
   }
 
   /** Redessine l'image pré-rendue : seulement à l'édition et au redimensionnement. */
   function repreparer(): void {
     window.clearTimeout(minuteur);
     if (tailleCss <= 0) return;
-    const corps = prerendre(image, noms, tailleCss, canvas.width);
+    const corps = prerendre(image, noms, tailleCss, canvas.width, relief);
+    // Sans relief, la couche fixe ne garde pas sa mémoire.
+    if (relief) prerendreFixe(fixe, tailleCss, canvas.width);
+    else fixe.width = 0;
     sansLibelles = noms.length >= 2 && corps < CORPS_MIN;
     bandeau.hidden = !sansLibelles;
     bandeau.style.top = `${String(geometrie(tailleCss).pointeY + 6)}px`;
@@ -160,7 +171,7 @@ export function creerRoue(conteneur: HTMLElement, options: OptionsRoue): Roue {
       repreparer();
       return;
     }
-    dessinerImage(canvas, image, css, vue);
+    dessinerImage(canvas, image, css, vue, relief ? fixe : null);
     window.clearTimeout(minuteur);
     minuteur = window.setTimeout(repreparer, REGROUPEMENT_PRERENDU);
   }
@@ -207,7 +218,10 @@ export function creerRoue(conteneur: HTMLElement, options: OptionsRoue): Roue {
   canvas.addEventListener('pointerup', (e) => {
     if (!geste.fin(e.pointerId, e.clientX, e.clientY)) return;
     const cadre = canvas.getBoundingClientRect();
-    if (estSurRoue(e.clientX - cadre.left, e.clientY - cadre.top, geometrie(cadre.width))) demander();
+    const g = geometrie(cadre.width);
+    // En relief, la jante fait partie de la roue visible.
+    const cible = relief ? { ...g, rayon: g.rayon + epaisseurJante(g) } : g;
+    if (estSurRoue(e.clientX - cadre.left, e.clientY - cadre.top, cible)) demander();
   });
 
   new ResizeObserver(ajusterTaille).observe(scene);
@@ -238,6 +252,14 @@ export function creerRoue(conteneur: HTMLElement, options: OptionsRoue): Roue {
       }
     },
     ecouter: (nom, rappel) => moteur.ecouter(nom, rappel),
+    definirRelief(actif) {
+      if (actif === relief) return;
+      relief = actif;
+      repreparer();
+    },
+    get relief() {
+      return relief;
+    },
     get enRotation() {
       return moteur.enRotation;
     },

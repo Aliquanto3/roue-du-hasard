@@ -8,6 +8,7 @@ import {
   separateurs,
   tronquer,
 } from './roue-geometrie';
+import { ombrerSecteurs } from './roue-relief';
 import type { Vue } from './roue-rotation';
 
 export interface NomRoue {
@@ -95,6 +96,7 @@ export function prerendre(
   noms: readonly NomRoue[],
   tailleCss: number,
   pixels: number,
+  relief = false,
 ): number {
   cible.width = pixels;
   cible.height = pixels;
@@ -114,6 +116,8 @@ export function prerendre(
     const couleurs = couleursSecteurs(noms);
     dessinerSecteurs(ctx, couleurs, rayonPx);
     dessinerSeparateurs(ctx, n, g.rayon, echelle);
+    // Relief : l'ombrage passe sous les libellés, qui gardent leur couleur et leur contraste.
+    if (relief) ombrerSecteurs(ctx, g.rayon, echelle);
     corps = corpsLibelle(g.rayon, n);
     if (corps >= CORPS_MIN) dessinerLibelles(ctx, noms, couleurs, corps, tailleCss, echelle);
   }
@@ -146,12 +150,13 @@ function dessinerPointeur(ctx: CanvasRenderingContext2D, tailleCss: number, eche
   ctx.stroke();
 }
 
-/** Compose une image : seule l'image pré-rendue tourne, le pointeur reste dessiné par-dessus. */
+/** Compose une image : seule l'image pré-rendue tourne ; le pointeur (ou la couche fixe du relief) reste par-dessus. */
 export function dessinerImage(
   canvas: HTMLCanvasElement,
   image: HTMLCanvasElement,
   tailleCss: number,
   vue: Vue,
+  fixe: HTMLCanvasElement | null = null,
 ): void {
   const ctx = contexte(canvas);
   const cote = canvas.width;
@@ -171,5 +176,11 @@ export function dessinerImage(
     poser(vue.rotation, 1);
   }
   ctx.globalAlpha = 1;
-  dessinerPointeur(ctx, tailleCss, cote / tailleCss);
+  if (fixe) {
+    // Relief : une seule image fixe de plus (ombre, jante, reflet, moyeu, pointeur).
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.drawImage(fixe, 0, 0, cote, cote);
+  } else {
+    dessinerPointeur(ctx, tailleCss, cote / tailleCss);
+  }
 }
