@@ -43,3 +43,27 @@ Au plus 2 stories en développement à la fois
 ## Journal
 
 - 2026-10-31 · cadrage · décision · spec, stories et plan de run rédigés ·
+- 2026-10-31 09:46 · 1.1 · décision · dépôt public Aliquanto3/roue-du-hasard créé · 93ff8bd
+- 2026-10-31 09:46 · 1.1 · dev · lancé ·
+- 2026-10-31 09:49 · 1.1 · dev · fini · 20d792b
+- 2026-10-31 09:51 · 1.1 · second-avis · 2 medium, 5 low · 20d792b
+- 2026-10-31 10:00 · 1.1 · review · 3 medium et 5 low corrigés · e8808a1
+- 2026-10-31 10:00 · 1.1 · CI · verte, 9 jobs sur 9 · e8808a1
+- 2026-10-31 10:00 · 1.1 · fusion · PR #1 fusionnée · 45cdc97
+- 2026-10-31 10:00 · 1.2 · dev · lancé ·
+- 2026-10-31 10:00 · 1.3 · dev · lancé ·
+- 2026-10-31 10:02 · 1.3 · dev · fini, PR #2 ouverte, écart sur le seuil de la spec · c194574
+- 2026-10-31 10:02 · 1.3 · décision · seuil de voisinage lu à une décimale (17,95, mesure 17,96), ordre du tableau conservé, à signaler à Anaël ·
+- 2026-10-31 10:03 · 1.3 · dev · fini, correctif du seuil poussé · 370ad40
+- 2026-10-31 10:04 · 1.2 · dev · fini, PR #3 ouverte · b395d34
+- 2026-10-31 10:06 · 1.3 · second-avis · 1 medium (formulation de la spec), 7 low · 370ad40
+- 2026-10-31 10:07 · 1.2 · second-avis · 2 medium, 9 low · b395d34
+- 2026-10-31 10:09 · 1.3 · review · 1 medium et 3 low corrigés, 1 low reporté à 3.1 (couleur importée) · 8216a2f
+- 2026-10-31 10:12 · 1.2 · review · 3 medium et 1 low corrigés · e9a237f
+- 2026-10-31 10:12 · 1.2 · décision · limites d'import (100 000 éléments, 5 M caractères) à retirer en 3.1 pour respecter F2 et F15, avec contrôle de taille du fichier avant lecture ·
+- 2026-10-31 10:12 · 1.2 · report · 3.1 : persistance sans double encodage (exporter renvoie une chaîne) ; 2.3 : message après recommencement si tous les noms sont retirés ·
+- 2026-10-31 10:12 · 1.3 · CI · verte, 9 jobs sur 9 · 8216a2f
+- 2026-10-31 10:12 · 1.3 · fusion · PR #2 fusionnée · 265a70c
+- 2026-10-31 10:17 · 1.2 · CI · verte, 9 jobs sur 9 · e9a237f
+- 2026-10-31 10:17 · 1.2 · fusion · PR #3 fusionnée · dd33bf8
+- 2026-10-31 10:18 · 2.1 · dev · lancé ·
