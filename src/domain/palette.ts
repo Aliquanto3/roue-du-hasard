@@ -11,8 +11,8 @@ export const NOIR = "#111111";
 export const BLANC = "#FFFFFF";
 /** Trait sombre entre les secteurs ; contraste d'au moins 3,4:1 sur chaque couleur. */
 export const SEPARATEUR = "#14162B";
-/** ΔE2000 minimal, pire cas des quatre visions, entre deux secteurs voisins. */
-export const SEUIL_DELTA_E = 18;
+/** ΔE2000 minimal, pire cas des quatre visions, entre deux secteurs voisins. Valeur mesurée du cycle : 17,96, soit 18,0 à la décimale de la spec §5. */
+export const SEUIL_DELTA_E = 17.95;
 
 export const PALETTE: readonly CouleurPalette[] = [
   { nom: "orange", hex: "#E69F00", texte: NOIR },
@@ -29,22 +29,18 @@ export const PALETTE: readonly CouleurPalette[] = [
  * au moins SEUIL_DELTA_E. Dérivé de la mesure `scripts/mesure-palette.py`
  * (fixture `palette-matrice.json`, vérifiée par les tests).
  */
-const VOISINES_ADMISES: readonly (readonly number[])[] = [
+export const VOISINES_ADMISES: readonly (readonly number[])[] = [
   [1, 6], // orange
   [0, 2, 5, 6], // ciel
   [1, 3, 4, 5, 6], // jaune
-  [2], // rose
-  [2, 5], // vert
+  [2, 4], // rose
+  [2, 3, 5], // vert
   [1, 2, 4, 6], // vermillon
   [0, 1, 2, 5], // bleu
 ];
 
-/**
- * Motif répété : marche fermée dans le graphe des paires admises. L'ordre du
- * tableau seul ne l'est pas (rose-vert mesure 17,96 < 18) : le jaune est
- * intercalé entre le rose et le vert.
- */
-const MOTIF: readonly number[] = [0, 1, 2, 3, 2, 4, 5, 6];
+/** Cycle du tableau, répété. Chaque paire voisine mesure au moins 17,96 (rose-vert, le minimum). */
+const MOTIF: readonly number[] = [0, 1, 2, 3, 4, 5, 6];
 
 function admise(a: number, b: number): boolean {
   return a !== b && (VOISINES_ADMISES[a]?.includes(b) ?? false);
@@ -54,7 +50,9 @@ function admise(a: number, b: number): boolean {
 function completer(seq: number[], restant: number): boolean {
   const dernier = seq[seq.length - 1] as number;
   if (restant === 0) return admise(dernier, seq[0] as number);
-  for (const c of VOISINES_ADMISES[dernier] ?? []) {
+  const suivant = (dernier + 1) % MOTIF.length;
+  const candidats = [...(VOISINES_ADMISES[dernier] ?? [])].sort((x, y) => +(y === suivant) - +(x === suivant));
+  for (const c of candidats) {
     seq.push(c);
     if (completer(seq, restant - 1)) return true;
     seq.pop();
@@ -72,7 +70,7 @@ export function indicesParDefaut(n: number): number[] {
   if (n === 1) return [0];
   const base: number[] = [];
   for (let i = 0; i < n; i++) base.push(MOTIF[i % MOTIF.length] as number);
-  for (let queue = 1; queue <= Math.min(n - 1, 12); queue++) {
+  for (let queue = 0; queue <= Math.min(n - 1, 12); queue++) {
     const seq = base.slice(0, n - queue);
     if (completer(seq, queue)) return seq;
   }

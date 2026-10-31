@@ -10,6 +10,7 @@ import {
   couleurTexte,
   couleursParDefaut,
   indicesParDefaut,
+  VOISINES_ADMISES,
 } from "./palette";
 
 const { matrice, couleurs, minToutesPaires, minCycle } = matriceJson as {
@@ -41,6 +42,12 @@ describe("fixture de mesure CVD", () => {
     expect(minToutesPaires).toBeCloseTo(7.9, 1);
     expect(matrice[0]![3]).toBeCloseTo(7.93, 2); // orange-rose
     expect(minCycle).toBeCloseTo(18.0, 1); // 17,96 mesuré
+  });
+  it("la table des voisines admises correspond exactement aux paires >= seuil", () => {
+    const attendu = matrice.map((l, i) =>
+      l.flatMap((v, j) => (i !== j && v >= SEUIL_DELTA_E ? [j] : [])),
+    );
+    expect(VOISINES_ADMISES.map((l) => [...l].sort((a, b) => a - b))).toEqual(attendu);
   });
   it("est symétrique à diagonale nulle", () => {
     matrice.forEach((l, i) =>
@@ -78,6 +85,20 @@ describe("couleursParDefaut", () => {
       const seq = couleursParDefaut(n);
       expect(seq).toHaveLength(n);
       verifierVoisines(seq);
+    }
+  });
+  it("n multiple de 7 : exactement le cycle du tableau", () => {
+    for (const n of [7, 14, 70, 700, 7000]) {
+      const attendu = Array.from({ length: n }, (_, i) => PALETTE[i % 7]!.hex);
+      expect(couleursParDefaut(n)).toEqual(attendu);
+    }
+  });
+  it("seule la fin est ajustée (au plus 12 secteurs)", () => {
+    for (let n = 14; n <= 300; n++) {
+      const idx = indicesParDefaut(n);
+      let k = 0;
+      while (k < n && idx[k] === k % 7) k++;
+      expect(n - k, `n=${n}`).toBeLessThanOrEqual(12);
     }
   });
   it("le motif est suivi jusqu'à la fin ajustée", () => {
