@@ -1,5 +1,5 @@
 project: roue-du-hasard
-last_updated: 2026-10-31 13:05
+last_updated: 2026-10-31 13:53
 development_status:
   1-1-socle: done
   1-2-domaine-etat-tirage: done
@@ -9,12 +9,10 @@ development_status:
   2-2-panneau-configuration: done
   2-3-annonce-historique: done
   2-4a-relief-rendu: done
-  2-4-relief-roue: in-progress
+  2-4-relief-roue: done
   3-1a-import-export-modules: done
-  3-1-import-export: in-progress
+  3-1-import-export: done
   3-2a-son-confettis-modules: done
-  3-2-son-confettis: in-progress
-  3-3-mode-projection: backlog
-  4-1-recette-automatisee: backlog
+  3-2-son-confettis: done
+  4-1-recette-automatisee: done
   4-2a-readme-qr: done
-  4-2-distribution: backlog
