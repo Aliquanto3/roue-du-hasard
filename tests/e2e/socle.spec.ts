@@ -15,7 +15,8 @@ test('le fichier construit s’exécute en file:// sans requête réseau', async
 
   await page.goto(url);
   await expect(page.locator('#app')).toHaveAttribute('data-ready', 'true');
-  await expect(page.locator('#app')).toHaveText('Prêt');
+  await expect(page.locator('#app canvas')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Lancer la roue' })).toBeVisible();
   await expect(page).toHaveTitle('Roue du hasard');
   expect(await page.locator('html').getAttribute('lang')).toBe('fr');
 

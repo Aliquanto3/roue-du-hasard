@@ -11,5 +11,6 @@ Application web en un seul fichier HTML : une roue désigne qui reçoit un cadea
 ## Commandes
 - Lint : `npm run lint` ; types : `npm run typecheck` ; tests unitaires : `npm test` (ciblé : `npx vitest run src/<fichier>.test.ts`).
 - Construction : `npm run build` (produit `dist/roue.html`) ; taille et ressources externes : `npm run check:size`.
-- E2E sur le fichier construit : `npm run test:e2e -- --project=chromium` (build d'abord ; en local seul chromium est installé).
+- E2E (construit `dist/` et `dist-harnais/`) : `npm run test:e2e:chromium`, seul moteur installé en local. Sous PowerShell, `npm.ps1` retire le `--` de `npm run test:e2e -- --project=…` : le filtre serait perdu.
+- Harnais de la roue, hors livraison : `npm run harnais` (`http://localhost:5199/?n=10`) ; `npm run build:harnais` construit `dist-harnais/`.
 Contrôle rapide avant chaque rapport : `uv run --no-project python .claude/cost-kit/controle_rapide.py` (ESLint et `tsc --noEmit`).
