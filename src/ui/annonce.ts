@@ -95,7 +95,13 @@ export function creerAnnonce(conteneur: HTMLElement, options: OptionsAnnonce): A
     boite = null;
     arriere.inert = false;
     if (opt.restaurerFocus === false) return;
-    const cible = origine?.isConnected ? origine : options.focusParDefaut();
+    // L'élément d'origine peut avoir disparu, être caché (bouton « sans rotation ») ou désactivé.
+    const utilisable =
+      origine?.isConnected === true &&
+      origine.getClientRects().length > 0 &&
+      origine.getAttribute('aria-disabled') !== 'true' &&
+      !(origine instanceof HTMLButtonElement && origine.disabled);
+    const cible = origine && utilisable ? origine : options.focusParDefaut();
     cible.focus();
     origine = null;
   }

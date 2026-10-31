@@ -240,6 +240,8 @@ export function creerHistorique(conteneur: HTMLElement, actions: Actions, roue: 
   });
 
   roue.ecouter('debut', () => {
+    // Une confirmation restée ouverte effacerait aussi le tirage à venir, que l'utilisateur n'a pas vu.
+    if (!confirmation.hidden) fermerConfirmation(false);
     appliquerVerrou(true);
   });
   roue.ecouter('fin', () => {

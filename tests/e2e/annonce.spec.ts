@@ -376,6 +376,8 @@ test('un nom et un cadeau : attribution sans rotation', async ({ page }) => {
   await expect(page.locator('.cadeaux')).toHaveAttribute('data-verrou', 'false');
   await expect(relancer(page)).toHaveAttribute('aria-disabled', 'true');
   await fermer(page).click();
+  // Le bouton d'origine est caché : le focus revient au bouton de lancement, pas à la page.
+  await expect(boutonLancer(page)).toBeFocused();
   await expect(rangsHistorique(page)).toHaveCount(1);
   await expect(sansRotation).toBeHidden();
   await expect(page.locator('.cadeaux__recap')).toBeVisible();
@@ -593,6 +595,21 @@ test('historique : copie, repli si le presse-papiers est refusé, effacement ave
   // Les cadeaux déjà attribués le restent.
   await expect(page.locator('.cadeaux .carte__compteur')).toHaveText('2 attribués sur 2');
   expect(dialoguesNatifs).toEqual([]);
+});
+
+test('la confirmation d’effacement se ferme quand une rotation démarre : le nouveau tirage est conservé', async ({
+  page,
+}) => {
+  await ouvrir(page);
+  await ajouterNoms(page, 'Ana\nBob');
+  await lancerEtAnnoncer(page);
+  await fermer(page).click();
+  await page.getByRole('button', { name: 'Effacer l’historique' }).click();
+  await expect(page.getByRole('alertdialog')).toBeVisible();
+  await boutonLancer(page).click();
+  await expect(page.getByRole('alertdialog')).toBeHidden();
+  await expect(dialogue(page)).toBeVisible({ timeout: 10_000 });
+  await expect(rangsHistorique(page)).toHaveCount(2);
 });
 
 test('plusieurs centaines de lignes d’historique : le panneau reste utilisable', async ({ page }) => {
