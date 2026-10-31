@@ -1,17 +1,20 @@
 project: roue-du-hasard
-last_updated: 2026-10-31 11:00
+last_updated: 2026-10-31 13:05
 development_status:
   1-1-socle: done
   1-2-domaine-etat-tirage: done
   1-3-domaine-couleurs: done
+  1-3a-couleurs-distinctes: done
   2-1-roue-canvas-rotation: done
-  2-2-panneau-configuration: in-progress
-  2-3-annonce-historique: backlog
-  2-4-relief-roue: backlog
-  3-1a-import-export-modules: in-progress
-  3-1-import-export: backlog
-  3-2a-son-confettis-modules: in-progress
-  3-2-son-confettis: backlog
+  2-2-panneau-configuration: done
+  2-3-annonce-historique: done
+  2-4a-relief-rendu: done
+  2-4-relief-roue: in-progress
+  3-1a-import-export-modules: done
+  3-1-import-export: in-progress
+  3-2a-son-confettis-modules: done
+  3-2-son-confettis: in-progress
   3-3-mode-projection: backlog
   4-1-recette-automatisee: backlog
+  4-2a-readme-qr: done
   4-2-distribution: backlog
