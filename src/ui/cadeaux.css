@@ -1,0 +1,86 @@
+/* Cadeaux (F11, F12) : liste, phrase avant le lancement, récapitulatif. */
+.cadeaux__liste {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cadeaux__liste:empty {
+  display: none;
+}
+.cadeau {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.cadeau__etat {
+  flex: 0 0 4.75rem;
+  color: var(--texte-doux);
+  font-size: 0.875rem;
+}
+.cadeau__nom {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0.5rem 0.75rem;
+  border: 2px solid var(--bord);
+  border-radius: 0.5rem;
+  background: var(--champ);
+  color: var(--texte);
+  font: inherit;
+}
+.cadeau[data-attribue='true'] .cadeau__nom {
+  border-style: dashed;
+}
+.cadeaux__avant {
+  display: grid;
+  gap: 0.5rem;
+  justify-items: center;
+  margin-top: 0.5rem;
+}
+.cadeaux__avant[hidden],
+.cadeaux__recap[hidden],
+.cadeaux__sans-rotation[hidden],
+.cadeaux__prochain[hidden],
+.carte__compteur[hidden] {
+  display: none;
+}
+.cadeaux__prochain {
+  margin: 0;
+  max-width: 100%;
+  font-weight: 700;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.cadeaux__sans-rotation {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+/* La phrase prend de la place : la roue en laisse un peu plus pour que roue et bouton restent entiers. */
+.page--cadeaux {
+  --taille-roue-max: calc(100vh - 15rem);
+  --taille-roue-max: calc(100dvh - 15rem);
+}
+.cadeaux__recap {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 2px solid var(--accent);
+  border-radius: 0.75rem;
+  background: var(--surface);
+  color: var(--texte);
+}
+.cadeaux__recap-titre {
+  margin: 0;
+  font-size: 1.125rem;
+}
+.cadeaux__recap-liste {
+  max-height: 12rem;
+  margin: 0;
+  padding-left: 1.25rem;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+}

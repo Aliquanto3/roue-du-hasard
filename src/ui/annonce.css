@@ -1,0 +1,124 @@
+/* Annonce du résultat (F9) : boîte modale centrée, nom jamais tronqué. */
+.visuellement-cache {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.annonce {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  padding: max(0.75rem, env(safe-area-inset-top)) max(0.75rem, env(safe-area-inset-right))
+    max(0.75rem, env(safe-area-inset-bottom)) max(0.75rem, env(safe-area-inset-left));
+  background: rgb(10 11 24 / 0.82);
+  overflow-y: auto;
+}
+.annonce__boite {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.75rem;
+  width: min(100%, 48rem);
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 1.25rem;
+  border: 2px solid var(--bord);
+  border-radius: 1rem;
+  background: var(--surface);
+  color: var(--texte);
+  text-align: center;
+}
+/* Le focus arrive sur la boîte par programme : l'anneau est réservé aux boutons. */
+.annonce__boite:focus {
+  outline: none;
+}
+.annonce__titre {
+  margin: 0;
+  font-size: 1.125rem;
+  line-height: 1.75rem;
+  color: var(--texte-doux);
+}
+.annonce__etiquette,
+.annonce__cadeau,
+.annonce__note {
+  margin: 0;
+}
+.annonce__etiquette {
+  color: var(--texte-doux);
+}
+.annonce__nom {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.75rem;
+  font-size: clamp(1.75rem, 8vw, 4.5rem);
+  font-weight: 800;
+  line-height: 1.15;
+  /* Un nom de 60 caractères sans espace se coupe, il n'est jamais tronqué ni débordant. */
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.annonce__cadeau {
+  font-size: clamp(1.25rem, 4vw, 2rem);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.annonce__note {
+  color: var(--alerte);
+  font-weight: 600;
+}
+.annonce__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: center;
+}
+.annonce__bouton {
+  min-width: 44px;
+  min-height: 48px;
+  padding: 0.5rem 1.5rem;
+  border: 3px solid var(--bord);
+  border-radius: 999px;
+  background: var(--champ);
+  color: var(--texte);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.annonce__bouton--principal {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--sur-accent);
+}
+.annonce__bouton:focus-visible {
+  outline: 4px solid var(--focus);
+  outline-offset: 4px;
+}
+.annonce__bouton[aria-disabled='true'] {
+  border-style: dashed;
+  border-color: var(--bord);
+  background: transparent;
+  color: var(--texte-doux);
+  cursor: not-allowed;
+}
+/* Apparition animée seulement si le système ne demande pas de mouvement réduit. */
+@media (prefers-reduced-motion: no-preference) {
+  .annonce__boite {
+    animation: annonce-entree 250ms ease-out;
+  }
+}
+@keyframes annonce-entree {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}

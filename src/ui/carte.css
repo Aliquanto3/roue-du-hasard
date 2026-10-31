@@ -1,0 +1,37 @@
+/* Cartes secondaires du panneau (cadeaux, historique) : même aspect que `.panneau`, classes distinctes. */
+.carte {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--bord);
+  border-radius: 0.75rem;
+  background: var(--surface);
+  color: var(--texte);
+}
+.carte__compteur {
+  margin: 0;
+  font-weight: 700;
+}
+.carte__vide {
+  margin: 0;
+  color: var(--texte-doux);
+  font-size: 0.9375rem;
+}
+.carte__vide[hidden] {
+  display: none;
+}
+.carte__statut {
+  margin: 0;
+  min-height: 1.5rem;
+  color: var(--texte-doux);
+  overflow-wrap: anywhere;
+}
+.carte[data-verrou='true'] :is(input, textarea, button) {
+  cursor: not-allowed;
+}
+.carte[data-verrou='true'] button[aria-disabled='true'] {
+  border-style: dashed;
+  color: var(--texte-doux);
+}

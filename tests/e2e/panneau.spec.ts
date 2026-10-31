@@ -257,6 +257,8 @@ test('parcours au clavier seul, du premier champ au lancement', async ({ page, b
   await page.keyboard.press('Space');
   await expect(boutonLancer(page)).toHaveAttribute('aria-disabled', 'true');
   await expect(boutonLancer(page)).toHaveAttribute('aria-disabled', 'false', { timeout: 10_000 });
+  // L'annonce prend le focus à l'arrêt ; Échap la ferme et rend le focus au bouton de lancement.
+  await page.keyboard.press('Escape');
   await expect(boutonLancer(page)).toBeFocused();
 });
 
@@ -297,7 +299,8 @@ test('pendant la rotation, l’édition est verrouillée sans perdre le focus, p
 
   await expect(panneau).toHaveAttribute('data-verrou', 'false', { timeout: 10_000 });
   await expect(statut(page)).toHaveText('Rotation terminée : la liste peut de nouveau être modifiée.');
-  // Le focus n'a pas bougé pendant ni après le verrou.
+  // L'annonce s'ouvre à l'arrêt et prend le focus ; à sa fermeture, il revient au champ d'avant.
+  await page.getByRole('button', { name: 'Fermer' }).click();
   await expect(champAjout(page)).toBeFocused();
   await expect(champAjout(page)).toHaveJSProperty('readOnly', false);
   await noms(page).nth(0).fill('Anaïs');

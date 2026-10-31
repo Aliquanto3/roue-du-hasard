@@ -139,6 +139,18 @@ describe('verrou F8 : toute action est refusée pendant une rotation', () => {
     reinitialiserCouleur: { id: 'p1' },
     reinitialiserCouleurs: {},
     lancer: {},
+    enregistrerTirage: { index: 0 },
+    fermerAnnonce: {},
+    relancer: {},
+    ajouterCadeau: { nom: 'Bougie' },
+    collerCadeaux: { texte: 'A,B' },
+    renommerCadeau: { index: 0, nom: 'Z' },
+    supprimerCadeau: { index: 0 },
+    recommencerAttributions: {},
+    effacerHistorique: {},
+    annulerDernierTirage: {},
+    definirRetirerGagnants: { valeur: true },
+    attribuerSansRotation: {},
   };
 
   for (const nom of Object.keys(params) as NomAction[]) {
