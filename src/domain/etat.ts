@@ -33,6 +33,8 @@ export interface Etat {
   readonly historique: readonly Tirage[];
   readonly retirerGagnants: boolean;
   readonly sonCoupe: boolean;
+  /** Rendu en relief (F20) ; plat si faux. */
+  readonly relief: boolean;
   readonly prochainId: number;
 }
 
@@ -56,6 +58,7 @@ export function etatInitial(): Etat {
     historique: [],
     retirerGagnants: false,
     sonCoupe: false,
+    relief: true,
     prochainId: 1,
   };
 }
@@ -272,4 +275,8 @@ export function definirRetirerGagnants(etat: Etat, valeur: boolean): Etat {
 
 export function definirSonCoupe(etat: Etat, valeur: boolean): Etat {
   return { ...etat, sonCoupe: valeur };
+}
+
+export function definirRelief(etat: Etat, valeur: boolean): Etat {
+  return etat.relief === valeur ? etat : { ...etat, relief: valeur };
 }

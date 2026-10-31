@@ -55,8 +55,8 @@ body {
 }
 
 .page {
-  --taille-roue-max: calc(100vh - 10.5rem);
-  --taille-roue-max: calc(100dvh - 10.5rem);
+  --taille-roue-max: calc(100vh - 13.75rem);
+  --taille-roue-max: calc(100dvh - 13.75rem);
   display: grid;
   gap: 1rem;
   max-width: 110rem;
@@ -98,8 +98,8 @@ body {
 /* Écran bas (téléphone en paysage) : le titre reste pour les lecteurs d'écran, la roue gagne la place. */
 @media (max-height: 32rem) {
   .page {
-    --taille-roue-max: calc(100vh - 9rem);
-    --taille-roue-max: calc(100dvh - 9rem);
+    --taille-roue-max: calc(100vh - 12.25rem);
+    --taille-roue-max: calc(100dvh - 12.25rem);
     gap: 0.5rem;
   }
   .page__titre {
@@ -110,4 +110,25 @@ body {
     clip-path: inset(50%);
     white-space: nowrap;
   }
+}
+
+/* Avis de sauvegarde indisponible (F14) : discret, mais lisible. */
+.donnees__avis {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--alerte);
+  border-radius: 0.5rem;
+  color: var(--alerte);
+  font-weight: 600;
+}
+.donnees__avis[hidden] {
+  display: none;
+}
+
+/* Confettis (F17) : au-dessus de la boîte d'annonce, sans jamais capter un clic. */
+.confettis {
+  position: fixed;
+  inset: 0;
+  z-index: 11;
+  pointer-events: none;
 }

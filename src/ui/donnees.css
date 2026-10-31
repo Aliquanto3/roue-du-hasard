@@ -1,0 +1,20 @@
+/* Sauvegarde et échange (F14, F15). */
+.donnees__barre {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.donnees__confirmation {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border: 2px solid var(--alerte);
+  border-radius: 0.5rem;
+}
+.donnees__confirmation[hidden] {
+  display: none;
+}
+.donnees__confirmation-titre {
+  margin: 0;
+  font-weight: 700;
+}

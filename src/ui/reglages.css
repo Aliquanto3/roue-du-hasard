@@ -1,0 +1,8 @@
+/* Réglages près de la roue : toujours visibles, cibles de 44 px. */
+.reglages {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}

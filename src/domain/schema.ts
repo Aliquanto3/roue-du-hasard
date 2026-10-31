@@ -41,6 +41,7 @@ export function exporter(etat: Etat): string {
     })),
     retirerGagnants: etat.retirerGagnants,
     sonCoupe: etat.sonCoupe,
+    relief: etat.relief,
     prochainId: etat.prochainId,
   });
 }
@@ -143,6 +144,8 @@ function construire(racine: Record<string, unknown>): Etat {
     historique,
     retirerGagnants: booleen(champ(racine, "retirerGagnants")),
     sonCoupe: booleen(champ(racine, "sonCoupe")),
+    // Champ absent : relief par défaut (aucune version n'est publiée, la version reste 1).
+    relief: champ(racine, "relief") === undefined ? true : booleen(champ(racine, "relief")),
     prochainId: entier(champ(racine, "prochainId"), max + 1, PROCHAIN_ID_MAX),
   };
 }

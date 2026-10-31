@@ -114,7 +114,42 @@ export const TEXTS = {
       v ? 'Les gagnants seront retirés de la roue.' : 'Les gagnants restent dans la roue.',
   },
 
+  // --- Réglages près de la roue (F16, F20) ---
+  reglages: {
+    groupe: 'Réglages de la roue',
+    relief: (actif: boolean): string => `Relief : ${actif ? 'activé' : 'désactivé'}`,
+    son: (coupe: boolean): string => `Son : ${coupe ? 'coupé' : 'activé'}`,
+    statutRelief: (actif: boolean): string => (actif ? 'Relief activé.' : 'Rendu plat activé.'),
+    statutSon: (coupe: boolean): string => (coupe ? 'Son coupé.' : 'Son rétabli.'),
+  },
+
+  // --- Conservation et échange (F14, F15) ---
+  donnees: {
+    titre: 'Sauvegarde et échange',
+    aide: 'La liste, les cadeaux, l’historique et les options sont conservés dans ce navigateur.',
+    exporter: 'Exporter',
+    importer: 'Importer',
+    fichierLibelle: 'Fichier à importer',
+    avisSansSauvegarde:
+      'La sauvegarde automatique est indisponible dans ce navigateur : exportez régulièrement votre liste pour ne pas la perdre.',
+    statutExporte: 'Fichier exporté.',
+    statutImporte: 'Fichier importé.',
+    confirmationTitre: 'Remplacer les données actuelles par celles du fichier ?',
+    confirmationAide: 'La liste, les cadeaux, l’historique et les options actuels seront remplacés.',
+    confirmer: 'Remplacer',
+    garder: 'Garder',
+    erreurs: {
+      'fichier-trop-gros': 'Ce fichier est trop gros pour être importé.',
+      'fichier-illisible': 'Ce fichier ne peut pas être lu.',
+      'json-invalide': 'Ce fichier n’est pas un fichier JSON valide.',
+      'format-invalide': 'Ce fichier n’est pas un export de la roue du hasard.',
+      'version-inconnue': 'Ce fichier vient d’une version inconnue de la roue du hasard.',
+      'donnees-invalides': 'Le contenu de ce fichier est invalide. Rien n’a été modifié.',
+    },
+  },
+
   refus: {
+    'rendu-invalide': 'Ce rendu n’existe pas.',
     'rotation-en-cours': 'Rotation en cours : la liste ne peut pas être modifiée.',
     'annonce-fermee': 'Aucune annonce n’est ouverte.',
     'annonce-ouverte': 'Fermez d’abord l’annonce du résultat.',

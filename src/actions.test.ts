@@ -151,9 +151,15 @@ describe('verrou F8 : toute action est refusée pendant une rotation', () => {
     annulerDernierTirage: {},
     definirRetirerGagnants: { valeur: true },
     attribuerSansRotation: {},
+    basculerRendu: { mode: '2d' },
+    couperSon: { coupe: true },
+    exporter: {},
+    importer: { etat: etatInitial() },
   };
+  // Réglages d'affichage et de son : permis pendant une rotation (testés plus bas).
+  const REGLAGES: readonly NomAction[] = ['basculerRendu', 'couperSon'];
 
-  for (const nom of Object.keys(params) as NomAction[]) {
+  for (const nom of (Object.keys(params) as NomAction[]).filter((n) => !REGLAGES.includes(n))) {
     it(`${nom} renvoie rotation-en-cours et ne change rien`, () => {
       const b = banc();
       b.actions.executer('coller', { texte: 'Ana,Bob' });
@@ -172,7 +178,68 @@ describe('verrou F8 : toute action est refusée pendant une rotation', () => {
     for (const [cle, action] of Object.entries(ACTIONS)) {
       expect(action.nom).toBe(cle);
       expect(action.description).not.toBe('');
-      expect(action.refusPossibles).toContain('rotation-en-cours');
+      if (!REGLAGES.includes(cle as NomAction)) expect(action.refusPossibles).toContain('rotation-en-cours');
     }
+  });
+});
+
+describe('rendu, son, export et import', () => {
+  it('basculerRendu mémorise 2d/3d dans l’état, relief par défaut, et refuse un autre mode', () => {
+    const b = banc();
+    expect(b.actions.magasin.lire().relief).toBe(true);
+    expect(b.actions.executer('basculerRendu', { mode: '2d' })).toEqual({ ok: true });
+    expect(b.actions.magasin.lire().relief).toBe(false);
+    expect(b.actions.executer('basculerRendu', { mode: '3d' })).toEqual({ ok: true });
+    expect(b.actions.magasin.lire().relief).toBe(true);
+    const avant = b.actions.magasin.lire();
+    expect(b.actions.executer('basculerRendu', { mode: 'plat' as '2d' })).toEqual({ ok: false, code: 'rendu-invalide' });
+    expect(b.actions.magasin.lire()).toBe(avant);
+  });
+
+  it('basculerRendu et couperSon restent permis pendant une rotation', () => {
+    const b = banc();
+    b.rotation.active = true;
+    expect(b.actions.executer('basculerRendu', { mode: '2d' })).toEqual({ ok: true });
+    expect(b.actions.executer('couperSon', { coupe: true })).toEqual({ ok: true });
+    expect(b.actions.magasin.lire()).toMatchObject({ relief: false, sonCoupe: true });
+  });
+
+  it('couperSon mémorise le choix et ne notifie pas si rien ne change', () => {
+    const b = banc();
+    let notifications = 0;
+    b.actions.magasin.abonner(() => (notifications += 1));
+    b.actions.executer('couperSon', { coupe: true });
+    b.actions.executer('couperSon', { coupe: true });
+    expect(b.actions.magasin.lire().sonCoupe).toBe(true);
+    expect(notifications).toBe(1);
+    b.actions.executer('couperSon', { coupe: false });
+    expect(b.actions.magasin.lire().sonCoupe).toBe(false);
+  });
+
+  it('exporter remet l’état courant au téléchargement', () => {
+    const magasin = creerMagasin();
+    const reçus: Etat[] = [];
+    const actions = creerActions({ magasin, enRotation: () => false, lancer: () => undefined, telecharger: (e) => reçus.push(e) });
+    actions.executer('coller', { texte: 'Ana' });
+    expect(actions.executer('exporter', {})).toEqual({ ok: true });
+    expect(reçus).toEqual([magasin.lire()]);
+  });
+
+  it('exporter et importer sont refusés pendant une rotation, sans rien changer', () => {
+    const reçus: Etat[] = [];
+    const magasin = creerMagasin();
+    const actions = creerActions({ magasin, enRotation: () => true, lancer: () => undefined, telecharger: (e) => reçus.push(e) });
+    expect(actions.executer('exporter', {})).toEqual({ ok: false, code: 'rotation-en-cours' });
+    expect(actions.executer('importer', { etat: { ...etatInitial(), cadeaux: ['X'] } })).toEqual({ ok: false, code: 'rotation-en-cours' });
+    expect(reçus).toEqual([]);
+    expect(magasin.lire().cadeaux).toEqual([]);
+  });
+
+  it('importer remplace tout l’état', () => {
+    const b = banc();
+    b.actions.executer('coller', { texte: 'Ana,Bob' });
+    const importe: Etat = { ...etatInitial(), cadeaux: ['Livre'], relief: false, sonCoupe: true };
+    expect(b.actions.executer('importer', { etat: importe })).toEqual({ ok: true });
+    expect(b.actions.magasin.lire()).toBe(importe);
   });
 });

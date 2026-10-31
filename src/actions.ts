@@ -13,7 +13,9 @@ import {
   coller,
   collerCadeaux,
   definirCouleur,
+  definirRelief,
   definirRetirerGagnants,
+  definirSonCoupe,
   effacerHistorique,
   enregistrerTirage,
   etatInitial,
@@ -42,7 +44,8 @@ export type CodeRefus =
   | 'annonce-fermee'
   | 'annonce-ouverte'
   | 'historique-vide'
-  | 'attribution-impossible';
+  | 'attribution-impossible'
+  | 'rendu-invalide';
 
 /** Ce que montre l'annonce d'un tirage (F9). */
 export interface InfoAnnonce {
@@ -128,6 +131,14 @@ export interface ParametresActions {
   annulerDernierTirage: Record<string, never>;
   definirRetirerGagnants: { readonly valeur: boolean };
   attribuerSansRotation: Record<string, never>;
+  /** Relief (`3d`, par défaut) ou rendu plat (`2d`) de la roue (F20). */
+  basculerRendu: { readonly mode: "2d" | "3d" };
+  /** Coupe ou rétablit le son (F16) ; le choix est mémorisé. */
+  couperSon: { readonly coupe: boolean };
+  /** Télécharge l'état en fichier JSON (F15). */
+  exporter: Record<string, never>;
+  /** Remplace tout l'état par un état déjà lu et validé (`lireFichierImport`) ; la confirmation est demandée par l'interface. */
+  importer: { readonly etat: Etat };
 }
 
 export type NomAction = keyof ParametresActions;
@@ -143,6 +154,8 @@ export interface Contexte {
   tirer?: (n: number) => number;
   /** Annonce du résultat ; absente (jamais ouverte) en test. */
   annonce?: ControleAnnonce;
+  /** Déclenche le téléchargement de l'export ; absent en test. */
+  telecharger?: (etat: Etat) => void;
   /** Horloge des tirages ; `new Date()` par défaut. */
   maintenant?: () => Date;
 }
@@ -376,6 +389,44 @@ export const ACTIONS: { readonly [N in NomAction]: Action<N> } = {
       return OK;
     },
   },
+  basculerRendu: {
+    nom: 'basculerRendu',
+    description: 'Choisit le rendu de la roue : relief (3d, par défaut) ou plat (2d)',
+    refusPossibles: ['rendu-invalide'],
+    executer(ctx, { mode }) {
+      if (mode !== '2d' && mode !== '3d') return refus('rendu-invalide');
+      ctx.magasin.remplacer(definirRelief(ctx.magasin.lire(), mode === '3d'));
+      return OK;
+    },
+  },
+  couperSon: {
+    nom: 'couperSon',
+    description: 'Coupe ou rétablit le son (cliquetis et fanfare)',
+    refusPossibles: [],
+    executer(ctx, { coupe }) {
+      const etat = ctx.magasin.lire();
+      if (etat.sonCoupe !== coupe) ctx.magasin.remplacer(definirSonCoupe(etat, coupe));
+      return OK;
+    },
+  },
+  exporter: {
+    nom: 'exporter',
+    description: 'Télécharge la liste, les cadeaux, l’historique et les options dans un fichier JSON',
+    refusPossibles: ['rotation-en-cours'],
+    executer(ctx) {
+      ctx.telecharger?.(ctx.magasin.lire());
+      return OK;
+    },
+  },
+  importer: {
+    nom: 'importer',
+    description: 'Remplace tout l’état par celui d’un fichier déjà validé',
+    refusPossibles: ['rotation-en-cours'],
+    executer(ctx, { etat }) {
+      ctx.magasin.remplacer(etat);
+      return OK;
+    },
+  },
 };
 
 const maintenant = (): Date => new Date();
@@ -402,6 +453,9 @@ function infoTirage(avant: Etat, apres: Etat, retraitPrevu: boolean): InfoAnnonc
   return { ordre: tirage.ordre, nom: tirage.nom, couleur, cadeau: tirage.cadeau, retraitPrevu };
 }
 
+/** Réglages d'affichage et de son : permis pendant une rotation (couper le son à ce moment est utile). */
+const SANS_VERROU: ReadonlySet<NomAction> = new Set<NomAction>(['basculerRendu', 'couperSon']);
+
 export interface Actions {
   /** Exécute une action ; refus avec code, jamais d'exception pour un refus attendu. */
   executer<N extends NomAction>(nom: N, params: ParametresActions[N]): Resultat;
@@ -417,8 +471,8 @@ export function creerActions(ctx: Contexte): Actions {
     magasin: ctx.magasin,
     executer<N extends NomAction>(nom: N, params: ParametresActions[N]): Resultat {
       const action: Action<N> = ACTIONS[nom];
-      // Verrou F8 : toute action est refusée pendant une rotation, aucune interface ne peut le contourner.
-      if (ctx.enRotation()) return refus('rotation-en-cours');
+      // Verrou F8 : toute action (sauf les réglages `SANS_VERROU`) est refusée pendant une rotation, aucune interface ne peut le contourner.
+      if (ctx.enRotation() && !SANS_VERROU.has(nom)) return refus('rotation-en-cours');
       return action.executer(ctx, params);
     },
     lancementInterdit() {
