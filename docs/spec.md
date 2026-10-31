@@ -88,10 +88,10 @@ Choisie par Anaël pour son ton vif et festif, après comparaison avec Tol Muted
 La paire la plus proche (orange et rose, 7,9) n'est jamais voisine grâce à la règle d'attribution. Les couleurs se répètent dès 8 noms : les noms écrits en toutes lettres restent la vraie distinction (N6).
 
 ### Règles
-- **Attribution** : la couleur `i` suit l'ordre du tableau, qui est un cycle où deux voisines gardent un ΔE2000 CVD d'au moins 17,95 (minimum mesuré du cycle : 17,96, affiché 18,0 une fois arrondi à une décimale). Pour tout N, y compris quand N n'est pas multiple de 7, la séquence est ajustée pour que deux secteurs voisins, **y compris le dernier et le premier**, respectent ce seuil. Faisabilité vérifiée pour tout N de 2 à 200 ; un test le garantit.
+- **Attribution** : jusqu'à 7 noms, les couleurs sont toutes différentes, dans un ordre choisi pour respecter le seuil de voisinage. Au-delà, la couleur `i` suit l'ordre du tableau, qui est un cycle où deux voisines gardent un ΔE2000 CVD d'au moins 17,95 (minimum mesuré du cycle : 17,96, affiché 18,0 une fois arrondi à une décimale). Pour tout N, y compris quand N n'est pas multiple de 7, la séquence est ajustée pour que deux secteurs voisins, **y compris le dernier et le premier**, respectent ce seuil. Faisabilité vérifiée pour tout N de 2 à 200 ; un test le garantit.
 - **Séparateurs** : trait sombre `#14162B`, de contraste au moins 3,4:1 sur chaque couleur. Le blanc ne convient pas (1,3:1 sur le jaune).
 - **Thème** : fond sombre `#14162B` par défaut, qui fait ressortir la roue et convient à la projection. Thème clair si le système le demande. Polices système uniquement (N1).
-- **Couleur personnalisée** : réservée au secteur concerné, sans recalcul des autres.
+- **Couleur personnalisée** : réservée au secteur concerné, sans recalcul des autres. Les couleurs par défaut dépendent du nombre de noms : ajouter ou retirer un nom peut en changer quelques-unes.
 
 ## 6. Diffusion
 
