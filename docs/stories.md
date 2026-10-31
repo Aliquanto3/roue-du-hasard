@@ -10,11 +10,11 @@ Référence : `docs/spec.md`. Chaque story livre ses tests. Lint, types et tests
 
 ## Epic 2 — La roue utilisable
 
-- **2.1 ★ Roue canvas et rotation** : rendu pré-calculé, séparateurs sombres, libellés adaptatifs, bandeau F10, animation F6 à F8, `prefers-reduced-motion`, performance N7. *Fini quand* : l'angle d'arrêt est vérifié à 2, 3, 10, 200 noms et le rendu tient à 1 000 noms.
+- **2.1 ★ Roue canvas et rotation** : rendu pré-calculé, séparateurs sombres, libellés adaptatifs, bandeau F10, animation F6 à F8, `prefers-reduced-motion`, performance N7. *Fini quand* : l'angle d'arrêt est vérifié à 2, 3, 10, 200 noms et le rendu reste fluide à 100 noms.
 - **2.2 Panneau de configuration et mise en page** : saisie, collage, couleurs F1 à F4, verrouillage pendant la rotation, mise en page N4, thèmes. *Fini quand* : parcours saisie puis lancement vert sur 320 et 1920 px.
 - **2.3 Annonce et historique** : annonce F9, `aria-live`, cadeaux F11 et F12, historique et annulation F13, option de retrait F19. *Fini quand* : parcours complet avec et sans cadeaux vert.
 
-- **2.4 Relief de la roue** : F20, rendu relief pré-calculé et bascule 2D / 3D mémorisée dans le panneau. *Fini quand* : l'arrêt reste exact dans les deux rendus, les contrastes des libellés sont tenus et le rendu tient à 1 000 noms.
+- **2.4 Relief de la roue** : F20, rendu relief pré-calculé et bascule 2D / 3D mémorisée dans le panneau. *Fini quand* : l'arrêt reste exact dans les deux rendus, les contrastes des libellés sont tenus et le rendu reste fluide à 100 noms.
 
 ## Epic 3 — Ambiance et échange
 

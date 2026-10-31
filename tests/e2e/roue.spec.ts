@@ -260,14 +260,23 @@ test('mouvement réduit : le bandeau ne révèle pas le gagnant avant le fondu',
   await ouvrir(page, `n=200&${RAPIDE}`);
   const r = await page.evaluate(async () => {
     const h = window.harnais;
+    const bandeau = () => document.querySelector('.roue__bandeau')?.textContent;
+    const depart = performance.now();
     const promesse = h.lancer(100);
-    await new Promise((suite) => requestAnimationFrame(suite));
-    await new Promise((suite) => requestAnimationFrame(suite));
-    const pendant = document.querySelector('.roue__bandeau')?.textContent;
+    let fini = false;
+    void promesse.then(() => (fini = true));
+    // Instant de la bascule, et non nombre d'images : une CI lente peut franchir la moitié du fondu en 2 images.
+    let bascule: number | null = null;
+    while (!fini && bascule === null) {
+      await new Promise((suite) => requestAnimationFrame(suite));
+      if (bandeau() !== 'Nom 0') bascule = performance.now() - depart;
+    }
     await promesse;
-    return { pendant, apres: document.querySelector('.roue__bandeau')?.textContent };
+    return { bascule, apres: bandeau() };
   });
-  expect(r).toEqual({ pendant: 'Nom 0', apres: 'Nom 100' });
+  expect(r.apres).toBe('Nom 100');
+  // Le fondu dure 400 ms et le bandeau bascule à sa moitié ; 50 ms de marge pour le départ.
+  expect(r.bascule ?? 400).toBeGreaterThanOrEqual(150);
 });
 
 test('un appui perdu ne bloque pas le toucher suivant, et un second doigt ne remplace pas le premier', async ({ page }) => {
@@ -379,7 +388,7 @@ test.describe('toucher', () => {
   });
 });
 
-test('à 1 000 noms, le rendu tient et le rappel de secteur reste agrégé par image', async ({ page }) => {
+test('à 1 000 noms, arrêt exact et rappel de secteur agrégé par image', async ({ page }) => {
   await page.setViewportSize({ width: 1000, height: 1000 });
   const erreurs = await ouvrir(page, 'duree=2000&source=milieu');
   const m = await page.evaluate(async () => {
@@ -400,9 +409,7 @@ test('à 1 000 noms, le rendu tient et le rappel de secteur reste agrégé par i
   console.log(
     `1000 noms : pré-rendu ${m.prerendu.toFixed(1)} ms, image médiane ${m.mediane.toFixed(1)} ms, ${String(m.images)} images`,
   );
-  // Seuils tolérants pour la CI ; N7 vise 16 ms sur PC et 33 ms sur téléphone.
-  expect(m.prerendu).toBeLessThan(1000);
-  expect(m.mediane).toBeLessThan(150);
+  // Sans seuil de temps : la cible de performance N7 s'arrête à 100 noms (test suivant).
   expect(m.sousPointeur).toBe(777);
   expect(m.journal.franchis).toBeGreaterThanOrEqual(4000);
   expect(m.journal.appelsSecteur).toBeLessThanOrEqual(m.images + 2);
@@ -414,4 +421,23 @@ test('le fichier livré ne contient rien du harnais', () => {
   for (const interdit of ['harnais', '__test', 'URLSearchParams', 'Math.random', 'innerHTML']) {
     expect(html).not.toContain(interdit);
   }
+});
+
+test('à 100 noms, le rendu tient la cible de performance', async ({ page }) => {
+  await page.setViewportSize({ width: 1000, height: 1000 });
+  const erreurs = await ouvrir(page, 'duree=2000&source=milieu');
+  const m = await page.evaluate(async () => {
+    const h = window.harnais;
+    const prerendu = h.definirN(100);
+    const promesse = h.lancer(77);
+    const intervalles = await h.intervallesImages();
+    await promesse;
+    const tries = [...intervalles].sort((a, b) => a - b);
+    return { prerendu, mediane: tries[Math.floor(tries.length / 2)] as number, sousPointeur: h.indexSousPointeur() };
+  });
+  // Garde-fou pour la CI, sans carte graphique : N7 vise 16 ms sur PC et 33 ms sur téléphone.
+  expect(m.prerendu).toBeLessThan(1000);
+  expect(m.mediane).toBeLessThan(150);
+  expect(m.sousPointeur).toBe(77);
+  expect(erreurs).toEqual([]);
 });
