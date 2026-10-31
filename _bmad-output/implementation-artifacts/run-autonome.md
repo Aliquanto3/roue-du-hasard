@@ -29,9 +29,7 @@ Au plus 2 stories en développement à la fois
 |---|---|---|
 | V4b | 2.4 | 2.4 ← 2.3 |
 | V5 | 3.1 · 3.2 | 3.1 ← 2.3 ; 3.2 ← 2.3 |
-| V6 | 3.3 | 3.3 ← 3.2 |
-| V7 | 4.1 | 4.1 ← 3.1 ; 4.1 ← 3.3 |
-| V8 | 4.2 (mixte) | 4.2 ← 4.1 |
+| V7 | 4.1 | 4.1 ← 3.1 ; 4.1 ← 3.2 ; 4.1 ← 2.4 |
 
 ## Règles
 
@@ -39,7 +37,8 @@ Au plus 2 stories en développement à la fois
 - Sonnet pour le développement, sauf 2.1 sur Opus (géométrie et animation, cas de bord peu visibles aux tests).
 - `verif-front` (expérimental) après `dev-story` et avant `second-avis`, pour les stories d'interface 2.1 à 3.3, si Chromium est installé ; sinon le signaler une fois et continuer sans.
 - Contrats partagés fixés par 1.2 et 1.3 : `src/domain/` avant toute interface, textes dans `src/texts.ts`.
-- Arrêts pour Anaël : recette humaine de la 4.2 (esthétique, son, projection, sur son PC), avant le tag `v1.0.0`.
+- Fin du run (Anaël, 2026-10-31) : produit fonctionnel en local sur son PC, puis notification. La release (4.2 : version 1.0.0, Pages, tag, notes) se fera plus tard, hors de ce run.
+- Arrêts pour Anaël : recette humaine de la 4.2 (esthétique et son, sur son PC), avant le tag `v1.0.0`.
 - État du run hors des PR de story (PR `chore/etat-run`).
 
 - Parallélisations à faible risque autorisées par Anaël le 2026-10-31 pour toute la suite du projet, V1.1 comprise, sans redemander : fichiers disjoints, limite de 2 stories en développement maintenue, enchaînement second avis et revue conservé. Le travail V1.1 ne compte pas dans cette limite (Anaël, 2026-10-31), s'il reste dans ses propres fichiers, sans modifier le code V1 ni lancer de suite E2E locale. Restent soumis à Anaël : téléchargements de modèles, essais mobilisant la carte graphique, écrans partagés mis en parallèle.
@@ -155,3 +154,25 @@ Au plus 2 stories en développement à la fois
 - 2026-10-31 13:05 · 2.4 · dev · lancé ·
 - 2026-10-31 13:05 · 3.1 · dev · lancé ·
 - 2026-10-31 13:05 · 3.2 · dev · lancé ·
+- 2026-10-31 13:16 · 2.4 · dev · fini, PR #20 ouverte · 3d0a9e1
+- 2026-10-31 13:16 · 3.1 · dev · fini, PR #20 ouverte · 3d0a9e1
+- 2026-10-31 13:16 · 3.2 · dev · fini, PR #20 ouverte · 3d0a9e1
+- 2026-10-31 13:21 · run · décision · Anaël : mode projection (3.3, F18) reporté hors du run, en V1.2 ·
+- 2026-10-31 13:21 · run · décision · Anaël : arrêt au produit fonctionnel en local ; release 4.2 reportée hors du run ·
+- 2026-10-31 13:23 · 2.4 · second-avis · 1 medium et 5 low sur la PR commune ; medium en correction · 3d0a9e1
+- 2026-10-31 13:23 · 3.1 · second-avis · voir 2.4 · 3d0a9e1
+- 2026-10-31 13:23 · 3.2 · second-avis · voir 2.4 · 3d0a9e1
+- 2026-10-31 13:29 · 2.4 · CI · verte · a35404c
+- 2026-10-31 13:29 · 2.4 · fusion · PR #20 fusionnée · c4963c2
+- 2026-10-31 13:29 · 3.1 · CI · verte · a35404c
+- 2026-10-31 13:29 · 3.1 · fusion · PR #20 fusionnée · c4963c2
+- 2026-10-31 13:29 · 3.2 · CI · verte · a35404c
+- 2026-10-31 13:29 · 3.2 · fusion · PR #20 fusionnée · c4963c2
+- 2026-10-31 13:29 · 4.1 · dev · lancé ·
+- 2026-10-31 13:31 · run · décision · parcours réel vérifié dans Chrome sur dist/roue.html (servi en localhost, l'extension n'ouvre pas file://) : saisie, relief, rotation, annonce, confettis, historique, rechargement, console sans erreur ; décalage du bouton Lancer envoyé à la 4.1 ·
+- 2026-10-31 13:37 · 4.1 · dev · fini, PR #22 ouverte · 16b99f2
+- 2026-10-31 13:43 · 4.1 · second-avis · 2 medium et 4 low jugés sans effet réel sur l'usage (CSP déjà contrôlée par check:size, message long rare) · 16b99f2
+- 2026-10-31 13:43 · 4.1 · CI · verte · 16b99f2
+- 2026-10-31 13:43 · 4.1 · fusion · PR #22 fusionnée · 2738fc1
+- 2026-10-31 13:53 · run · décision · produit fonctionnel en local : main vérifiée, 281 tests unitaires et 127 E2E Chromium verts, fin du run ; release 4.2 à faire plus tard · 2738fc1
+- 2026-10-31 13:53 · run · ménage · anti-veille arrêté, serveurs de test arrêtés ·
