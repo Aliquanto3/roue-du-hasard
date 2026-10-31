@@ -57,7 +57,7 @@ Un fichier invalide ou qui ne vient pas de cette application est refusé avec un
 - **Historique** : ordre, nom, cadeau et heure de chaque tirage ; copiable, effaçable après confirmation, avec « Annuler le dernier tirage ».
 - **Retirer les gagnants** : case facultative qui sort le gagnant de la roue.
 - **Rendu** : roue en relief ou plate, au choix.
-- **Ambiance** : son généré dans le navigateur (avec bouton de coupure), confettis, et mode projection plein écran pour une télé ou un projecteur.
+- **Ambiance** : son généré dans le navigateur (avec bouton de coupure) et confettis.
 - **Accessibilité** : utilisable au clavier, résultat annoncé aux lecteurs d'écran, animation remplacée par un fondu si votre système demande moins de mouvement.
 
 ## Un tirage équitable
