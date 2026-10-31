@@ -1,7 +1,7 @@
 /**
  * Export et import JSON versionnés (F15). L'import ne fait jamais confiance au contenu.
- * Aucune limite de nombre d'éléments ni de taille ici : tout export doit se réimporter (F2, F15).
- * La limite de taille de fichier vit dans `ui/echange.ts` (code `fichier-trop-gros`).
+ * Aucune limite de nombre d'éléments ni de taille ici (F2, F15). Seule la lecture d'un fichier en a
+ * une, très au-delà des usages : voir `TAILLE_MAX_FICHIER_OCTETS` (code `fichier-trop-gros`).
  */
 import type { Etat, Participant, Retrait, Tirage } from "./etat";
 import { LONGUEUR_MAX_NOM, longueur } from "./normalisation";
@@ -20,7 +20,7 @@ export type ResultatImport =
   | { readonly ok: false; readonly code: CodeErreurImport };
 
 const COULEUR = /^#[0-9a-fA-F]{6}$/;
-const ID = /^p\d{1,9}$/;
+const ID = /^p[1-9]\d{0,8}$/;
 const PROCHAIN_ID_MAX = 999_999_999;
 
 /** Sérialise l'état (même format pour le fichier exporté et la sauvegarde automatique). */
@@ -67,7 +67,8 @@ function tableau(v: unknown): unknown[] {
 }
 
 function texte(v: unknown, max = LONGUEUR_MAX_NOM): string {
-  if (typeof v !== "string" || v.trim() === "" || v !== v.trim() || longueur(v) > max) return refuser();
+  if (typeof v !== "string" || v.length > 2 * max) return refuser(); // 2 unités au plus par point de code
+  if (v.trim() === "" || v !== v.trim() || longueur(v) > max) return refuser();
   return v;
 }
 
@@ -128,10 +129,12 @@ function construire(racine: Record<string, unknown>): Etat {
   const cadeaux = tableau(champ(racine, "cadeaux")).map((c) => texte(c));
   const historique = tableau(champ(racine, "historique")).map(lireTirage);
   const attribues = entier(champ(racine, "attribues"), 0, cadeaux.length);
-  const ids = new Set(participants.map((p) => p.id));
-  if (ids.size !== participants.length) return refuser();
+  // Ordre strictement croissant, comme tout état produit par `etat.ts` : `annulerDernierTirage` en dépend.
   let max = 0;
-  for (const id of ids) max = Math.max(max, numeroId(id));
+  for (const p of participants) {
+    if (numeroId(p.id) <= max) return refuser();
+    max = numeroId(p.id);
+  }
   for (const t of historique) max = Math.max(max, numeroId(t.participantId));
   return {
     participants,

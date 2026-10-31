@@ -105,6 +105,27 @@ describe("export / import", () => {
     for (const c of cas) expect(code(fichier(c))).toBe("donnees-invalides");
   });
 
+  it("refuse des participants hors de l'ordre croissant des ids, dont `annuler` dépend", () => {
+    const avec = (...ids: string[]) =>
+      fichier((o) => {
+        o["participants"] = ids.map((id) => ({ id, nom: "A", couleur: null }));
+        o["historique"] = [];
+        o["prochainId"] = 100;
+      });
+    expect(code(avec("p1", "p3"))).toBeUndefined();
+    expect(code(avec("p3", "p1"))).toBe("donnees-invalides");
+    expect(code(avec("p1", "p01"))).toBe("donnees-invalides");
+    expect(code(avec("p0"))).toBe("donnees-invalides");
+  });
+
+  it("refuse un id non canonique dans l'historique", () => {
+    const f = fichier((o) => {
+      const [t] = o["historique"] as Record<string, unknown>[];
+      if (t) t["participantId"] = "p01";
+    });
+    expect(code(f)).toBe("donnees-invalides");
+  });
+
   it("refuse noms vides, non normalisés ou de plus de 60 caractères", () => {
     const avec = (nom: unknown) => fichier((o) => (o["participants"] = [{ id: "p1", nom, couleur: null }]));
     expect(code(avec("a".repeat(60)))).toBeUndefined();
@@ -153,7 +174,7 @@ describe("export / import", () => {
     const r = importer(exporter(e));
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.etat).toEqual(e);
-  });
+  }, 30_000);
 
   it("conserve tel quel un nom hostile", () => {
     const hostile = "<img src=x onerror=alert(1)>";

@@ -3,8 +3,10 @@ import type { Etat } from "../domain/etat";
 import { exporter, importer, type CodeErreurImport } from "../domain/schema";
 
 /**
- * Taille maximale d'un fichier à importer, en octets (50 Mo). Très au-dessus de tout export réel
- * plausible (150 000 noms font environ 10 Mo) : elle ne sert qu'à ne pas lire un fichier absurde.
+ * Taille maximale d'un fichier à importer, en octets (50 Mio) : évite de lire un fichier choisi par
+ * erreur. Mesures : 1 000 noms = 40 Ko, 150 000 noms courts = 7,4 Mo, 150 000 noms de 60 emojis = 42 Mo.
+ * Un export au-delà (environ 1 million de noms courts) s'écrit mais se refuse à l'import : cas assumé,
+ * loin de la cible de 1 000 noms (N7).
  */
 export const TAILLE_MAX_FICHIER_OCTETS = 50 * 1024 * 1024;
 
@@ -45,9 +47,9 @@ export function telechargerExport(etat: Etat, document: Document, maintenant: Da
 
 /** Lit et valide un fichier d'import. Ne rejette jamais ; l'appelant remplace l'état si `ok`. */
 export async function lireFichierImport(fichier: File): Promise<ResultatLecture> {
-  if (fichier.size > TAILLE_MAX_FICHIER_OCTETS) return { ok: false, code: "fichier-trop-gros" };
   let contenu: string;
   try {
+    if (fichier.size > TAILLE_MAX_FICHIER_OCTETS) return { ok: false, code: "fichier-trop-gros" };
     contenu = await fichier.text();
   } catch {
     return { ok: false, code: "fichier-illisible" };

@@ -1,7 +1,7 @@
 /** Sauvegarde automatique de l'état (F14), par le même schéma que l'export (F15). */
 import type { Etat } from "./etat";
 import type { Persistance } from "./persistance";
-import { exporter, importer } from "./schema";
+import { exporter, valider } from "./schema";
 
 export const CLE_ETAT = "roue:etat";
 
@@ -18,7 +18,7 @@ export function restaurer(persistance: Persistance): Etat | null {
   try {
     const brut = persistance.lire(CLE_ETAT);
     if (brut === null) return null;
-    const r = importer(JSON.stringify(brut));
+    const r = valider(brut);
     return r.ok ? r.etat : null;
   } catch {
     return null;

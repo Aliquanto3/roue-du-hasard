@@ -27,7 +27,7 @@ export default defineConfig({
   root: resolve('tests/harnais-echange'),
   plugins: [viteSingleFile(), cspDuBuild()],
   build: {
-    outDir: resolve('dist/harnais-echange'),
+    outDir: resolve('dist-harnais/echange'),
     emptyOutDir: true,
     target: 'es2022',
     modulePreload: false,

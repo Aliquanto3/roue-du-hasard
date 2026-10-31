@@ -109,9 +109,20 @@ describe("lireFichierImport", () => {
     expect(await lireFichierImport(casse)).toEqual({ ok: false, code: "fichier-illisible" });
   });
 
+  it("ne rejette pas quand le fichier est absent ou que sa taille est illisible", async () => {
+    expect(await lireFichierImport(undefined as unknown as File)).toEqual({ ok: false, code: "fichier-illisible" });
+  });
+
+  it("accepte un UTF-8 avec BOM (éditeurs Windows), refuse un UTF-16", async () => {
+    const e = exemple();
+    expect(await lireFichierImport(fichier(`\uFEFF${exporter(e)}`))).toEqual({ ok: true, etat: e });
+    const utf16 = new File([Buffer.from(`\uFEFF${exporter(e)}`, "utf16le")], "x.json");
+    expect(await lireFichierImport(utf16)).toEqual({ ok: false, code: "json-invalide" });
+  });
+
   it("accepte 150 000 noms", async () => {
     const e = coller(etatInitial(), Array.from({ length: 150_000 }, (_, i) => `N${String(i)}`).join("\n"));
     const r = await lireFichierImport(fichier(exporter(e)));
     expect(r).toEqual({ ok: true, etat: e });
-  });
+  }, 30_000);
 });

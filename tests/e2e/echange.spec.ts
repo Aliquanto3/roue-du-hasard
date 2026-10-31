@@ -1,16 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
-import { build } from 'vite';
 import { expect, test } from '@playwright/test';
 import { importer } from '../../src/domain/schema';
 
-const harnais = resolve('dist/harnais-echange/index.html');
+const harnais = resolve('dist-harnais/echange/index.html');
 const url = pathToFileURL(harnais).href;
-
-test.beforeAll(async () => {
-  await build({ configFile: resolve('tests/harnais-echange/vite.config.ts'), logLevel: 'warn' });
-});
 
 test('la CSP du harnais est celle du fichier construit', () => {
   const csp = /Content-Security-Policy"\s+content="([^"]+)"/.exec(readFileSync(harnais, 'utf8'));

@@ -61,6 +61,23 @@ describe("sauvegarder / restaurer", () => {
     expect(restaurer(p)).toBeNull();
   });
 
+  it("au-delà du quota : renvoie false et garde la sauvegarde précédente", () => {
+    const s = memoire();
+    const p = creerPersistance(() => ({
+      ...s,
+      // Comme `localStorage` : l'écriture refusée lève et laisse l'ancienne valeur intacte.
+      setItem: (k, v) => {
+        if (v.length > 500) throw new DOMException("quota", "QuotaExceededError");
+        s.setItem(k, v);
+      },
+    }));
+    const e = exemple();
+    expect(sauvegarder(p, e)).toBe(true);
+    const gros = coller(e, Array.from({ length: 200 }, (_, i) => `Nom ${String(i)}`).join("\n"));
+    expect(sauvegarder(p, gros)).toBe(false);
+    expect(restaurer(p)).toEqual(e);
+  });
+
   it("ne lève jamais quand le stockage est en panne", () => {
     const p = creerPersistance(() => {
       throw new Error("SecurityError");
