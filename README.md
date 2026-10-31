@@ -1,19 +1,19 @@
 # Roue du hasard
 
-> À retirer à la release : la version `v1.0.0` et la page pour téléphone arrivent bientôt ; les liens ci-dessous seront actifs à ce moment-là.
+> À retirer à la release : ce README décrit la V1 prévue. La version `v1.0.0` et la page pour téléphone ne sont pas encore publiées : certaines fonctions et les liens ci-dessous ne seront actifs qu'à ce moment-là.
 
 Une roue qui désigne au hasard qui reçoit un cadeau : vous saisissez les noms des invités (et, si vous voulez, la liste des cadeaux), vous lancez la roue, et le gagnant est annoncé en grand avec des confettis. Aucune installation, aucun compte, aucun droit administrateur : un seul fichier `roue.html` suffit.
 
 ## Un clic
 
-1. Téléchargez `roue.html` depuis la [dernière release](https://github.com/Aliquanto3/roue-du-hasard/releases/latest).
+1. Sur la page de la [dernière release](https://github.com/Aliquanto3/roue-du-hasard/releases/latest), téléchargez le fichier `roue.html` (dans la liste « Assets »). Ne prenez pas les archives « Source code ».
 2. Double-cliquez dessus : il s'ouvre dans votre navigateur.
 
 ## Une ligne de commande
 
 Si vous préférez le terminal, une seule ligne télécharge le fichier et l'ouvre.
 
-**Windows** (PowerShell) :
+**Windows**, dans PowerShell (appuyez sur la touche Windows, tapez `PowerShell`, puis Entrée ; la commande ne fonctionne pas dans l'invite de commandes) :
 
 ```powershell
 irm https://github.com/Aliquanto3/roue-du-hasard/releases/latest/download/roue.html -OutFile roue.html; start roue.html
@@ -33,7 +33,7 @@ curl -fLO https://github.com/Aliquanto3/roue-du-hasard/releases/latest/download/
 
 ## Sur téléphone
 
-Ouvrez <https://aliquanto3.github.io/roue-du-hasard/> ou scannez ce code :
+Ouvrez <https://aliquanto3.github.io/roue-du-hasard/> ou scannez ce code. La page se charge une fois depuis GitHub Pages (connexion nécessaire à ce moment-là) ; ensuite, vos noms ne quittent jamais le téléphone.
 
 ![QR code vers https://aliquanto3.github.io/roue-du-hasard/](docs/qr-telephone.svg)
 
@@ -41,11 +41,11 @@ Ouvrez <https://aliquanto3.github.io/roue-du-hasard/> ou scannez ce code :
 
 Le fichier `roue.html` et la page du téléphone ne partagent pas leurs données. Pour transférer une liste :
 
-1. Sur le PC, utilisez l'**export** : l'application enregistre un fichier JSON.
+1. Sur le PC, utilisez l'**export** : l'application enregistre un fichier.
 2. Envoyez ce fichier à votre téléphone (messagerie, courriel, câble).
 3. Sur le téléphone, utilisez l'**import** et choisissez ce fichier.
 
-Un fichier invalide ou d'une version inconnue est refusé avec un message clair, sans toucher à votre liste actuelle. Si l'import remplace une liste non vide, l'application demande confirmation.
+Un fichier invalide ou qui ne vient pas de cette application est refusé avec un message clair, sans toucher à votre liste actuelle. Si l'import remplace une liste non vide, l'application demande confirmation.
 
 ## Ce que fait l'application
 
@@ -56,17 +56,17 @@ Un fichier invalide ou d'une version inconnue est refusé avec un message clair,
 - **Annonce** : nom, couleur et cadeau du gagnant en grand, avec « Relancer » et « Fermer ».
 - **Historique** : ordre, nom, cadeau et heure de chaque tirage ; copiable, effaçable après confirmation, avec « Annuler le dernier tirage ».
 - **Retirer les gagnants** : case facultative qui sort le gagnant de la roue.
-- **Rendu** : relief ou plat, au choix.
+- **Rendu** : roue en relief ou plate, au choix.
 - **Ambiance** : son généré dans le navigateur (avec bouton de coupure), confettis, et mode projection plein écran pour une télé ou un projecteur.
 - **Accessibilité** : utilisable au clavier, résultat annoncé aux lecteurs d'écran, animation remplacée par un fondu si votre système demande moins de mouvement.
 
 ## Un tirage équitable
 
-Tous les secteurs ont la même taille : chaque nom a exactement la même chance. Le gagnant est tiré **avant** que la roue ne tourne, avec `crypto.getRandomValues`, le générateur aléatoire de sécurité du navigateur, et un rejet d'échantillonnage pour éviter tout biais. `Math.random` n'est jamais utilisé. L'animation se contente de conduire la roue jusqu'au secteur déjà choisi : elle ne décide de rien.
+Tous les secteurs ont la même taille : chaque nom a exactement la même chance. Le gagnant est tiré **avant** que la roue ne tourne, avec le générateur aléatoire de sécurité du navigateur, sans aucun biais. L'animation se contente de conduire la roue jusqu'au secteur déjà choisi : elle ne décide de rien.
 
 ## Vie privée
 
-Les noms ne quittent jamais votre appareil. L'application n'émet aucune requête réseau après son chargement, n'utilise aucune statistique ni police ou ressource externe, et une politique de sécurité du contenu interdit toute connexion sortante.
+Les noms ne quittent jamais votre appareil. Une fois la page chargée, l'application n'envoie aucune requête sur le réseau et n'utilise ni statistiques ni ressource externe ; le navigateur lui interdit d'ailleurs toute connexion sortante.
 
 ## Si le navigateur bloque le stockage
 
@@ -85,5 +85,7 @@ npm run build         # produit dist/roue.html
 npm run check:size    # taille (moins de 200 Ko) et ressources externes
 npm run test:e2e:chromium   # parcours E2E (construit dist/ et dist-harnais/)
 ```
+
+Détails techniques : le tirage utilise `crypto.getRandomValues` avec rejet d'échantillonnage (jamais `Math.random`), l'export est un fichier JSON versionné, et une politique de sécurité du contenu bloque les connexions sortantes.
 
 Le harnais de la roue se lance avec `npm run harnais` (`http://localhost:5199/?n=10`). La spécification est dans `docs/spec.md`.
