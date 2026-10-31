@@ -35,9 +35,13 @@
   overflow-wrap: anywhere;
   pointer-events: none;
 }
-.roue__bandeau[hidden],
-.roue__indice[hidden] {
+.roue__bandeau[hidden] {
   display: none;
+}
+/* Indice masqué : sa place reste réservée (texte de l'indice par défaut) pour que le bouton ne bouge pas. */
+.roue__indice[hidden] {
+  display: block;
+  visibility: hidden;
 }
 .roue__indice {
   margin: 0.5rem 0 0;
