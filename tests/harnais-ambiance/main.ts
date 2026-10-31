@@ -8,24 +8,26 @@ const sondes = {
   oscillateurs: 0,
   termines: 0,
 };
-class ContexteSonde extends AudioContext {
-  constructor() {
-    super();
-    // Tout ce que le son envoie à la sortie passe par l'analyseur.
-    const analyseur = this.createAnalyser();
-    analyseur.connect(this.destination);
-    Object.defineProperty(this, 'destination', { value: analyseur });
-    sondes.contexte = this;
-    sondes.analyseur = analyseur;
-  }
-  override createOscillator(): OscillatorNode {
-    const osc = super.createOscillator();
-    sondes.oscillateurs++;
-    osc.addEventListener('ended', () => sondes.termines++);
-    return osc;
-  }
+// WebKit sous Windows n'a pas d'AudioContext : le harnais doit quand même se charger.
+if (typeof AudioContext !== 'undefined') {
+  globalThis.AudioContext = class extends AudioContext {
+    constructor() {
+      super();
+      // Tout ce que le son envoie à la sortie passe par l'analyseur.
+      const analyseur = this.createAnalyser();
+      analyseur.connect(this.destination);
+      Object.defineProperty(this, 'destination', { value: analyseur });
+      sondes.contexte = this;
+      sondes.analyseur = analyseur;
+    }
+    override createOscillator(): OscillatorNode {
+      const osc = super.createOscillator();
+      sondes.oscillateurs++;
+      osc.addEventListener('ended', () => sondes.termines++);
+      return osc;
+    }
+  };
 }
-globalThis.AudioContext = ContexteSonde;
 
 (globalThis as unknown as { ambiance: unknown }).ambiance = {
   etat: () => sondes.contexte?.state ?? 'absent',
