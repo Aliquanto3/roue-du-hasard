@@ -235,9 +235,13 @@ test('parcours au clavier seul, du premier champ au lancement', async ({ page, b
   await ouvrir(page);
   // Safari sur macOS saute les boutons avec Tab seul : Option+Tab parcourt tous les contrôles.
   const option = browserName === 'webkit' && process.platform === 'darwin' ? 'Alt+' : '';
-  // Ordre de tabulation : roue (bouton), puis champ d'ajout.
+  // Ordre de tabulation : roue (bouton), réglages (relief, son), puis champ d'ajout.
   await page.keyboard.press(`${option}Tab`);
   await expect(boutonLancer(page)).toBeFocused();
+  await page.keyboard.press(`${option}Tab`);
+  await expect(page.getByRole('button', { name: /^Relief :/ })).toBeFocused();
+  await page.keyboard.press(`${option}Tab`);
+  await expect(page.getByRole('button', { name: /^Son :/ })).toBeFocused();
   await page.keyboard.press(`${option}Tab`);
   await expect(champAjout(page)).toBeFocused();
   await page.keyboard.type('Ana');
@@ -245,8 +249,8 @@ test('parcours au clavier seul, du premier champ au lancement', async ({ page, b
   await page.keyboard.type('Bob');
   await page.keyboard.press('Enter');
   await expect.poll(() => valeurs(page)).toEqual(['Ana', 'Bob']);
-  // Retour au bouton de lancement, qui garde un focus visible.
-  await page.keyboard.press(`${option}Shift+Tab`);
+  // Retour au bouton de lancement (par-dessus les deux réglages), qui garde un focus visible.
+  for (let i = 0; i < 3; i++) await page.keyboard.press(`${option}Shift+Tab`);
   await expect(boutonLancer(page)).toBeFocused();
   const anneau = await boutonLancer(page).evaluate((el) => {
     const s = getComputedStyle(el);
@@ -362,6 +366,10 @@ test.describe('mise en page N4', () => {
   });
 
   test('les cibles tactiles font au moins 44 px, à 320 px comme à 1920 px', async ({ page }) => {
+    // L'état est conservé d'une page à l'autre : chaque largeur repart d'un stockage vide.
+    await page.addInitScript(() => {
+      window.localStorage.clear();
+    });
     for (const largeur of [320, 1920]) {
       await page.setViewportSize({ width: largeur, height: 900 });
       await ouvrir(page);
@@ -426,22 +434,34 @@ test.describe('thèmes et accessibilité', () => {
   });
 
   test('le pointeur et le moyeu restent visibles sur les deux fonds', async ({ page }) => {
+    // L'état est conservé d'une page à l'autre : on repart d'un stockage vide (relief par défaut).
+    await page.addInitScript(() => {
+      window.localStorage.clear();
+    });
     for (const scheme of ['dark', 'light'] as const) {
       await page.emulateMedia({ colorScheme: scheme });
       await ouvrir(page);
       await zoneCollage(page).fill('Ana\nBob\nChloé');
       await boutonCollage(page).click();
-      const pixels = await page.locator('canvas.roue__canvas').evaluate((c) => {
-        const canvas = c as HTMLCanvasElement;
-        const ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
-        const lire = (x: number, y: number): number[] => Array.from(ctx.getImageData(x, y, 1, 1).data);
-        const centre = Math.floor(canvas.width / 2);
-        // Pointeur : sonde juste sous la pointe ; moyeu : centre du disque.
-        return { moyeu: lire(centre, centre), pointe: lire(Number(c.dataset['sondeX']), Number(c.dataset['sondeY'])) };
-      });
-      // Moyeu #14162B opaque au centre de la roue, quel que soit le thème de la page.
-      expect(pixels.moyeu).toEqual([20, 22, 43, 255]);
-      expect(pixels.pointe[3]).toBe(255);
+      const lirePixels = () =>
+        page.locator('canvas.roue__canvas').evaluate((c) => {
+          const canvas = c as HTMLCanvasElement;
+          const ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
+          const lire = (x: number, y: number): number[] => Array.from(ctx.getImageData(x, y, 1, 1).data);
+          const centre = Math.floor(canvas.width / 2);
+          // Pointeur : sonde juste sous la pointe ; moyeu : centre du disque.
+          return { moyeu: lire(centre, centre), pointe: lire(Number(c.dataset['sondeX']), Number(c.dataset['sondeY'])) };
+        });
+      // Relief (par défaut) : le moyeu est une bille éclairée, opaque et distincte du fond de la page.
+      const relief = await lirePixels();
+      expect(relief.moyeu[3]).toBe(255);
+      expect(relief.moyeu).not.toEqual([20, 22, 43, 255]);
+      expect(relief.pointe[3]).toBe(255);
+      // Rendu plat : moyeu #14162B opaque au centre de la roue, quel que soit le thème de la page.
+      await page.getByRole('button', { name: /^Relief :/ }).click();
+      const plat = await lirePixels();
+      expect(plat.moyeu).toEqual([20, 22, 43, 255]);
+      expect(plat.pointe[3]).toBe(255);
     }
   });
 });

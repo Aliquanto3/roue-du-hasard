@@ -1,10 +1,18 @@
 import { creerActions, creerMagasin } from './actions';
+import { couleursParDefaut } from './domain/palette';
+import { creerPersistance } from './domain/persistance';
+import { restaurer, sauvegarder } from './domain/sauvegarde';
 import { TEXTS } from './texts';
 import { creerAnnonce, type Annonce } from './ui/annonce';
 import { creerCadeaux } from './ui/cadeaux';
+import { creerConfettis } from './ui/confettis';
+import { creerDonnees } from './ui/donnees';
+import { telechargerExport } from './ui/echange';
 import { creerHistorique } from './ui/historique';
 import { creerPanneau } from './ui/panneau';
+import { creerReglages } from './ui/reglages';
 import { creerRoue, type Roue } from './ui/roue';
+import { creerSon } from './ui/son';
 import './ui/page.css';
 
 export function render(root: HTMLElement): Roue {
@@ -19,8 +27,29 @@ export function render(root: HTMLElement): Roue {
   zonePanneau.className = 'page__panneau';
   page.append(titre, zoneRoue, zonePanneau);
   root.append(page);
+  const zoneConfettis = document.createElement('div');
+  zoneConfettis.className = 'confettis';
+  zoneConfettis.setAttribute('aria-hidden', 'true');
+  root.append(zoneConfettis);
 
-  const magasin = creerMagasin();
+  // F14 : l'accès à `window.localStorage` peut lever (stockage bloqué) ; la persistance le tolère.
+  const persistance = creerPersistance(() => window.localStorage);
+  const magasin = creerMagasin(restaurer(persistance) ?? undefined);
+  const son = creerSon();
+  const confettis = creerConfettis(zoneConfettis);
+  son.couper(magasin.lire().sonCoupe);
+  // Un contexte audio ne démarre que sur un geste : le premier appui ou la première touche suffit,
+  // ce qui couvre aussi l'attribution sans rotation. Le lancement le refait explicitement.
+  for (const evenement of ['pointerdown', 'keydown']) {
+    document.addEventListener(
+      evenement,
+      () => {
+        son.preparer();
+      },
+      { capture: true },
+    );
+  }
+
   // Roue, panneau et annonce sont créés après la table d'actions, qui ne les lit qu'à l'exécution.
   const actions = creerActions({
     magasin,
@@ -28,7 +57,11 @@ export function render(root: HTMLElement): Roue {
     lancer: (index) => {
       // Une modification de la même tâche doit atteindre la roue avant le départ, pas à l'arrêt.
       pousserNoms();
+      confettis.arreter();
       void roue.lancer(index);
+    },
+    telecharger: (etat) => {
+      telechargerExport(etat, document);
     },
     annonce: {
       ouverte: () => annonce.ouverte(),
@@ -36,17 +69,21 @@ export function render(root: HTMLElement): Roue {
         annonce.ouvrir(info);
       },
       fermer: (options) => {
+        confettis.arreter();
         annonce.fermer(options);
       },
     },
   });
   const roue: Roue = creerRoue(zoneRoue, {
+    relief: magasin.lire().relief,
     surDemande: () => {
+      son.preparer();
       panneau.validerSaisie();
       const r = actions.executer('lancer', {});
       if (!r.ok) annonce.dire(TEXTS.refus[r.code]);
     },
   });
+  roue.definirNoms(magasin.lire().participants.map(({ nom, couleur }) => ({ nom, couleur })));
 
   // Un seul recalcul de la roue par salve de modifications (collage, rafale de couleurs).
   let planifie = false;
@@ -55,7 +92,23 @@ export function render(root: HTMLElement): Roue {
     planifie = false;
     roue.definirNoms(magasin.lire().participants.map(({ nom, couleur }) => ({ nom, couleur })));
   };
+  // Une seule sauvegarde par salve de modifications ; l'avis n'est affiché qu'une fois.
+  let sauvegardePlanifiee = false;
+  let avise = false;
+  const sauver = (): void => {
+    sauvegardePlanifiee = false;
+    if (!sauvegarder(persistance, magasin.lire()) && !avise) {
+      avise = true;
+      donnees.avertirSansSauvegarde();
+    }
+  };
   magasin.abonner((etat, precedent) => {
+    if (etat.relief !== precedent.relief) roue.definirRelief(etat.relief);
+    if (etat.sonCoupe !== precedent.sonCoupe) son.couper(etat.sonCoupe);
+    if (!sauvegardePlanifiee) {
+      sauvegardePlanifiee = true;
+      queueMicrotask(sauver);
+    }
     // Un tirage ou un cadeau ne change pas la roue : pas de nouveau pré-rendu.
     if (planifie || etat.participants === precedent.participants) return;
     planifie = true;
@@ -68,19 +121,35 @@ export function render(root: HTMLElement): Roue {
     const r = actions.executer('enregistrerTirage', { index });
     if (!r.ok) annonce.dire(TEXTS.refus[r.code]);
   });
+  roue.ecouter('secteur', ({ franchis }) => {
+    son.cliquetis(franchis);
+  });
 
   const panneau = creerPanneau(zonePanneau, actions, roue);
+  creerReglages(zoneRoue, actions);
   creerCadeaux({ panneau: zonePanneau, roue: zoneRoue, page }, actions, roue);
   creerHistorique(zonePanneau, actions, roue);
+  const donnees = creerDonnees(zonePanneau, actions, roue);
   const annonce: Annonce = creerAnnonce(root, {
     actions,
     arriere: page,
     focusParDefaut: () => roue.bouton,
     avantLancement: () => {
+      son.preparer();
       panneau.validerSaisie();
     },
-    // 3.2 : brancher ici la fanfare et les confettis (`celebration: (info, mouvementReduit) => …`).
+    celebration: (_info, mouvementReduit) => {
+      son.fanfare();
+      if (mouvementReduit) return;
+      const { participants } = magasin.lire();
+      const defauts = couleursParDefaut(participants.length);
+      confettis.lancer(participants.map((p, i) => p.couleur ?? defauts[i] ?? '#ffd166'));
+    },
   });
+  if (!persistance.fonctionne()) {
+    avise = true;
+    donnees.avertirSansSauvegarde();
+  }
   root.dataset['ready'] = 'true';
   return roue;
 }

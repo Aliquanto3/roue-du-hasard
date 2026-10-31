@@ -4,6 +4,7 @@ import {
   coller,
   collerCadeaux,
   definirCouleur,
+  definirRelief,
   definirRetirerGagnants,
   definirSonCoupe,
   enregistrerTirage,
@@ -196,6 +197,18 @@ describe("export / import", () => {
       `{"version":1,"participants":[${participant}],"cadeaux":[],"attribues":0,"historique":[],"retirerGagnants":false,"sonCoupe":false,"prochainId":2}`,
     );
     expect(r2.ok && Object.keys(r2.etat.participants[0] as object)).toEqual(["id", "nom", "couleur"]);
+  });
+
+  it("relief : exporté, relu à l'identique, vrai si le champ est absent, refusé s'il n'est pas booléen", () => {
+    const plat = definirRelief(exemple(), false);
+    expect((JSON.parse(exporter(plat)) as Record<string, unknown>)["relief"]).toBe(false);
+    const relu = importer(exporter(plat));
+    expect(relu.ok && relu.etat).toEqual(plat);
+    expect(etatInitial().relief).toBe(true);
+    const sans = importer(fichier((o) => delete o["relief"]));
+    expect(sans.ok && sans.etat.relief).toBe(true);
+    expect(importer(fichier((o) => (o["relief"] = "oui"))).ok).toBe(false);
+    expect(importer(fichier((o) => (o["relief"] = null)))).toEqual({ ok: false, code: "donnees-invalides" });
   });
 
   it("un __proto__ ne peut pas se substituer à un champ requis", () => {
