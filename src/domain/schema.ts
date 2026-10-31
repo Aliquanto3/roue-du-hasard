@@ -1,10 +1,12 @@
-/** Export et import JSON versionnés (F15). L'import ne fait jamais confiance au contenu. */
+/**
+ * Export et import JSON versionnés (F15). L'import ne fait jamais confiance au contenu.
+ * Aucune limite de nombre d'éléments ni de taille ici (F2, F15). Seule la lecture d'un fichier en a
+ * une, très au-delà des usages : voir `TAILLE_MAX_FICHIER_OCTETS` (code `fichier-trop-gros`).
+ */
 import type { Etat, Participant, Retrait, Tirage } from "./etat";
 import { LONGUEUR_MAX_NOM, longueur } from "./normalisation";
 
 export const VERSION_SCHEMA = 1;
-export const TAILLE_MAX_FICHIER = 5_000_000;
-export const MAX_ELEMENTS = 100_000;
 
 export type CodeErreurImport =
   | "fichier-trop-gros"
@@ -18,7 +20,7 @@ export type ResultatImport =
   | { readonly ok: false; readonly code: CodeErreurImport };
 
 const COULEUR = /^#[0-9a-fA-F]{6}$/;
-const ID = /^p\d{1,9}$/;
+const ID = /^p[1-9]\d{0,8}$/;
 const PROCHAIN_ID_MAX = 999_999_999;
 
 /** Sérialise l'état (même format pour le fichier exporté et la sauvegarde automatique). */
@@ -60,12 +62,13 @@ function champ(o: Record<string, unknown>, nom: string): unknown {
 }
 
 function tableau(v: unknown): unknown[] {
-  if (!Array.isArray(v) || v.length > MAX_ELEMENTS) return refuser();
+  if (!Array.isArray(v)) return refuser();
   return v as unknown[];
 }
 
 function texte(v: unknown, max = LONGUEUR_MAX_NOM): string {
-  if (typeof v !== "string" || v.trim() === "" || v !== v.trim() || longueur(v) > max) return refuser();
+  if (typeof v !== "string" || v.length > 2 * max) return refuser(); // 2 unités au plus par point de code
+  if (v.trim() === "" || v !== v.trim() || longueur(v) > max) return refuser();
   return v;
 }
 
@@ -126,10 +129,12 @@ function construire(racine: Record<string, unknown>): Etat {
   const cadeaux = tableau(champ(racine, "cadeaux")).map((c) => texte(c));
   const historique = tableau(champ(racine, "historique")).map(lireTirage);
   const attribues = entier(champ(racine, "attribues"), 0, cadeaux.length);
-  const ids = new Set(participants.map((p) => p.id));
-  if (ids.size !== participants.length) return refuser();
+  // Ordre strictement croissant, comme tout état produit par `etat.ts` : `annulerDernierTirage` en dépend.
   let max = 0;
-  for (const id of ids) max = Math.max(max, numeroId(id));
+  for (const p of participants) {
+    if (numeroId(p.id) <= max) return refuser();
+    max = numeroId(p.id);
+  }
   for (const t of historique) max = Math.max(max, numeroId(t.participantId));
   return {
     participants,
@@ -163,9 +168,6 @@ export function valider(donnees: unknown): ResultatImport {
 
 /** Importe un texte JSON ; ne lève jamais et ne modifie rien : l'appelant remplace l'état si `ok`. */
 export function importer(contenu: string): ResultatImport {
-  if (contenu.length > TAILLE_MAX_FICHIER) {
-    return { ok: false, code: "fichier-trop-gros" };
-  }
   let donnees: unknown;
   try {
     donnees = JSON.parse(contenu);

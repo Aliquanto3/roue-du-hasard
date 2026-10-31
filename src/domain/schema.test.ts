@@ -11,7 +11,7 @@ import {
   supprimer,
   supprimerCadeau,
 } from "./etat";
-import { MAX_ELEMENTS, TAILLE_MAX_FICHIER, VERSION_SCHEMA, exporter, importer, valider } from "./schema";
+import { VERSION_SCHEMA, exporter, importer, valider } from "./schema";
 
 function exemple() {
   let e = coller(etatInitial(), "Ana\nBob\nChloé");
@@ -81,10 +81,6 @@ describe("export / import", () => {
     expect(code(fichier((o) => (o["version"] = 0)))).toBe("version-inconnue");
   });
 
-  it("refuse un fichier trop gros", () => {
-    expect(code(" ".repeat(TAILLE_MAX_FICHIER + 1))).toBe("fichier-trop-gros");
-  });
-
   it("refuse les types incorrects", () => {
     const cas: ((o: Record<string, unknown>) => void)[] = [
       (o) => delete o["participants"],
@@ -107,6 +103,27 @@ describe("export / import", () => {
         ]),
     ];
     for (const c of cas) expect(code(fichier(c))).toBe("donnees-invalides");
+  });
+
+  it("refuse des participants hors de l'ordre croissant des ids, dont `annuler` dépend", () => {
+    const avec = (...ids: string[]) =>
+      fichier((o) => {
+        o["participants"] = ids.map((id) => ({ id, nom: "A", couleur: null }));
+        o["historique"] = [];
+        o["prochainId"] = 100;
+      });
+    expect(code(avec("p1", "p3"))).toBeUndefined();
+    expect(code(avec("p3", "p1"))).toBe("donnees-invalides");
+    expect(code(avec("p1", "p01"))).toBe("donnees-invalides");
+    expect(code(avec("p0"))).toBe("donnees-invalides");
+  });
+
+  it("refuse un id non canonique dans l'historique", () => {
+    const f = fichier((o) => {
+      const [t] = o["historique"] as Record<string, unknown>[];
+      if (t) t["participantId"] = "p01";
+    });
+    expect(code(f)).toBe("donnees-invalides");
   });
 
   it("refuse noms vides, non normalisés ou de plus de 60 caractères", () => {
@@ -150,9 +167,19 @@ describe("export / import", () => {
     expect(code(avec({ retrait: 3 }))).toBe("donnees-invalides");
   });
 
-  it("refuse un tableau au-delà de la limite", () => {
-    const geant = Array.from({ length: MAX_ELEMENTS + 1 }, () => "x");
-    expect(code(fichier((o) => (o["cadeaux"] = geant)))).toBe("donnees-invalides");
+  it("fait l'aller-retour exact d'un export de 150 000 noms", () => {
+    const noms = Array.from({ length: 150_000 }, (_, i) => `Nom ${String(i)}`);
+    const e = coller(etatInitial(), noms.join("\n"));
+    expect(e.participants).toHaveLength(150_000);
+    const r = importer(exporter(e));
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.etat).toEqual(e);
+  }, 30_000);
+
+  it("conserve tel quel un nom hostile", () => {
+    const hostile = "<img src=x onerror=alert(1)>";
+    const r = importer(exporter(ajouter(etatInitial(), hostile)));
+    expect(r.ok && r.etat.participants[0]?.nom).toBe(hostile);
   });
 
   it("ne pollue pas les prototypes et ignore __proto__", () => {
