@@ -230,13 +230,15 @@ test('une couleur personnalisée ne touche que son secteur, puis retour au défa
   await expect(statut(page)).toHaveText('Couleurs par défaut rétablies.');
 });
 
-test('parcours au clavier seul, du premier champ au lancement', async ({ page }) => {
+test('parcours au clavier seul, du premier champ au lancement', async ({ page, browserName }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await ouvrir(page);
+  // Safari sur macOS saute les boutons avec Tab seul : Option+Tab parcourt tous les contrôles.
+  const option = browserName === 'webkit' && process.platform === 'darwin' ? 'Alt+' : '';
   // Ordre de tabulation : roue (bouton), puis champ d'ajout.
-  await page.keyboard.press('Tab');
+  await page.keyboard.press(`${option}Tab`);
   await expect(boutonLancer(page)).toBeFocused();
-  await page.keyboard.press('Tab');
+  await page.keyboard.press(`${option}Tab`);
   await expect(champAjout(page)).toBeFocused();
   await page.keyboard.type('Ana');
   await page.keyboard.press('Enter');
@@ -244,7 +246,7 @@ test('parcours au clavier seul, du premier champ au lancement', async ({ page })
   await page.keyboard.press('Enter');
   await expect.poll(() => valeurs(page)).toEqual(['Ana', 'Bob']);
   // Retour au bouton de lancement, qui garde un focus visible.
-  await page.keyboard.press('Shift+Tab');
+  await page.keyboard.press(`${option}Shift+Tab`);
   await expect(boutonLancer(page)).toBeFocused();
   const anneau = await boutonLancer(page).evaluate((el) => {
     const s = getComputedStyle(el);
