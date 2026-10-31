@@ -20,7 +20,7 @@ Référence : `docs/spec.md`. Chaque story livre ses tests. Lint, types et tests
 
 - **3.1 Import / export** : interface de F15, avis de stockage F14. *Fini quand* : aller-retour exact, fichiers invalides refusés sans perte d'état, nom hostile (`<img onerror>`) rendu en texte.
 - **3.2 Son et confettis** : F16 et F17, coupure mémorisée, désactivation en mouvement réduit.
-- **3.3 Mode projection** : F18 avec repli CSS, à 1920 et 3840 px.
+- **3.3 Mode projection** : reportée en V1.2 (F18).
 
 ## Epic 4 — Livraison
 

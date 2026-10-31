@@ -13,7 +13,7 @@ Personas : **l'organisateur** (prépare la liste sur PC ou téléphone, peut ne 
 | Après un tirage | La personne reste dans la roue et peut regagner, sauf si l'option F19 est cochée. Retrait manuel possible dans la liste |
 | Cadeaux | Liste facultative. Sans liste, l'application fonctionne avec les noms seuls |
 | Diffusion | Un fichier `roue.html` autonome, et la même page sur GitHub Pages pour les téléphones |
-| Ambiance V1 | Son coupable, confettis, plein écran / projection, import / export |
+| Ambiance V1 | Son coupable, confettis, import / export. Mode projection reporté en V1.2 |
 
 ## 3. Exigences fonctionnelles
 
@@ -47,7 +47,7 @@ Personas : **l'organisateur** (prépare la liste sur PC ou téléphone, peut ne 
 ### Ambiance
 - **F16** Son généré par Web Audio, sans fichier : cliquetis synchronisé sur le passage des secteurs (fréquence plafonnée), fanfare courte à l'annonce. Bouton de coupure toujours visible, choix mémorisé.
 - **F17** Confettis à l'annonce, sans bibliothèque externe, en canvas.
-- **F18** Mode projection : la roue et l'annonce occupent tout l'écran, avec les contrôles d'édition masqués. Utilise l'API Fullscreen si elle existe, sinon un mode pleine fenêtre en CSS (cas de l'iPhone). Échap ou un bouton pour sortir.
+- **F18** (reporté en V1.2) Mode projection : la roue et l'annonce occupent tout l'écran, avec les contrôles d'édition masqués. Utilise l'API Fullscreen si elle existe, sinon un mode pleine fenêtre en CSS (cas de l'iPhone). Échap ou un bouton pour sortir.
 
 ## 4. Exigences non fonctionnelles
 
@@ -130,4 +130,4 @@ Secteurs pondérés, comptes, synchronisation entre appareils, roue du cadeau, t
 2. Les parcours E2E passent sous Windows et Chromium, en 320, 390, 768, 1366, 1920 et 3840 px de large.
 3. Aucune requête réseau détectée pendant les parcours, sur le fichier construit.
 4. Les parcours passent en `file://` et en HTTPS, stockage disponible ou non.
-5. Recette humaine d'Anaël sur son PC : esthétique, son, projection. Le téléphone réel passe en V1.2.
+5. Recette humaine d'Anaël sur son PC : esthétique et son. Le téléphone réel et la projection passent en V1.2.
