@@ -17,6 +17,7 @@ Au plus 2 stories en développement à la fois
 | V0 | 1.1 ★ | |
 | V1 | 1.2 · 1.3 | 1.2 ← 1.1 ; 1.3 ← 1.1 |
 | V2 | 2.1 ★ | 2.1 ← 1.2 ; 2.1 ← 1.3 |
+| V2b | 3.1a · 3.2a | 3.1a ← 1.2 ; 3.2a ← 1.1 |
 | V3 | 2.2 | 2.2 ← 2.1 |
 | V4 | 2.3 | 2.3 ← 2.2 |
 
@@ -24,6 +25,7 @@ Au plus 2 stories en développement à la fois
 
 | Vague | Stories en parallèle | Après |
 |---|---|---|
+| V4b | 2.4 | 2.4 ← 2.3 |
 | V5 | 3.1 · 3.2 | 3.1 ← 2.3 ; 3.2 ← 2.3 |
 | V6 | 3.3 | 3.3 ← 3.2 |
 | V7 | 4.1 | 4.1 ← 3.1 ; 4.1 ← 3.3 |
@@ -67,3 +69,21 @@ Au plus 2 stories en développement à la fois
 - 2026-10-31 10:17 · 1.2 · CI · verte, 9 jobs sur 9 · e9a237f
 - 2026-10-31 10:17 · 1.2 · fusion · PR #3 fusionnée · dd33bf8
 - 2026-10-31 10:18 · 2.1 · dev · lancé ·
+- 2026-10-31 10:33 · 2.1 · dev · fini, PR #5 ouverte · 2defe9c
+- 2026-10-31 10:34 · 2.1 · décision · verif-front sans outils Playwright dans sa session : captures faites par l'orchestrateur, à signaler à Anaël ·
+- 2026-10-31 10:34 · 2.1 · décision · captures à 10 et 1 000 noms, 320 et 1366 px : sans erreur ni défilement horizontal ; moiré à 1 000 noms et libellés tête en bas sur la moitié gauche à soumettre à la recette ·
+- 2026-10-31 10:39 · 2.1 · second-avis · 2 medium, 6 low · 2defe9c
+- 2026-10-31 10:39 · run · décision · vérifications navigateur faites dans Chrome (Claude in Chrome) par l'orchestrateur, à la place de verif-front, à la demande d'Anaël ·
+- 2026-10-31 10:42 · 2.1 · décision · vérifiée dans Chrome : arrêt exact à 10 et 1 000 noms, 5,8 s, second lancement refusé, clavier, clic, 1 nom, nom hostile, console sans erreur ; contour de focus à reprendre en 2.2 ·
+- 2026-10-31 10:42 · run · décision · à la demande d'Anaël, modules autonomes 3.1a et 3.2a avancés en V2b, branchement maintenu en V5 ·
+- 2026-10-31 10:42 · 3.1a · dev · lancé ·
+- 2026-10-31 10:42 · 3.2a · dev · lancé ·
+- 2026-10-31 10:42 · run · décision · demande d'Anaël : effet 3D avec bascule, ajouté en F20 et story 2.4 (V4b), relief par défaut en canvas 2D, à valider à la recette ·
+- 2026-10-31 10:44 · run · décision · chat SLM local cadré pour la V1.1, hors run (docs/v1.1-chat-slm.md) ; table d'actions src/actions.ts à prévoir dès la 2.2 ·
+- 2026-10-31 10:45 · 3.2a · dev · fini, PR #6 ouverte · 7bf1df5
+- 2026-10-31 10:46 · 3.1a · dev · fini, PR #7 ouverte · 04e7c25
+- 2026-10-31 10:59 · 3.2a · second-avis · 6 medium, 8 low · 7bf1df5
+- 2026-10-31 11:00 · 2.1 · review · 3 medium et 3 low corrigés, orientation des libellés reportée à la recette · 7889a9c
+- 2026-10-31 11:00 · 2.1 · CI · verte, 9 jobs sur 9 · 7889a9c
+- 2026-10-31 11:00 · 2.1 · fusion · PR #5 fusionnée · c15c345
+- 2026-10-31 11:00 · 2.2 · dev · lancé ·

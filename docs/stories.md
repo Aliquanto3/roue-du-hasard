@@ -14,6 +14,8 @@ Référence : `docs/spec.md`. Chaque story livre ses tests. Lint, types et tests
 - **2.2 Panneau de configuration et mise en page** : saisie, collage, couleurs F1 à F4, verrouillage pendant la rotation, mise en page N4, thèmes. *Fini quand* : parcours saisie puis lancement vert sur 320 et 1920 px.
 - **2.3 Annonce et historique** : annonce F9, `aria-live`, cadeaux F11 et F12, historique et annulation F13, option de retrait F19. *Fini quand* : parcours complet avec et sans cadeaux vert.
 
+- **2.4 Relief de la roue** : F20, rendu relief pré-calculé et bascule 2D / 3D mémorisée dans le panneau. *Fini quand* : l'arrêt reste exact dans les deux rendus, les contrastes des libellés sont tenus et le rendu tient à 1 000 noms.
+
 ## Epic 3 — Ambiance et échange
 
 - **3.1 Import / export** : interface de F15, avis de stockage F14. *Fini quand* : aller-retour exact, fichiers invalides refusés sans perte d'état, nom hostile (`<img onerror>`) rendu en texte.
