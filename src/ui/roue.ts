@@ -126,8 +126,8 @@ export function creerRoue(conteneur: HTMLElement, options: OptionsRoue): Roue {
     const manquant = noms.length < 2;
     const texte = explication?.message ?? (manquant ? TEXTS.roueIndice : null);
     indice.hidden = texte === null;
+    indice.textContent = texte ?? TEXTS.roueIndice;
     if (texte !== null) {
-      indice.textContent = texte;
       bouton.setAttribute('aria-describedby', indice.id);
     } else {
       bouton.removeAttribute('aria-describedby');
