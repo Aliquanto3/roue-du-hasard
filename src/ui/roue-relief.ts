@@ -15,8 +15,10 @@ export const OMBRE_BORD = 0.4;
 export const ZONE_BORD = 12;
 /** Opacité maximale du blanc du reflet, fixe, par-dessus secteurs et libellés. */
 export const REFLET_ALPHA = 0.05;
-/** Seuil de contraste des libellés avec relief (WCAG AA). */
+/** Seuil de contraste des libellés de la palette avec relief (WCAG AA, F20). */
 export const CONTRASTE_MIN = 4.5;
+/** Part du contraste du rendu plat que garde au moins un libellé sur couleur personnalisée (F20). */
+export const PART_CONTRASTE_PLAT = 0.85;
 
 const DEUX_PI = Math.PI * 2;
 
@@ -200,11 +202,12 @@ export function prerendreFixe(cible: HTMLCanvasElement, tailleCss: number, pixel
   const g = geometrie(tailleCss);
   ctx.setTransform(echelle, 0, 0, echelle, 0, 0);
   const externe = g.rayon + epaisseurJante(g);
-  // Ombre portée : disque ombré puis évidé, il ne reste que l'ombre qui déborde.
+  // Ombre portée : disque ombré puis évidé, il ne reste que l'ombre qui déborde. Elle s'éteint
+  // dans la marge laissée par la jante, sans liseré coupé au bord du canvas.
   ctx.save();
   ctx.shadowColor = 'rgba(0,0,0,0.55)';
-  ctx.shadowBlur = tailleCss * 0.014 * echelle;
-  ctx.shadowOffsetY = tailleCss * 0.005 * echelle;
+  ctx.shadowBlur = tailleCss * 0.012 * echelle;
+  ctx.shadowOffsetY = tailleCss * 0.003 * echelle;
   ctx.fillStyle = '#000000';
   disque(ctx, g.centre, g.centre, externe);
   ctx.fill();

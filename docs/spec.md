@@ -31,7 +31,7 @@ Personas : **l'organisateur** (prépare la liste sur PC ou téléphone, peut ne 
 - **F9** À l'arrêt : annonce en grand du nom, de sa couleur et du cadeau s'il existe, avec les boutons « Relancer » et « Fermer ».
 - **F10** Si le texte devient illisible à cause du nombre de noms (corps inférieur à 11 px CSS), les libellés ne sont plus dessinés dans les secteurs. Un bandeau sous le pointeur affiche alors en continu le nom du secteur courant. Les noms longs sont tronqués avec « … » dans le secteur, jamais dans l'annonce.
 
-- **F20** Rendu de la roue au choix : relief (par défaut) ou plat, par une bascule mémorisée. Le relief donne un effet 3D vu de face en canvas 2D (ombres, reflet, jante, moyeu et pointeur en volume), sans WebGL ni perspective : le secteur sous le pointeur, les libellés et leur contraste (F4, §5) restent ceux du rendu plat, et N7 reste tenu à 1 000 noms.
+- **F20** Rendu de la roue au choix : relief (par défaut) ou plat, par une bascule mémorisée. Le relief donne un effet 3D vu de face en canvas 2D (ombres, reflet, jante, moyeu et pointeur en volume), sans WebGL ni perspective : le secteur sous le pointeur et les libellés restent ceux du rendu plat. Le contraste des libellés (F4, §5) reste d'au moins 4,5:1 pour les couleurs de la palette, et un libellé sur couleur personnalisée perd au plus 15 % de son contraste en rendu plat. N7 reste tenu.
 
 ### Cadeaux et historique
 - **F11** Liste facultative et ordonnée de cadeaux, avec la même saisie que les noms. Chaque tirage attribue le prochain cadeau, annoncé avant le lancement : « Cadeau n° 3 sur 8 : la bougie ».

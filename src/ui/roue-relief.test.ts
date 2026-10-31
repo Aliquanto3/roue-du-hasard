@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
-import { PALETTE } from '../domain/palette';
+import { contraste, couleurTexte, PALETTE } from '../domain/palette';
 import {
   alphaOmbre,
   composer,
@@ -8,6 +8,7 @@ import {
   distanceLibelleBord,
   OMBRE_BASE,
   OMBRE_BORD,
+  PART_CONTRASTE_PLAT,
   pireContrasteLibelle,
   ZONE_BORD,
 } from './roue-relief';
@@ -25,7 +26,8 @@ describe('alphaOmbre', () => {
 
   it('les libellés s’arrêtent toujours hors de la zone de bord, à toute taille', () => {
     for (const taille of [100, 200, 320, 500, 800, 1000, 1600, 2400]) {
-      expect(distanceLibelleBord(taille)).toBeGreaterThanOrEqual(ZONE_BORD);
+      expect(distanceLibelleBord(taille)).toBeGreaterThanOrEqual(13.5);
+      expect(distanceLibelleBord(taille)).toBeGreaterThan(ZONE_BORD);
     }
   });
 });
@@ -46,9 +48,21 @@ describe('contraste des libellés avec relief', () => {
   }
 
   it('un ombrage fort sous le libellé du vermillon casserait le seuil (la marge est réelle)', () => {
-    const fond = composer('#D55E00', [{ couleur: '#111111', alpha: 0.2 }]);
-    expect(fond).not.toBe('#D55E00');
-    expect(pireContrasteLibelle('#D55E00')).toBeLessThan(5);
+    const fond = composer('#D55E00', [{ couleur: '#000000', alpha: 0.2 }]);
+    expect(contraste(couleurTexte('#D55E00'), fond)).toBeLessThan(CONTRASTE_MIN);
+  });
+
+  it(`une couleur personnalisée garde au moins ${String(PART_CONTRASTE_PLAT)} de son contraste plat`, () => {
+    const niveaux = Array.from({ length: 18 }, (_, i) => (i * 15).toString(16).padStart(2, '0'));
+    for (const r of niveaux) {
+      for (const v of niveaux) {
+        for (const b of niveaux) {
+          const c = `#${r}${v}${b}`;
+          const plat = contraste(couleurTexte(c), c);
+          expect(pireContrasteLibelle(c), c).toBeGreaterThanOrEqual(PART_CONTRASTE_PLAT * plat);
+        }
+      }
+    }
   });
 });
 

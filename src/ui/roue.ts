@@ -14,7 +14,7 @@ import {
   type ResultatLancer,
   type Vue,
 } from './roue-rotation';
-import { prerendreFixe } from './roue-relief';
+import { epaisseurJante, prerendreFixe } from './roue-relief';
 import './roue.css';
 
 export type { NomRoue } from './roue-rendu';
@@ -143,7 +143,9 @@ export function creerRoue(conteneur: HTMLElement, options: OptionsRoue): Roue {
     window.clearTimeout(minuteur);
     if (tailleCss <= 0) return;
     const corps = prerendre(image, noms, tailleCss, canvas.width, relief);
+    // Sans relief, la couche fixe ne garde pas sa mémoire.
     if (relief) prerendreFixe(fixe, tailleCss, canvas.width);
+    else fixe.width = 0;
     sansLibelles = noms.length >= 2 && corps < CORPS_MIN;
     bandeau.hidden = !sansLibelles;
     bandeau.style.top = `${String(geometrie(tailleCss).pointeY + 6)}px`;
@@ -216,7 +218,10 @@ export function creerRoue(conteneur: HTMLElement, options: OptionsRoue): Roue {
   canvas.addEventListener('pointerup', (e) => {
     if (!geste.fin(e.pointerId, e.clientX, e.clientY)) return;
     const cadre = canvas.getBoundingClientRect();
-    if (estSurRoue(e.clientX - cadre.left, e.clientY - cadre.top, geometrie(cadre.width))) demander();
+    const g = geometrie(cadre.width);
+    // En relief, la jante fait partie de la roue visible.
+    const cible = relief ? { ...g, rayon: g.rayon + epaisseurJante(g) } : g;
+    if (estSurRoue(e.clientX - cadre.left, e.clientY - cadre.top, cible)) demander();
   });
 
   new ResizeObserver(ajusterTaille).observe(scene);
