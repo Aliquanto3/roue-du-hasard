@@ -14,8 +14,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        browser: [chromium, firefox, webkit]
+        # V1.0 : Windows et Chromium seulement. Les autres supports reviennent en V1.2 (docs/v1.2-supports.md).
+        os: [windows-latest]
+        browser: [chromium]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
