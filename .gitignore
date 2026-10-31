@@ -2,3 +2,6 @@ node_modules/
 dist/
 .claude/cost-kit/.blocages
 .claude/cost-kit/verif-front/
+test-results/
+playwright-report/
+.claude/worktrees/

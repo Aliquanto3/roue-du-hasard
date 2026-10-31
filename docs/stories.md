@@ -24,3 +24,19 @@ Référence : `docs/spec.md`. Chaque story livre ses tests. Lint, types et tests
 
 - **4.1 Recette automatisée** : matrice §9, axe-core, absence de réseau, `file://` et stockage bloqué.
 - **4.2 Distribution** : README français pour novices, lignes de commande réelles, QR code, activation de Pages, tag `v1.0.0` avec `roue.html` et notes, topic `status-deployed` si le projet est exposé.
+
+## Revue
+
+### Passe 1 (2026-10-31, SHA revu 20d792b)
+
+Story 1.1. Base à jour (main 93ff8bd), pas de rebase. Mutation : sans la méta CSP, `check:size` et le E2E CSP échouent.
+
+- Important, medium, second avis, corrigé : CSP non testée. Contrôle dans `check:size` (présence, directives, avant le premier script, donc aussi avant release et Pages) et E2E sur l'événement `securitypolicyviolation`.
+- Important, medium, second avis, corrigé : garde externe trop étroit. Il refuse aussi références relatives, `//`, `url()` et API réseau. Le E2E signale aussi un fichier voisin demandé en `file:`, jusque-là filtré.
+- Important, medium, orchestrateur, corrigé : CI lancée deux fois par commit de PR (18 jobs). `push` limité à `main`.
+- Nit, low, second avis, corrigé : CSP sans `base-uri` ni `form-action`, directives qui n'héritent pas de `default-src`.
+- Nit, low, second avis, corrigé : release sans lint, tests ni contrôle tag = version. Ajoutés ; le E2E reste à la CI de `main`.
+- Nit, low, second avis, corrigé : `cancel-in-progress` à `false` sur Pages, pour ne pas couper un déploiement en cours.
+- Nit, low, second avis, corrigé : `.claude/worktrees/` absent de `.gitignore` ; `.claude/` ignoré par ESLint.
+- Nit, low, revue, corrigé : `permissions: contents: read` ajouté à la CI.
+- Nit, low, second avis, rejeté : N1 testé au chargement seulement. Il n'y a pas d'autre parcours à ce stade, la story 4.1 les couvre.

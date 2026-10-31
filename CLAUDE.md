@@ -9,5 +9,7 @@ Application web en un seul fichier HTML : une roue désigne qui reçoit un cadea
 - Fonctionne en `file://`, même sans stockage.
 
 ## Commandes
-Définies par la story 1.1 : les ajouter ici (lint, types, tests ciblés, E2E, construction).
+- Lint : `npm run lint` ; types : `npm run typecheck` ; tests unitaires : `npm test` (ciblé : `npx vitest run src/<fichier>.test.ts`).
+- Construction : `npm run build` (produit `dist/roue.html`) ; taille et ressources externes : `npm run check:size`.
+- E2E sur le fichier construit : `npm run test:e2e -- --project=chromium` (build d'abord ; en local seul chromium est installé).
 Contrôle rapide avant chaque rapport : `uv run --no-project python .claude/cost-kit/controle_rapide.py` (ESLint et `tsc --noEmit`).
