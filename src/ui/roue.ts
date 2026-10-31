@@ -34,7 +34,7 @@ export interface OptionsRoue {
 export interface Roue {
   /** Conduit la roue au gagnant déjà tiré ; résolue à l'arrêt, ou aussitôt avec `accepte: false`. */
   lancer(index: number): Promise<ResultatLancer>;
-  /** Remplace la liste ; pendant une rotation, appliqué à l'arrêt. */
+  /** Remplace la liste ; pendant une rotation, appliqué à l'arrêt, après les écouteurs de `fin`. */
   definirNoms(noms: readonly NomRoue[]): void;
   /** Événements `debut`, `fin` et `secteur` ; renvoie la fonction de désabonnement. */
   ecouter<K extends keyof Evenements>(nom: K, rappel: (e: Evenements[K]) => void): () => void;
@@ -95,6 +95,7 @@ export function creerRoue(conteneur: HTMLElement, options: OptionsRoue): Roue {
     source: options.source ?? sourceCrypto,
     mouvementReduit: () => window.matchMedia('(prefers-reduced-motion: reduce)').matches,
     surImage: afficher,
+    surArret: appliquerAttente,
     dureeMs: options.dureeMs,
   });
 
@@ -124,8 +125,8 @@ export function creerRoue(conteneur: HTMLElement, options: OptionsRoue): Roue {
 
   function afficher(nouvelle: Vue): void {
     vue = nouvelle;
-    canvas.dataset['rotation'] = String(vue.rotation % 360);
-    majBandeau(vue.rotation);
+    // Pendant un fondu, le bandeau suit l'image dominante : il ne révèle pas le gagnant d'avance.
+    majBandeau(vue.fondu && vue.fondu.progression < 0.5 ? vue.fondu.depart : vue.rotation);
     if (tailleCss > 0) dessinerImage(canvas, image, tailleCss, vue);
   }
 
@@ -171,19 +172,20 @@ export function creerRoue(conteneur: HTMLElement, options: OptionsRoue): Roue {
     majEtatLancement();
   }
 
+  /** Un écouteur de `fin` a pu relancer : la liste attend alors l'arrêt suivant. */
+  function appliquerAttente(): void {
+    if (!enAttente || moteur.enRotation) return;
+    const liste = enAttente;
+    enAttente = null;
+    appliquerNoms(liste);
+  }
+
   function demander(): void {
     if (peutLancer()) options.surDemande();
   }
 
   moteur.ecouter('debut', majEtatLancement);
-  moteur.ecouter('fin', () => {
-    if (enAttente) {
-      const liste = enAttente;
-      enAttente = null;
-      appliquerNoms(liste);
-    }
-    majEtatLancement();
-  });
+  moteur.ecouter('fin', majEtatLancement);
 
   bouton.addEventListener('click', demander);
 
@@ -228,8 +230,12 @@ export function creerRoue(conteneur: HTMLElement, options: OptionsRoue): Roue {
   return {
     lancer: (index) => moteur.lancer(index, noms.length),
     definirNoms(liste) {
-      if (moteur.enRotation) enAttente = [...liste];
-      else appliquerNoms(liste);
+      if (moteur.enRotation) {
+        enAttente = [...liste];
+      } else {
+        enAttente = null;
+        appliquerNoms(liste);
+      }
     },
     ecouter: (nom, rappel) => moteur.ecouter(nom, rappel),
     get enRotation() {

@@ -27,14 +27,20 @@ describe('creerGeste', () => {
     g.annuler(1);
     expect(g.fin(1, 0, 0)).toBe(false);
   });
-  it('ignore un second doigt', () => {
+  it('ignore les événements d’un autre pointeur', () => {
     const g = creerGeste();
     g.debut(1, 0, 0);
-    g.debut(2, 500, 500);
     g.deplacement(2, 900, 900);
     g.annuler(2);
     expect(g.fin(2, 500, 500)).toBe(false);
     expect(g.fin(1, 0, 0)).toBe(true);
+  });
+  it('un nouvel appui remplace un appui resté sans fin', () => {
+    const g = creerGeste();
+    g.debut(1, 0, 0);
+    g.debut(2, 500, 500);
+    expect(g.fin(1, 0, 0)).toBe(false);
+    expect(g.fin(2, 500, 500)).toBe(true);
   });
   it('un geste terminé ne se termine pas deux fois', () => {
     const g = creerGeste();

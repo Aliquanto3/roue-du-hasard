@@ -188,6 +188,110 @@ test('une liste reçue pendant la rotation est appliquée à l’arrêt', async 
   await expect(canvas(page)).toHaveAttribute('data-noms', '3');
 });
 
+test('des couleurs toutes différentes prouvent l’alignement du rendu et de la géométrie', async ({ page }) => {
+  await page.setViewportSize({ width: 800, height: 800 });
+  await ouvrir(page, RAPIDE);
+  for (const n of [10, 200]) {
+    await page.evaluate((k) => {
+      const canal = (v: number) => (v * 40).toString(16).padStart(2, '0');
+      window.harnais.definir(
+        Array.from({ length: k }, (_, i) => ({
+          nom: `Nom ${String(i)}`,
+          couleur: `#${canal(i % 6)}${canal(Math.floor(i / 6) % 6)}${canal(Math.floor(i / 36))}`,
+        })),
+      );
+    }, n);
+    for (const index of [1, 7, n - 1]) await verifierArret(page, index);
+  }
+});
+
+test('à la fin, les écouteurs voient encore le gagnant sous le pointeur, puis la liste en attente s’applique', async ({ page }) => {
+  await ouvrir(page, `n=5&${RAPIDE}`);
+  const r = await page.evaluate(async () => {
+    const h = window.harnais;
+    const attendu = h.couleurAttendue(2);
+    let vu: { nombre: number; pixel: number[] } | null = null;
+    h.roue.ecouter('fin', () => {
+      vu ??= { nombre: h.roue.nombre, pixel: h.pixelPointe() };
+    });
+    const promesse = h.lancer(2);
+    h.definirN(3);
+    await promesse;
+    return { attendu, vu: vu as { nombre: number; pixel: number[] } | null, apres: h.roue.nombre };
+  });
+  expect(r.vu?.nombre).toBe(5);
+  for (const c of [0, 1, 2]) {
+    expect(Math.abs((r.vu?.pixel[c] as number) - (r.attendu[c] as number))).toBeLessThanOrEqual(3);
+  }
+  expect(r.apres).toBe(3);
+});
+
+test('une liste donnée ou un lancement décidés à la fin l’emportent sur la liste en attente', async ({ page }) => {
+  await ouvrir(page, `n=5&${RAPIDE}`);
+  const r = await page.evaluate(async () => {
+    const h = window.harnais;
+    const remplacer = h.roue.ecouter('fin', () => {
+      remplacer();
+      h.definirN(4);
+    });
+    const premier = h.lancer(1);
+    h.definirN(3);
+    await premier;
+    const apresRemplacement = h.roue.nombre;
+
+    let relance: Promise<unknown> = Promise.resolve();
+    const relancer = h.roue.ecouter('fin', () => {
+      relancer();
+      relance = h.roue.lancer(0);
+    });
+    const second = h.lancer(1);
+    h.definirN(6);
+    await second;
+    const pendantRelance = h.roue.nombre;
+    await relance;
+    return { apresRemplacement, pendantRelance, apresRelance: h.roue.nombre };
+  });
+  expect(r).toEqual({ apresRemplacement: 4, pendantRelance: 4, apresRelance: 6 });
+});
+
+test('mouvement réduit : le bandeau ne révèle pas le gagnant avant le fondu', async ({ page }) => {
+  await page.setViewportSize({ width: 800, height: 800 });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await ouvrir(page, `n=200&${RAPIDE}`);
+  const r = await page.evaluate(async () => {
+    const h = window.harnais;
+    const promesse = h.lancer(100);
+    await new Promise((suite) => requestAnimationFrame(suite));
+    await new Promise((suite) => requestAnimationFrame(suite));
+    const pendant = document.querySelector('.roue__bandeau')?.textContent;
+    await promesse;
+    return { pendant, apres: document.querySelector('.roue__bandeau')?.textContent };
+  });
+  expect(r).toEqual({ pendant: 'Nom 0', apres: 'Nom 100' });
+});
+
+test('un appui perdu ne bloque pas le toucher suivant, et un second doigt ne remplace pas le premier', async ({ page }) => {
+  await ouvrir(page, 'n=5&duree=150&source=milieu');
+  const cadre = await canvas(page).boundingBox();
+  if (!cadre) throw new Error('canvas absent');
+  const demandes = await page.evaluate(
+    ({ x, y }) => {
+      const c = window.harnais.roue.canvas;
+      const envoyer = (type: string, pointerId: number, isPrimary = true) =>
+        c.dispatchEvent(new PointerEvent(type, { pointerId, isPrimary, button: 0, clientX: x, clientY: y }));
+      envoyer('pointerdown', 21); // Jamais relâché : changement d'application pendant l'appui.
+      envoyer('pointerdown', 22);
+      envoyer('pointerdown', 23, false);
+      envoyer('pointerup', 23, false);
+      const avant = window.harnais.journal.demandes;
+      envoyer('pointerup', 22);
+      return { avant, apres: window.harnais.journal.demandes };
+    },
+    { x: cadre.x + cadre.width / 2, y: cadre.y + cadre.height / 2 },
+  );
+  expect(demandes).toEqual({ avant: 0, apres: 1 });
+});
+
 test('un nom hostile reste du texte dans le bandeau', async ({ page }) => {
   await page.setViewportSize({ width: 340, height: 700 });
   await ouvrir(page, RAPIDE);

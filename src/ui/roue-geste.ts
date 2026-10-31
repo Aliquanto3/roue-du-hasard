@@ -18,7 +18,9 @@ export function creerGeste(seuil: number = SEUIL_DEPLACEMENT): Geste {
   };
   return {
     debut(id, x, y) {
-      if (!actif) actif = { id, x, y, glisse: false };
+      // Un appui resté sans fin (changement d'application) ne doit pas bloquer les suivants ;
+      // l'appelant ne transmet que le pointeur principal, un second doigt n'arrive donc pas ici.
+      actif = { id, x, y, glisse: false };
     },
     deplacement(id, x, y) {
       if (actif?.id === id) noter(x, y);

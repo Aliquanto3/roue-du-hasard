@@ -91,6 +91,8 @@ export interface OptionsMoteur {
   source: Source;
   mouvementReduit: () => boolean;
   surImage: (vue: Vue) => void;
+  /** Appelé à l'arrêt, après les écouteurs de `fin`, qui voient encore le gagnant sous le pointeur. */
+  surArret?: (() => void) | undefined;
   /** Durée forcée, pour un harnais de test ; bornes de F8 sinon. */
   dureeMs?: number | undefined;
 }
@@ -144,6 +146,7 @@ export function creerMoteur(options: OptionsMoteur): Moteur {
         enRotation = false;
         surImage({ rotation });
         emettre('fin', { index, n, rotation });
+        options.surArret?.();
         resoudre({ accepte: true, index, rotation });
       };
       const surAnimation = (): void => {
