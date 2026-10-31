@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   DUREE_CONFETTIS_MS,
   PARTICULES_MAX,
@@ -39,7 +39,11 @@ class FauxCanvas {
   }
 }
 
-function monter(opts: { reduit?: boolean; ctxNul?: boolean; w?: number; h?: number } = {}) {
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+function monter(opts: { reduit?: boolean | 'media'; ctxNul?: boolean; w?: number; h?: number } = {}) {
   const canvases: FauxCanvas[] = [];
   const ajoutes: FauxCanvas[] = [];
   const rappels = new Map<number, () => void>();
@@ -52,7 +56,7 @@ function monter(opts: { reduit?: boolean; ctxNul?: boolean; w?: number; h?: numb
   };
   let n = 0;
   const confettis = creerConfettis(conteneur, {
-    reduit: opts.reduit ?? false,
+    ...(opts.reduit === 'media' ? {} : { reduit: opts.reduit ?? false }),
     source: () => ((n++ * 0.37) % 1),
     maintenant: () => temps,
     demanderImage: (f) => {
@@ -142,6 +146,41 @@ describe('creerConfettis', () => {
     expect(canvases).toHaveLength(0);
     expect(ajoutes).toHaveLength(0);
     expect(rappels.size).toBe(0);
+  });
+
+  it('sans option, lit prefers-reduced-motion à chaque lancement (N6)', () => {
+    let reduit = true;
+    const requetes: string[] = [];
+    vi.stubGlobal('matchMedia', (q: string) => {
+      requetes.push(q);
+      return { matches: reduit };
+    });
+    const { confettis, canvases } = monter({ reduit: 'media' });
+    confettis.lancer(['#f00']);
+    expect(canvases).toHaveLength(0);
+    expect(requetes).toEqual(['(prefers-reduced-motion: reduce)']);
+    reduit = false;
+    confettis.lancer(['#f00']);
+    expect(canvases).toHaveLength(1);
+  });
+
+  it('reste net selon devicePixelRatio sur un écran courant', () => {
+    vi.stubGlobal('devicePixelRatio', 2);
+    const { confettis, ajoutes } = monter();
+    confettis.lancer(['#f00']);
+    expect([ajoutes[0]?.width, ajoutes[0]?.height]).toEqual([1600, 1200]);
+  });
+
+  it.each([
+    [2560, 1440],
+    [3840, 2160],
+  ])('plafonne la surface du canvas à celle d’un écran 4K en %i x %i à ratio 2 (N7)', (w, h) => {
+    vi.stubGlobal('devicePixelRatio', 2);
+    const { confettis, ajoutes } = monter({ w, h });
+    confettis.lancer(['#f00']);
+    const c = ajoutes[0]!;
+    expect(c.width * c.height).toBeLessThanOrEqual(3840 * 2160 * 1.001);
+    expect(c.width / c.height).toBeCloseTo(w / h, 2);
   });
 
   it('un contexte 2D nul ne lève pas et ne laisse rien', () => {

@@ -37,9 +37,13 @@ export interface OptionsSon {
 }
 
 export interface Son {
-  /** À appeler sur un geste utilisateur : crée ou reprend le contexte. */
+  /** À appeler sur un geste utilisateur : crée le contexte, ou le reprend s'il n'est pas actif. */
   preparer(): void;
-  /** `franchis` : secteurs franchis depuis la dernière image (0 à 1 000) ; un seul clic, plafonné. */
+  /**
+   * `franchis` : secteurs franchis depuis la dernière image (0 à 1 000) ; un seul clic, plafonné.
+   * `cliquetis` et `fanfare` sont sans effet tant que le contexte n'est pas `running` : la reprise
+   * est asynchrone, donc une fanfare dans le même tour que le premier `preparer()` reste muette.
+   */
   cliquetis(franchis: number): void;
   fanfare(): void;
   couper(coupe: boolean): void;
@@ -137,11 +141,11 @@ export function creerSon(options: OptionsSon = {}): Son {
           maitre.connect(neuf.destination);
           appliquerCoupure();
         }
-        if (contexte.state === 'suspended') contexte.resume().catch(() => undefined);
+        if (contexte.state !== 'running') contexte.resume().catch(() => undefined);
       });
     },
     cliquetis(franchis) {
-      if (coupe || !contexte || !maitre || !(franchis > 0)) return;
+      if (coupe || !contexte || !maitre || !(franchis > 0) || contexte.state !== 'running') return;
       const t = maintenant();
       if (t - dernierClic < INTERVALLE_CLIQUETIS_MS) return;
       dernierClic = t;
@@ -149,7 +153,7 @@ export function creerSon(options: OptionsSon = {}): Son {
       sansEffet(() => jouer(ctx, sortie, 1800, ctx.currentTime, DUREE_CLIC_S, 'square', 0.4));
     },
     fanfare() {
-      if (coupe || !contexte || !maitre) return;
+      if (coupe || !contexte || !maitre || contexte.state !== 'running') return;
       const [ctx, sortie] = [contexte, maitre];
       sansEffet(() => {
         const debut = ctx.currentTime;

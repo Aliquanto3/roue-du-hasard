@@ -1,5 +1,6 @@
 /** Confettis en canvas, sans bibliothèque (F17). Désactivés en mouvement réduit (N6). */
 
+/** Le conteneur doit être positionné (`position: relative`) : le canvas s'y place en absolu. */
 export interface ConteneurConfettis {
   readonly clientWidth: number;
   readonly clientHeight: number;
@@ -27,6 +28,8 @@ export const DUREE_CONFETTIS_MS = 3500;
 export const PARTICULES_MAX = 150;
 export const PARTICULES_MIN = 30;
 export const RATIO_PIXELS_MAX = 2;
+/** Surface d'un écran 4K : au-delà (écran 5K à ratio 2…), la netteté ne vaut pas le coût par image (N7). */
+const SURFACE_MAX = 3840 * 2160;
 const PIXELS_PAR_PARTICULE = 8000;
 const GRAVITE = 900; // px/s²
 
@@ -80,7 +83,11 @@ export function creerConfettis(conteneur: ConteneurConfettis, options: OptionsCo
     try {
       const largeur = Math.max(1, conteneur.clientWidth || globalThis.innerWidth || 1);
       const hauteur = Math.max(1, conteneur.clientHeight || globalThis.innerHeight || 1);
-      const ratio = Math.min(globalThis.devicePixelRatio || 1, RATIO_PIXELS_MAX);
+      const ratio = Math.min(
+        globalThis.devicePixelRatio || 1,
+        RATIO_PIXELS_MAX,
+        Math.sqrt(SURFACE_MAX / (largeur * hauteur)),
+      );
       const c = creerCanvas();
       const ctx = c.getContext('2d');
       if (!ctx) return;

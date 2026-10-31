@@ -39,6 +39,8 @@ class FauxContexte {
   oscillateurs: FauxOsc[] = [];
   gains: FauxGain[] = [];
   reprises = 0;
+  /** Reprise refusée ou en attente : l'état ne change pas (autoplay, appel entrant sur iOS). */
+  repriseBloquee = false;
   createOscillator(): OscillateurAudio {
     const o = new FauxOsc();
     this.oscillateurs.push(o);
@@ -51,7 +53,7 @@ class FauxContexte {
   }
   resume(): Promise<void> {
     this.reprises++;
-    this.state = 'running';
+    if (!this.repriseBloquee) this.state = 'running';
     return Promise.resolve();
   }
 }
@@ -91,6 +93,31 @@ describe('creerSon', () => {
     expect(creations()).toBe(1);
     expect(ctx.reprises).toBe(1);
     expect(ctx.gains[0]?.gain.value).toBe(VOLUME_MAITRE);
+  });
+
+  it('preparer() reprend aussi un contexte interrompu (iOS)', () => {
+    const { ctx, son } = monter();
+    son.preparer();
+    ctx.state = 'interrupted';
+    son.preparer();
+    expect(ctx.reprises).toBe(2);
+    expect(ctx.state).toBe('running');
+  });
+
+  it.each(['suspended', 'interrupted'])('contexte %s : rien n’est planifié, aucune rafale à la reprise', (etat) => {
+    const { ctx, son, avancer } = monter();
+    son.preparer();
+    ctx.state = etat;
+    for (let i = 0; i < 80; i++) {
+      son.cliquetis(1);
+      avancer(INTERVALLE_CLIQUETIS_MS);
+    }
+    son.fanfare();
+    expect(ctx.oscillateurs).toHaveLength(0);
+    // Le premier cliquetis après la reprise part sans attendre la fenêtre de 50 ms.
+    ctx.state = 'running';
+    son.cliquetis(1);
+    expect(ctx.oscillateurs).toHaveLength(1);
   });
 
   it('plafonne les cliquetis à 20 par seconde, quel que soit franchis', () => {
