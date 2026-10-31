@@ -1,5 +1,7 @@
 .panneau {
   display: grid;
+  /* Sans `minmax(0, …)`, un contenu insécable élargirait la colonne au-delà de la fenêtre. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.75rem;
   padding: 1rem;
   border: 1px solid var(--bord);
@@ -81,6 +83,8 @@
   margin: 0;
   min-height: 1.5rem;
   color: var(--texte-doux);
+  /* Le statut cite un nom : 60 caractères sans espace doivent passer à la ligne. */
+  overflow-wrap: anywhere;
 }
 .panneau[data-verrou='true'] .panneau__statut {
   padding: 0.5rem 0.75rem;

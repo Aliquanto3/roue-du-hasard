@@ -6,7 +6,7 @@
  */
 import type { Actions, NomAction, ParametresActions, Resultat } from '../actions';
 import type { Etat, Participant } from '../domain/etat';
-import { compterDoublons, compterTronques } from '../domain/normalisation';
+import { compterDoublons, compterTronques, estTronque } from '../domain/normalisation';
 import { couleursParDefaut, couleurTexte } from '../domain/palette';
 import { TEXTS } from '../texts';
 import type { Roue } from './roue';
@@ -60,7 +60,15 @@ function etiquette(texte: string, idCible: string, parent: HTMLElement): void {
 let compteurId = 0;
 const idUnique = (base: string): string => `${base}-${String((compteurId += 1))}`;
 
-export function creerPanneau(conteneur: HTMLElement, actions: Actions, roue: RoueVerrou): void {
+export interface Panneau {
+  /**
+   * Valide le renommage en cours de saisie. À appeler avant un lancement : au toucher, la rotation
+   * part au `pointerup`, avant le `mousedown` de compatibilité qui fait sortir du champ.
+   */
+  validerSaisie(): void;
+}
+
+export function creerPanneau(conteneur: HTMLElement, actions: Actions, roue: RoueVerrou): Panneau {
   const racine = creer('section', 'panneau', conteneur);
   const titre = creer('h2', 'panneau__titre', racine);
   titre.id = idUnique('panneau-titre');
@@ -258,7 +266,7 @@ export function creerPanneau(conteneur: HTMLElement, actions: Actions, roue: Rou
     const saisie = champAjout.value;
     if (!executer('ajouter', { nom: saisie }).ok) return;
     champAjout.value = '';
-    annoncer(messageAjout(avant, actions.magasin.lire().participants.length, compterTronques(saisie)));
+    annoncer(messageAjout(avant, actions.magasin.lire().participants.length, estTronque(saisie) ? 1 : 0));
     champAjout.focus();
   });
 
@@ -275,18 +283,21 @@ export function creerPanneau(conteneur: HTMLElement, actions: Actions, roue: Rou
     if (executer('reinitialiserCouleurs', {}).ok) annoncer(TEXTS.statutCouleurs);
   });
 
+  /** Valide le champ d'une ligne : il montre ensuite le nom retenu, normalisé ou rétabli. */
+  function validerRenommage(ligne: Ligne): void {
+    const avant = ligne.participant;
+    const saisie = ligne.nom.value;
+    // Déjà validé (`validerSaisie` avant le lancement, puis sortie du champ) : pas de refus à annoncer.
+    if (!avant || saisie === avant.nom) return;
+    const r = executer('renommer', { id: avant.id, nom: saisie });
+    if (r.ok) annoncer(estTronque(saisie) ? TEXTS.statutTronques(1) : TEXTS.statutRenomme);
+    ligne.nom.value = (ligne.participant ?? avant).nom;
+  }
+
   /** Renommage validé (sortie du champ ou Entrée) : un seul recalcul, pas un par frappe. */
   liste.addEventListener('change', (e) => {
     const ligne = ligneDe(e.target);
-    if (!ligne?.participant || e.target !== ligne.nom) return;
-    const saisie = ligne.nom.value;
-    const r = executer('renommer', { id: ligne.participant.id, nom: saisie });
-    if (r.ok) {
-      const tronques = compterTronques(saisie);
-      annoncer(tronques > 0 ? TEXTS.statutTronques(tronques) : TEXTS.statutRenomme);
-    } else if (ligne.participant) {
-      ligne.nom.value = ligne.participant.nom;
-    }
+    if (ligne && e.target === ligne.nom) validerRenommage(ligne);
   });
 
   liste.addEventListener('keydown', (e) => {
@@ -342,4 +353,11 @@ export function creerPanneau(conteneur: HTMLElement, actions: Actions, roue: Rou
   });
   synchroniser(actions.magasin.lire(), null);
   appliquerVerrou(roue.enRotation);
+
+  return {
+    validerSaisie() {
+      const ligne = ligneDe(document.activeElement);
+      if (ligne && document.activeElement === ligne.nom) validerRenommage(ligne);
+    },
+  };
 }

@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { compterDoublons, compterTronques, decouper, longueur, normaliserNom, tronquer } from "./normalisation";
+import { compterDoublons, compterTronques, decouper, estTronque, longueur, normaliserNom, tronquer } from "./normalisation";
+
+describe("estTronque", () => {
+  it("juge le nom entier, sans découper sur les virgules", () => {
+    expect(estTronque(`${"a".repeat(40)}, ${"b".repeat(40)}`)).toBe(true);
+    expect(estTronque(`  ${"a".repeat(60)}  `)).toBe(false);
+  });
+});
 
 describe("compterTronques", () => {
   it("compte les noms au-delà de 60 points de code, séparateurs compris", () => {

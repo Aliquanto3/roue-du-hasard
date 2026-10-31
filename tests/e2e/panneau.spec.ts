@@ -98,6 +98,63 @@ test('un nom trop long est raccourci à 60 caractères avec un message', async (
   await expect(statut(page)).toHaveText('1 nom ajouté. 1 nom raccourci à 60 caractères.');
 });
 
+test('un nom unique trop long contenant une virgule est signalé, à l’ajout comme au renommage', async ({ page }) => {
+  await ouvrir(page);
+  const avecVirgule = `${'a'.repeat(40)}, ${'b'.repeat(40)}`;
+  await ajouter(page, avecVirgule);
+  await expect(statut(page)).toHaveText('1 nom ajouté. 1 nom raccourci à 60 caractères.');
+  await ajouter(page, 'Bob');
+  await noms(page).nth(1).fill(avecVirgule);
+  await noms(page).nth(1).press('Enter');
+  await expect(statut(page)).toHaveText('1 nom raccourci à 60 caractères.');
+});
+
+test('le champ renommé montre le nom retenu, même si l’état ne change pas', async ({ page }) => {
+  await ouvrir(page);
+  const long = 'a'.repeat(60);
+  await zoneCollage(page).fill(`${long}\nBob`);
+  await boutonCollage(page).click();
+  await noms(page).nth(0).fill('a'.repeat(70));
+  await noms(page).nth(0).press('Enter');
+  await noms(page).nth(1).fill('  Bob  ');
+  await noms(page).nth(1).press('Enter');
+  await expect.poll(() => valeurs(page)).toEqual([long, 'Bob']);
+});
+
+test.describe('toucher', () => {
+  test.use({ hasTouch: true });
+  test('un toucher sur la roue ne perd pas le renommage en cours, et la roue le reçoit avant de partir', async ({
+    page,
+    browserName,
+  }) => {
+    test.skip(browserName === 'firefox', 'Playwright ne simule pas le toucher sous Firefox');
+    await ouvrir(page);
+    await zoneCollage(page).fill('Ana\nBob\nChloé');
+    await boutonCollage(page).click();
+    await expect(page.locator('canvas.roue__canvas')).toHaveAttribute('data-noms', '3');
+    // Ordre des mises à jour : `data-noms` est réécrit à chaque liste reçue par la roue.
+    await page.evaluate(() => {
+      const ordre: (string | null)[] = [];
+      new MutationObserver((mutations) => ordre.push(...mutations.map((m) => m.attributeName))).observe(
+        document.getElementById('app') as HTMLElement,
+        { subtree: true, attributes: true, attributeFilter: ['data-noms', 'data-verrou'] },
+      );
+      (window as unknown as { ordre: (string | null)[] }).ordre = ordre;
+    });
+    await noms(page).nth(0).fill('Anaïs');
+    const cadre = await page.locator('canvas.roue__canvas').boundingBox();
+    if (!cadre) throw new Error('canvas absent');
+    await page.touchscreen.tap(cadre.x + cadre.width / 2, cadre.y + cadre.height / 2);
+    await expect(page.locator('.panneau')).toHaveAttribute('data-verrou', 'true');
+    await expect.poll(() => valeurs(page)).toEqual(['Anaïs', 'Bob', 'Chloé']);
+    await expect(statut(page)).not.toContainText('ne peut pas être modifiée');
+    const ordre = await page.evaluate(() => (window as unknown as { ordre: (string | null)[] }).ordre);
+    expect(ordre.slice(0, 2)).toEqual(['data-noms', 'data-verrou']);
+    await expect(page.locator('.panneau')).toHaveAttribute('data-verrou', 'false', { timeout: 10_000 });
+    expect(await valeurs(page)).toEqual(['Anaïs', 'Bob', 'Chloé']);
+  });
+});
+
 test('renommer valide à la sortie du champ, supprimer rend le focus à la ligne voisine', async ({ page }) => {
   await ouvrir(page);
   await zoneCollage(page).fill('Ana\nBob\nChloé');
@@ -286,6 +343,19 @@ test.describe('mise en page N4', () => {
     });
   }
 
+  test('à 320 px, le message citant un nom de 60 caractères sans espace ne déborde pas', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 568 });
+    await ouvrir(page);
+    const long = 'A'.repeat(60);
+    await zoneCollage(page).fill(`${long}\nBob`);
+    await boutonCollage(page).click();
+    await page.getByRole('button', { name: `Supprimer ${long}` }).click();
+    await expect(statut(page)).toHaveText(`${long} retiré de la liste.`);
+    await sansDefilementHorizontal(page);
+    const cadre = await statut(page).boundingBox();
+    expect(cadre && cadre.x + cadre.width).toBeLessThanOrEqual(320);
+  });
+
   test('les cibles tactiles font au moins 44 px, à 320 px comme à 1920 px', async ({ page }) => {
     for (const largeur of [320, 1920]) {
       await page.setViewportSize({ width: largeur, height: 900 });
@@ -336,6 +406,19 @@ test.describe('thèmes et accessibilité', () => {
       expect(graves.map((v) => `${v.id} : ${v.nodes.map((n) => n.target.join(' ')).join(' | ')}`)).toEqual([]);
     });
   }
+
+  test('axe-core sans violation sérieuse pendant le verrou', async ({ page }) => {
+    await ouvrir(page);
+    await zoneCollage(page).fill('Ana\nBob\nChloé');
+    await boutonCollage(page).click();
+    await boutonLancer(page).click();
+    await expect(page.locator('.panneau')).toHaveAttribute('data-verrou', 'true');
+    const resultat = await new AxeBuilder({ page }).analyze();
+    // L'analyse doit avoir eu lieu pendant la rotation (4 à 6 s).
+    await expect(page.locator('.panneau')).toHaveAttribute('data-verrou', 'true', { timeout: 100 });
+    const graves = resultat.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
+    expect(graves.map((v) => v.id)).toEqual([]);
+  });
 
   test('le pointeur et le moyeu restent visibles sur les deux fonds', async ({ page }) => {
     for (const scheme of ['dark', 'light'] as const) {
