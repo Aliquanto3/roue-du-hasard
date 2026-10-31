@@ -28,6 +28,7 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: npm run check:size
+      - run: npm run build:harnais
       - run: npx playwright install --with-deps ${{ matrix.browser }}
       - run: npx playwright test --project=${{ matrix.browser }}
       - uses: actions/upload-artifact@v4

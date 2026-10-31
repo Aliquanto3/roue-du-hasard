@@ -12,7 +12,9 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:e2e": "playwright test",
+    "harnais": "vite --config tests/harnais/vite.config.ts",
+    "build:harnais": "vite build --config tests/harnais/vite.config.ts",
+    "test:e2e": "npm run build:harnais && playwright test",
     "check:size": "node scripts/check-size.mjs"
   },
   "devDependencies": {

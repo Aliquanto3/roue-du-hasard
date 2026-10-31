@@ -1,0 +1,56 @@
+.roue {
+  width: min(100%, calc(100vh - 8rem));
+  width: min(100%, calc(100dvh - 8rem));
+  min-width: 200px;
+  margin-inline: auto;
+}
+.roue__scene {
+  position: relative;
+  aspect-ratio: 1 / 1;
+}
+.roue__canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  /* Le défilement de la page reste possible ; le double toucher ne zoome pas. */
+  touch-action: manipulation;
+  cursor: pointer;
+}
+.roue__canvas[data-lancable='false'] {
+  cursor: default;
+}
+.roue__bandeau {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 80%;
+  padding: 0.25em 0.75em;
+  border-radius: 0.5em;
+  background: #14162b;
+  color: #fff;
+  font: 600 1rem/1.3 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  text-align: center;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
+.roue__bandeau[hidden],
+.roue__indice[hidden] {
+  display: none;
+}
+.roue__indice {
+  margin: 0.5rem 0 0;
+  text-align: center;
+}
+.roue__bouton {
+  display: block;
+  min-height: 44px;
+  margin: 0.75rem auto 0;
+  padding: 0.5rem 1.5rem;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.roue__bouton[aria-disabled='true'] {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

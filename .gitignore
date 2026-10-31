@@ -1,5 +1,6 @@
 node_modules/
 dist/
+dist-harnais/
 .claude/cost-kit/.blocages
 .claude/cost-kit/verif-front/
 test-results/
