@@ -24,7 +24,7 @@ Référence : `docs/spec.md`. Chaque story livre ses tests. Lint, types et tests
 
 ## Epic 4 — Livraison
 
-- **4.1 Recette automatisée** : matrice §9, axe-core, absence de réseau, `file://` et stockage bloqué.
+- **4.1 Recette automatisée** : matrice §9 sous Windows et Chromium, axe-core, absence de réseau, `file://` et stockage bloqué.
 - **4.2 Distribution** : README français pour novices, lignes de commande réelles, QR code, activation de Pages, tag `v1.0.0` avec `roue.html` et notes, topic `status-deployed` si le projet est exposé.
 
 ## Revue
