@@ -41,6 +41,11 @@ export interface Roue {
   definirNoms(noms: readonly NomRoue[]): void;
   /** Événements `debut`, `fin` et `secteur` ; renvoie la fonction de désabonnement. */
   ecouter<K extends keyof Evenements>(nom: K, rappel: (e: Evenements[K]) => void): () => void;
+  /**
+   * Explication affichée sous la roue à la place de l'indice « Ajoutez au moins deux noms » ;
+   * `bloquer` désactive aussi le lancement (bouton, toucher, clavier). `null` la retire.
+   */
+  definirExplication(message: string | null, bloquer?: boolean): void;
   readonly enRotation: boolean;
   /** Rotation au repos, dans [0, 360). */
   readonly rotation: number;
@@ -97,6 +102,8 @@ export function creerRoue(conteneur: HTMLElement, options: OptionsRoue): Roue {
   let dernierIndexBandeau = -1;
   let vue: Vue = { rotation: 0 };
   let minuteur = 0;
+  /** Explication donnée par l'application (cadeaux épuisés, plus assez de noms), affichée à la place de l'indice. */
+  let explication: { message: string; bloquer: boolean } | null = null;
 
   const moteur = creerMoteur({
     horloge: horlogeNavigateur,
@@ -108,7 +115,7 @@ export function creerRoue(conteneur: HTMLElement, options: OptionsRoue): Roue {
   });
 
   function peutLancer(): boolean {
-    return noms.length >= 2 && !moteur.enRotation;
+    return noms.length >= 2 && !moteur.enRotation && !explication?.bloquer;
   }
 
   function majEtatLancement(): void {
@@ -117,9 +124,14 @@ export function creerRoue(conteneur: HTMLElement, options: OptionsRoue): Roue {
     bouton.setAttribute('aria-disabled', String(!lancable));
     canvas.dataset['lancable'] = String(lancable);
     const manquant = noms.length < 2;
-    indice.hidden = !manquant;
-    if (manquant) bouton.setAttribute('aria-describedby', indice.id);
-    else bouton.removeAttribute('aria-describedby');
+    const texte = explication?.message ?? (manquant ? TEXTS.roueIndice : null);
+    indice.hidden = texte === null;
+    if (texte !== null) {
+      indice.textContent = texte;
+      bouton.setAttribute('aria-describedby', indice.id);
+    } else {
+      bouton.removeAttribute('aria-describedby');
+    }
   }
 
   function majBandeau(rotation: number): void {
@@ -259,6 +271,10 @@ export function creerRoue(conteneur: HTMLElement, options: OptionsRoue): Roue {
     },
     get relief() {
       return relief;
+    },
+    definirExplication(message, bloquer = true) {
+      explication = message === null ? null : { message, bloquer };
+      majEtatLancement();
     },
     get enRotation() {
       return moteur.enRotation;

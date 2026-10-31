@@ -1,5 +1,8 @@
 import { creerActions, creerMagasin } from './actions';
 import { TEXTS } from './texts';
+import { creerAnnonce, type Annonce } from './ui/annonce';
+import { creerCadeaux } from './ui/cadeaux';
+import { creerHistorique } from './ui/historique';
 import { creerPanneau } from './ui/panneau';
 import { creerRoue, type Roue } from './ui/roue';
 import './ui/page.css';
@@ -18,7 +21,7 @@ export function render(root: HTMLElement): Roue {
   root.append(page);
 
   const magasin = creerMagasin();
-  // La roue est créée après la table d'actions, qui ne lit `roue` qu'à l'exécution.
+  // Roue, panneau et annonce sont créés après la table d'actions, qui ne les lit qu'à l'exécution.
   const actions = creerActions({
     magasin,
     enRotation: () => roue.enRotation,
@@ -27,11 +30,21 @@ export function render(root: HTMLElement): Roue {
       pousserNoms();
       void roue.lancer(index);
     },
+    annonce: {
+      ouverte: () => annonce.ouverte(),
+      ouvrir: (info) => {
+        annonce.ouvrir(info);
+      },
+      fermer: (options) => {
+        annonce.fermer(options);
+      },
+    },
   });
   const roue: Roue = creerRoue(zoneRoue, {
     surDemande: () => {
       panneau.validerSaisie();
-      void actions.executer('lancer', {});
+      const r = actions.executer('lancer', {});
+      if (!r.ok) annonce.dire(TEXTS.refus[r.code]);
     },
   });
 
@@ -42,13 +55,32 @@ export function render(root: HTMLElement): Roue {
     planifie = false;
     roue.definirNoms(magasin.lire().participants.map(({ nom, couleur }) => ({ nom, couleur })));
   };
-  magasin.abonner(() => {
-    if (planifie) return;
+  magasin.abonner((etat, precedent) => {
+    // Un tirage ou un cadeau ne change pas la roue : pas de nouveau pré-rendu.
+    if (planifie || etat.participants === precedent.participants) return;
     planifie = true;
     queueMicrotask(pousserNoms);
   });
 
+  // Le tirage s'enregistre et l'annonce s'ouvre à l'arrêt, sur l'index de l'événement `fin` : le gagnant
+  // annoncé, la ligne d'historique et le secteur sous le pointeur sont le même.
+  roue.ecouter('fin', ({ index }) => {
+    const r = actions.executer('enregistrerTirage', { index });
+    if (!r.ok) annonce.dire(TEXTS.refus[r.code]);
+  });
+
   const panneau = creerPanneau(zonePanneau, actions, roue);
+  creerCadeaux({ panneau: zonePanneau, roue: zoneRoue, page }, actions, roue);
+  creerHistorique(zonePanneau, actions, roue);
+  const annonce: Annonce = creerAnnonce(root, {
+    actions,
+    arriere: page,
+    focusParDefaut: () => roue.bouton,
+    avantLancement: () => {
+      panneau.validerSaisie();
+    },
+    // 3.2 : brancher ici la fanfare et les confettis (`celebration: (info, mouvementReduit) => …`).
+  });
   root.dataset['ready'] = 'true';
   return roue;
 }

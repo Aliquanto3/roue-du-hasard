@@ -1,0 +1,71 @@
+/* Historique (F13) et option F19. */
+.historique__option {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 44px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.historique__case {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+.historique__barre {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.historique__confirmation {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border: 2px solid var(--alerte);
+  border-radius: 0.5rem;
+}
+.historique__confirmation[hidden],
+.historique__copie[hidden],
+.historique__defilant[hidden] {
+  display: none;
+}
+.historique__confirmation-titre {
+  margin: 0;
+  font-weight: 700;
+}
+/* Plusieurs centaines de lignes : la liste défile dans sa région, le panneau reste court. */
+.historique__defilant {
+  max-height: 18rem;
+  overflow: auto;
+  border: 1px solid var(--bord);
+  border-radius: 0.5rem;
+}
+.historique__table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 0.9375rem;
+}
+.historique__table th,
+.historique__table td {
+  padding: 0.375rem 0.5rem;
+  border-bottom: 1px solid var(--bord);
+  text-align: left;
+  overflow-wrap: anywhere;
+  vertical-align: top;
+}
+.historique__table th {
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+}
+.historique__table th:first-child,
+.historique__table td:first-child {
+  width: 2.75rem;
+}
+.historique__table th:last-child,
+.historique__table td:last-child {
+  width: 5.5rem;
+}
