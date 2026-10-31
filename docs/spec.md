@@ -55,7 +55,7 @@ Personas : **l'organisateur** (prépare la liste sur PC ou téléphone, peut ne 
 - **N2 Sécurité** : les noms et cadeaux, y compris importés, sont rendus uniquement en texte (`textContent` ou canvas, jamais `innerHTML`).
 - **N3 Autonomie** : une version unique en un seul fichier HTML, tout en ligne, moins de 200 Ko, fonctionnant en `file://` et en HTTPS, sans dépendance d'exécution.
 - **N4 Responsive** : sans défilement horizontal de 320 px à 3840 px de large, en portrait et en paysage. Roue et panneau côte à côte sur écran large, empilés sur téléphone, roue d'abord. Cibles tactiles d'au moins 44 px. Respect des zones sûres (`safe-area-inset`).
-- **N5 Navigateurs** : deux dernières versions de Chrome, Edge, Firefox, Safari (macOS et iOS), Chrome Android.
+- **N5 Navigateurs** : V1.0 garantie et testée sous Windows avec Chrome (moteur Chromium). Edge, Firefox, Safari (macOS et iOS), Chrome Android, macOS et Linux sont reportés en V1.2 (`docs/v1.2-supports.md`).
 - **N6 Accessibilité** : WCAG 2.2 AA. Parcours complet au clavier, focus visible, résultat annoncé par `aria-live`, aucun axe bloquant ou sérieux relevé par axe-core. La couleur n'est jamais la seule information : le nom est toujours lisible en toutes lettres (secteur ou bandeau). Avec `prefers-reduced-motion`, la rotation et les confettis sont remplacés par un fondu court vers le secteur gagnant.
 - **N7 Performance** : 60 images/s visées sur PC et 30 au minimum sur un téléphone moyen, jusqu'à 100 noms ; au-delà, l'application reste utilisable sans garantie de fluidité (roue pré-rendue dans un canvas hors écran, redessinée seulement à l'édition). Rendu net selon `devicePixelRatio`.
 - **N8 Langue** : interface en français. Textes centralisés dans un seul module, sans système de traduction en V1.
@@ -127,7 +127,7 @@ Secteurs pondérés, comptes, synchronisation entre appareils, roue du cadeau, t
 ## 9. Critères d'acceptation globaux
 
 1. Un novice ouvre `roue.html` en double-cliquant, saisit des noms, lance la roue et lit le gagnant sans aide.
-2. Les parcours E2E passent sur les trois moteurs, en 320, 390, 768, 1366, 1920 et 3840 px de large.
+2. Les parcours E2E passent sous Windows et Chromium, en 320, 390, 768, 1366, 1920 et 3840 px de large.
 3. Aucune requête réseau détectée pendant les parcours, sur le fichier construit.
 4. Les parcours passent en `file://` et en HTTPS, stockage disponible ou non.
-5. Recette humaine d'Anaël : esthétique, son, téléphone réel, projection.
+5. Recette humaine d'Anaël sur son PC : esthétique, son, projection. Le téléphone réel passe en V1.2.
