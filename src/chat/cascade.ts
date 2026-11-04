@@ -9,12 +9,14 @@
  * arrête tout, et une décision rendue après l'annulation est ignorée. Sans résultat : refus
  * `incompris`. La forme des décisions est vérifiée plus loin, par `planifier`.
  */
+import { creerEtageDecisionEnregistre } from './decision';
 import { creerEtageSlm } from './slm';
 import type { Decision, Etage, EtatChat, FabriqueEtage, OptionsEtages, ResultatCascade, TraceEtage } from './types';
 
 /** Fabriques des étages actifs, par ordre de priorité. Une ligne par étage. */
 export const ETAGES_ENREGISTRES: readonly FabriqueEtage[] = [
-  // 5.3 : règles ; 5.10 : décision
+  // 5.3 : `regles` s'insérera ici, en tête, avant `decision`
+  creerEtageDecisionEnregistre,
   creerEtageSlm,
 ];
 

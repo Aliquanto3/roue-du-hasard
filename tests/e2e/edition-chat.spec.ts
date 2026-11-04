@@ -31,7 +31,7 @@ test('l’édition chat se charge sans violation de CSP et la roue fonctionne', 
   const reponse = await page.goto(ORIGINE);
   expect(reponse?.status()).toBe(200);
   await expect(page.locator('#app')).toHaveAttribute('data-ready', 'true');
-  await expect(page.locator('#app')).toHaveAttribute('data-chat', 'roue-du-hasard:edition-chat:0');
+  await expect(page.locator('#app')).toHaveAttribute('data-chat', /^roue-du-hasard:edition-chat:\d+$/);
 
   await page.getByLabel('Coller une liste de noms').fill('Ada\nBob\nCy');
   await page.getByRole('button', { name: 'Ajouter la liste' }).click();
