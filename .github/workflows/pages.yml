@@ -30,10 +30,12 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm run check:size
-      - run: cp dist/roue.html dist/index.html
+      # Pages ne publie que roue.html (en index.html) : l'édition chat n'est servie qu'en local.
+      - run: mkdir pages && cp dist/roue.html pages/index.html
+      - run: test ! -e pages/roue-chat.html && ! grep -q "edition-chat" pages/index.html
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: pages
       - id: deployment
         uses: actions/deploy-pages@v4

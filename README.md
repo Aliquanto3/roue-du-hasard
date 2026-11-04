@@ -72,6 +72,18 @@ Les noms ne quittent jamais votre appareil. Une fois la page chargée, l'applica
 
 La liste et l'historique sont enregistrés automatiquement dans le navigateur. En navigation privée, ou si le navigateur bloque le stockage pour un fichier local, l'application fonctionne quand même : elle affiche un avis discret qui vous invite à **exporter** votre liste pour ne pas la perdre.
 
+## Édition chat (facultatif, avancé)
+
+Une édition expérimentale prépare le pilotage de la roue par des phrases, avec un modèle local [Ollama](https://ollama.com). Elle n'est pas nécessaire : sans Ollama, la roue marche comme dans `roue.html`. Elle se sert depuis `http://localhost:5200`, jamais en double-cliquant le fichier.
+
+1. Lancer Ollama en n'autorisant que cette origine.
+   - PowerShell : `$env:OLLAMA_ORIGINS = "http://localhost:5200"; ollama serve`
+   - bash : `OLLAMA_ORIGINS=http://localhost:5200 ollama serve`
+2. Dans le dépôt : `npm run build`, puis `npm run chat`.
+3. Ouvrir `http://localhost:5200` (et non `127.0.0.1:5200` : Ollama n'accepte que l'origine `localhost`). Le serveur redirige `127.0.0.1` vers `localhost` et refuse tout autre nom d'hôte.
+
+Le serveur n'écoute que sur cette machine (`127.0.0.1`) et ne sert que `dist/roue-chat.html`. La page ne peut joindre qu'Ollama en local (`localhost:11434`).
+
 ## Contribuer
 
 Réservé aux développeurs. Il faut Node 22.

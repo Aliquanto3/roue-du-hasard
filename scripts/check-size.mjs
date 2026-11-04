@@ -1,23 +1,24 @@
 import { readFileSync, statSync } from 'node:fs';
 
-const FILE = process.argv[2] ?? 'dist/roue.html';
 const MAX_BYTES = 200 * 1024;
 const REQUIRED_CSP = [
   "default-src 'none'",
-  "connect-src 'none'",
   "base-uri 'none'",
   "form-action 'none'",
 ];
+// Doit rester égal à MARQUEUR_CHAT (src/chat/marqueur.ts).
+const MARQUEUR_CHAT = "roue-du-hasard:edition-chat";
+const OLLAMA = ["http://localhost:11434", "http://127.0.0.1:11434"];
 const LOCAL = '(?!#|data:|blob:)';
 
+function verifier(FILE, chat, errors) {
 let size;
 try {
   size = statSync(FILE).size;
 } catch {
-  console.error(`${FILE} introuvable : lancer npm run build.`);
-  process.exit(1);
+  errors.push(`${FILE} introuvable : lancer npm run build.`);
+  return;
 }
-const errors = [];
 if (size > MAX_BYTES) errors.push(`${FILE} fait ${size} octets (maximum ${MAX_BYTES}).`);
 const html = readFileSync(FILE, 'utf8');
 
@@ -32,27 +33,41 @@ const external = [
   ),
   ...html.matchAll(new RegExp(`\\burl\\(\\s*["'\`]?${LOCAL}[^)"'\`\\s]+`, 'g')),
 ].map((m) => m[0]);
-if (external.length) errors.push(`Ressource externe référencée : ${external.join(', ')}`);
+if (external.length) errors.push(`${FILE} : ressource externe référencée : ${external.join(', ')}`);
 
-const network = html.match(/\b(?:fetch|XMLHttpRequest|WebSocket|EventSource|sendBeacon)\b/g);
-if (network) errors.push(`API réseau présente dans le fichier : ${[...new Set(network)].join(', ')}`);
+if (!chat) {
+  const network = html.match(/\b(?:fetch|XMLHttpRequest|WebSocket|EventSource|sendBeacon)\b/g);
+  if (network) errors.push(`${FILE} : API réseau présente : ${[...new Set(network)].join(', ')}`);
+}
+if (chat !== html.includes(MARQUEUR_CHAT)) {
+  errors.push(chat ? `${FILE} ne contient pas le code du chat.` : `${FILE} contient du code du chat.`);
+}
 
 const meta = /<meta\b[^>]*http-equiv=["']Content-Security-Policy["'][^>]*>/i.exec(html);
 if (!meta) {
-  errors.push('Méta-balise CSP absente.');
+  errors.push(`${FILE} : méta-balise CSP absente.`);
 } else {
-  if (meta.index > html.search(/<script\b/i)) errors.push('La CSP doit précéder le premier script.');
+  if (meta.index > html.search(/<script\b/i)) errors.push(`${FILE} : la CSP doit précéder le premier script.`);
   const content = /\bcontent="([^"]*)"/i.exec(meta[0])?.[1] ?? '';
   const directives = content
     .replaceAll('&#39;', "'")
     .split(';')
     .map((d) => d.trim());
+  const connect = directives.filter((d) => d.startsWith('connect-src'));
+  const attendu = chat ? `connect-src ${OLLAMA.join(' ')}` : "connect-src 'none'";
+  if (connect.length !== 1 || connect[0] !== attendu) errors.push(`CSP de ${FILE} : '${attendu}' attendu, trouvé '${connect.join(' ; ')}'.`);
   const missing = REQUIRED_CSP.filter((d) => !directives.includes(d));
-  if (missing.length) errors.push(`Directives CSP manquantes : ${missing.join(', ')}`);
+  if (missing.length) errors.push(`${FILE} : directives CSP manquantes : ${missing.join(', ')}`);
 }
 
+  console.log(`${FILE} : ${size} octets.`);
+}
+
+const errors = [];
+verifier('dist/roue.html', false, errors);
+verifier('dist/roue-chat.html', true, errors);
 if (errors.length) {
   console.error(errors.join('\n'));
   process.exit(1);
 }
-console.log(`${FILE} : ${size} octets, aucune ressource externe, CSP présente.`);
+console.log('Aucune ressource externe, CSP conforme.');
