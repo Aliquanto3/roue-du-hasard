@@ -74,16 +74,14 @@ async function sansDefilementHorizontal(page: Page): Promise<void> {
   expect(defilable).toBeLessThanOrEqual(vue as number);
 }
 
-/** Lance au bouton et attend l'annonce ; renvoie le nom annoncé après avoir vérifié qu'il est sous le pointeur. */
-async function lancerEtAnnoncer(page: Page): Promise<string> {
-  await boutonLancer(page).click();
-  await expect(dialogue(page)).toBeVisible({ timeout: 10_000 });
-  const annonce = (await nomAnnonce(page).textContent()) ?? '';
-  const diag = await page.evaluate(() => {
+/** Pixel sondé, taille du canvas et couleurs des lignes : message d'échec des contrôles « sous le pointeur ». */
+async function diagnosticSonde(page: Page): Promise<string> {
+  return page.evaluate(() => {
     const c = document.querySelector<HTMLCanvasElement>('canvas.roue__canvas');
     const p = c?.getContext('2d')?.getImageData(Number(c.dataset['sondeX']), Number(c.dataset['sondeY']), 1, 1).data;
     return JSON.stringify({
       p: Array.from(p ?? []),
+      px: [c?.width, c?.dataset['sondeX'], c?.dataset['sondeY'], window.devicePixelRatio],
       noms: c?.dataset['noms'],
       l: [...document.querySelectorAll('li.ligne')].map((li) => [
         li.querySelector<HTMLInputElement>('.ligne__nom')?.value,
@@ -91,6 +89,14 @@ async function lancerEtAnnoncer(page: Page): Promise<string> {
       ]),
     });
   });
+}
+
+/** Lance au bouton et attend l'annonce ; renvoie le nom annoncé après avoir vérifié qu'il est sous le pointeur. */
+async function lancerEtAnnoncer(page: Page): Promise<string> {
+  await boutonLancer(page).click();
+  await expect(dialogue(page)).toBeVisible({ timeout: 10_000 });
+  const annonce = (await nomAnnonce(page).textContent()) ?? '';
+  const diag = await diagnosticSonde(page);
   expect(await nomSousPointeur(page), diag).toBe(annonce);
   return annonce;
 }
@@ -115,7 +121,7 @@ for (const largeur of [320, 1920]) {
       await expect(dialogue(page)).toBeVisible({ timeout: 10_000 });
       const gagnant = (await nomAnnonce(page).textContent()) ?? '';
       expect(['Ana', 'Bob', 'Chloé', 'Dan']).toContain(gagnant);
-      expect(await nomSousPointeur(page)).toBe(gagnant);
+      expect(await nomSousPointeur(page), await diagnosticSonde(page)).toBe(gagnant);
       await expect(page.locator('.annonce__cadeau')).toHaveCount(0);
       await expect(live(page)).toHaveText(`Le gagnant est ${gagnant}.`);
       // Le fond de l'annonce est la couleur du secteur gagnant, le texte suit couleurTexte.
