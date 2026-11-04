@@ -49,6 +49,10 @@ export async function decider(
         traces.push({ etage: etage.nom, entree: commande, sortie: resultat?.trace.sortie ?? null, dureeMs });
         return { decision: REFUS_ANNULE, etage: null, traces };
       }
+      if (resultat !== null && resultat.decision === null) {
+        traces.push({ etage: etage.nom, ...resultat.trace, dureeMs, raison: resultat.raison });
+        continue;
+      }
       if (resultat === null) {
         traces.push({ etage: etage.nom, entree: commande, sortie: null, dureeMs });
         continue;
@@ -68,4 +72,19 @@ export async function decider(
     }
   }
   return { decision: REFUS_INCOMPRIS, etage: null, traces };
+}
+
+export interface Cascade {
+  readonly etages: readonly Etage[];
+  decider(commande: string, etat: EtatChat, signal: AbortSignal): Promise<ResultatCascade>;
+}
+
+/**
+ * Cascade durable : les étages sont construits une seule fois (le panneau 5.5 en garde une), si bien
+ * que l'état de chaque étage (SLM : `etat()`, `raisonIndisponible()`, `derniereTrace()`) persiste
+ * d'une commande à l'autre. `decider` seul reste sans état (tests, banc).
+ */
+export function creerCascade(options: OptionsCascade = {}): Cascade {
+  const etages = options.etages ?? (options.fabriques ?? ETAGES_ENREGISTRES).map((f) => f(options.options ?? {}));
+  return { etages, decider: (commande, etat, signal) => decider(commande, etat, signal, { ...options, etages }) };
 }
