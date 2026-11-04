@@ -238,3 +238,9 @@ Ordre de reprise :
 - 2026-11-04 · 6.2 · dev · WebKit Linux reproduit sous Docker (image Playwright 1.64.1) : rangée de saisie coupée de 12 px au défilement du tiroir ; formulaire collant · a873566
 - 2026-11-04 18:21 · 6.2 · fusion · PR #44 fusionnée, 7/9 jobs verts, 2 macOS annulés sans runner (même exception que 5.10) · e251189
 - 2026-11-04 18:21 · 6.3 · dev · lancé (spec docs/specs/6.3-prenoms-oral.md écrite par l'orchestrateur) ·
+- 2026-11-04 · 6.3 · dev · fini, PR #45 : oral.ts (rapprochement par regles.ts, seuil 0,85), banc dev règles 100/100 ; roue-chat.html 166 Ko · df3c6d7
+- 2026-11-04 · 6.3 · second-avis · 1 high (verbes manquants : nom dicté corrigé sans confirmation), 1 medium (« supprime Mari » supprime Marie), 2 low ; corrigés, ora-01 du lot dev passé à confirmation true (décision à valider par Anaël) · 21d10a6
+- 2026-11-04 · 6.3 · review · Opus : 1 Important corrigé (prénom proche d'un verbe, « supprime Virgini », corrigé en silence : nom non entendu tel quel toujours confirmé sur action destructive dictée) · 66946aa
+- 2026-11-04 · 6.3 · CI · annonce.spec.ts:691 WebKit Windows (clic bloqué sur roue.html, déjà vu en 6.2), vert à la relance ; macOS Chromium sans runner · 66946aa
+- 2026-11-04 22:20 · 6.3 · fusion · PR #45 fusionnée, 8/9 jobs verts · 564417e
+- 2026-11-04 22:20 · run · attente humaine · plus aucune story sans Anaël : relecture test2 (5.8), recette V1.0 (4.2, PR #25), recette chat (5.9), recette appareils (7.3), essai en salle (6.4) ; décisions à valider : bouton Parler actif en rotation, ora-01 confirmé, fusions sans macOS ·
