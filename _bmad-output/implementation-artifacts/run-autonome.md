@@ -235,3 +235,6 @@ Ordre de reprise :
 - 2026-11-04 · run · CI · runners macOS indisponibles depuis 14:47 UTC (jobs annulés sans runner après 15 min, toutes branches) ·
 - 2026-11-04 17:25 · 5.10 · décision · fusion sur les 6 jobs Linux et Windows verts, macOS sans runner (logique indépendante de la plateforme) ; la CI de main revérifiera macOS · 3c3e620
 - 2026-11-04 17:25 · 5.10 · fusion · PR #41 fusionnée (étape B : contrat réel, seuils, règle plusieurs noms) · 464be8b
+- 2026-11-04 · 6.2 · dev · WebKit Linux reproduit sous Docker (image Playwright 1.64.1) : rangée de saisie coupée de 12 px au défilement du tiroir ; formulaire collant · a873566
+- 2026-11-04 18:21 · 6.2 · fusion · PR #44 fusionnée, 7/9 jobs verts, 2 macOS annulés sans runner (même exception que 5.10) · e251189
+- 2026-11-04 18:21 · 6.3 · dev · lancé (spec docs/specs/6.3-prenoms-oral.md écrite par l'orchestrateur) ·
