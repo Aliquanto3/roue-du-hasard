@@ -9,6 +9,7 @@
  * - `slm` (5.6) : `[fabriqueSlm]` (lit `urlOllama` et `modele`)
  * - `decision` (5.10) : `[fabriqueDecision]`
  */
+import { creerEtageDecision } from '../chat/decision';
 import type { Etage, FabriqueEtage } from '../chat/types';
 
 /** Moteur factice : refuse toujours. Son score est le plancher de référence du corpus. */
@@ -22,15 +23,19 @@ export const fabriqueRefuseTout: FabriqueEtage = (): Etage => ({
     }),
 });
 
+/** Moteur `decision` (5.10) : `--modele` du banc désigne le modèle de décision ; `--url`, son serveur. */
+export const fabriqueDecisionBanc: FabriqueEtage = (options) =>
+  creerEtageDecision({ ...options, modeleDecision: options.modeleDecision ?? options.modele });
+
 export const MOTEURS: Readonly<Record<string, readonly FabriqueEtage[]>> = {
   'refuse-tout': [fabriqueRefuseTout],
+  decision: [fabriqueDecisionBanc],
 };
 
 /** Moteurs prévus, pas encore livrés, avec la story qui les apporte. */
 export const MOTEURS_A_VENIR: Readonly<Record<string, string>> = {
   regles: '5.3',
   slm: '5.6',
-  decision: '5.10',
 };
 
 export function moteursDisponibles(): string[] {
