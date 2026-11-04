@@ -324,7 +324,14 @@ export function creerPanneauChat(parent: HTMLElement, options: OptionsPanneauCha
     // La roue ne descend pas sous 8 rem (roue.css) : si l'espace manque, c'est le tiroir qui cède,
     // jusqu'à un minimum qui garde la saisie visible ; au-delà il défile à l'intérieur.
     const pourTiroir = Math.floor(window.innerHeight - haut - 8 * rem - hors - 8);
-    if (pourTiroir < window.innerHeight * 0.35) poser('--tiroir-max', `${String(Math.max(5 * rem, pourTiroir))}px`);
+    // Plancher : le titre et la rangée « Commande, Envoyer, Parler » entiers (mesurés), jamais moins de 5 rem.
+    const style = getComputedStyle(racine);
+    const cadre =
+      parseFloat(style.paddingTop) + parseFloat(style.paddingBottom) + parseFloat(style.borderTopWidth) + parseFloat(style.borderBottomWidth);
+    const plancher = entete.offsetHeight + (parseFloat(style.rowGap) || 0) + rangee.offsetHeight + cadre + 2;
+    if (pourTiroir < window.innerHeight * 0.35) {
+      poser('--tiroir-max', `${String(Math.ceil(Math.max(5 * rem, plancher, pourTiroir)))}px`);
+    }
     else cible.removeProperty('--tiroir-max');
     const libre = Math.floor(window.innerHeight - racine.getBoundingClientRect().height - haut - hors - 8);
     poser('--roue-libre', `${String(Math.max(0, libre))}px`);

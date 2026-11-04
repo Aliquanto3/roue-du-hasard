@@ -97,6 +97,25 @@ for (const [largeur, hauteur] of [
   });
 }
 
+test('568 × 480 avec des polices larges : la rangée Commande, Envoyer, Parler reste entière et sous la roue', async ({ page }) => {
+  await page.setViewportSize({ width: 568, height: 480 });
+  await page.goto(ORIGINE);
+  await page.addStyleTag({
+    content: '* { font-family: Verdana, "DejaVu Sans", sans-serif !important; letter-spacing: 0.12em !important; }',
+  });
+  await ouvrir(page);
+  await dire(page, 'une commande');
+  await expect(fil(page)).toContainText('Je n’ai pas compris');
+  for (const nom of ['Envoyer', 'Parler']) {
+    const b = page.getByRole('button', { name: nom });
+    if ((await b.count()) > 0) await expect(b).toBeInViewport({ ratio: 1 });
+  }
+  await expect(page.getByLabel('Commande', { exact: true })).toBeInViewport({ ratio: 1 });
+  const roue = await page.locator('.page__roue').boundingBox();
+  const panneau = await page.locator('.chat').boundingBox();
+  expect(roue && panneau && roue.y + roue.height <= panneau.y + 1).toBe(true);
+});
+
 test.describe('parcours avec l’étage règles', () => {
   test('ajout', async ({ page }) => {
     await ouvrir(page);

@@ -190,6 +190,25 @@
   }
 }
 
+/* Fenêtre basse (téléphone en paysage) : tiroir compact, le libellé « Commande » reste lu par les lecteurs d'écran. */
+@media (max-width: 51.99rem) and (max-height: 32rem) {
+  .chat {
+    gap: 0;
+    padding-block: 0.25rem;
+  }
+  .chat__corps {
+    gap: 0.25rem;
+  }
+  .chat__etiquette {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
 /* Voix (6.2) : bouton à appui maintenu, état annoncé en texte. */
 .chat__parler {
   flex: 0 0 auto;
