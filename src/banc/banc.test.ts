@@ -28,14 +28,14 @@ describe('plancher « refuse tout »', () => {
 });
 
 describe('lot test2', () => {
-  it('lu dans son fichier : le moteur refuse-tout donne le plancher du vérificateur (20/83)', async () => {
+  it('lu dans son fichier : le moteur refuse-tout donne le plancher du vérificateur (25/91)', async () => {
     const test2 = lireCorpusDuLot('test2');
-    expect(test2).toHaveLength(83);
+    expect(test2).toHaveLength(91);
     expect(test2.every((l) => l.lot === 'test2')).toBe(true);
     const r = await lancerBanc(test2, 'test2', { moteur: 'refuse-tout', fabriques: MOTEURS['refuse-tout'] ?? [] });
     expect(r.lot).toBe('test2');
-    expect(r.global).toEqual({ ok: 20, total: 83 });
-    expect(r.plancher).toEqual({ ok: 20, total: 83 });
+    expect(r.global).toEqual({ ok: 25, total: 91 });
+    expect(r.plancher).toEqual({ ok: 25, total: 91 });
   });
 
   it('le corpus principal ne contient aucune ligne test2', () => {

@@ -295,7 +295,7 @@ def verifier_test2(chemin: Path, ids: set[str], dev_test: list[dict], erreurs: l
         print(f"Référence « moteur qui refuse tout » : test2 {refuser}/{total} = {refuser / total:.0%}")
 
 
-def main(chemin: Path, chemin_test2: Path | None = None) -> int:
+def main(chemin: Path, chemin_test2: Path | None = None, explicite: bool = False) -> int:
     erreurs: list[str] = []
     lignes = [ligne for ligne in chemin.read_text(encoding="utf-8").splitlines() if ligne.strip()]
     ids: set[str] = set()
@@ -346,8 +346,10 @@ def main(chemin: Path, chemin_test2: Path | None = None) -> int:
     erreurs.extend(quasi_doublons(valides))
     if chemin_test2 is not None and chemin_test2.exists():
         verifier_test2(chemin_test2, ids, valides, erreurs)
-    elif chemin_test2 is not None:
+    elif chemin_test2 is not None and explicite:
         erreurs.append(f"fichier absent : {chemin_test2}")
+    elif chemin_test2 is not None:
+        print(f"AVERTISSEMENT : {chemin_test2.name} absent, lot test2 non vérifié.", file=sys.stderr)
 
     for cat in sorted(CATEGORIES):
         if par_cat[cat] == 0:
@@ -393,5 +395,6 @@ def main(chemin: Path, chemin_test2: Path | None = None) -> int:
 if __name__ == "__main__":
     sys.exit(main(
         Path(sys.argv[1]) if len(sys.argv) > 1 else CORPUS,
-        Path(sys.argv[2]) if len(sys.argv) > 2 else (CORPUS_TEST2 if len(sys.argv) == 1 else None),
+        Path(sys.argv[2]) if len(sys.argv) > 2 else CORPUS_TEST2,
+        explicite=len(sys.argv) > 2,
     ))

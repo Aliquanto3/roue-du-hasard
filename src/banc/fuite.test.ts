@@ -15,7 +15,7 @@
  * absent de `dev` et présent dans `test2`. La base se fige une seule fois, à la création du lot
  * (`FUITE_GENERER_BASE=1`), et ne se régénère jamais pour faire passer un test.
  */
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { lireCorpus, lireCorpusDuLot } from './cli';
@@ -111,8 +111,15 @@ describe('séparation des lots : regles.ts', () => {
     expect(fuites).toEqual([]);
   });
 
-  it('génère la base figée du lot test2 (seulement avec FUITE_GENERER_BASE=1)', () => {
-    if (process.env['FUITE_GENERER_BASE'] !== '1') return;
+  // Outil de création, pas un contrôle : ignoré sans FUITE_GENERER_BASE=1. Une base existante n'est
+  // jamais écrasée, sauf avec FUITE_REGENERER_BASE_SCIEMMENT=1 (réservé à la création d'un nouveau lot).
+  it.skipIf(process.env['FUITE_GENERER_BASE'] !== '1')('génère la base figée du lot test2', () => {
+    if (existsSync(CHEMIN_BASE_TEST2) && process.env['FUITE_REGENERER_BASE_SCIEMMENT'] !== '1') {
+      throw new Error(
+        'fuite-base-test2.json existe déjà : elle ne se régénère jamais pour faire passer un test. ' +
+          'FUITE_REGENERER_BASE_SCIEMMENT=1 est réservé à la création d’un nouveau lot.',
+      );
+    }
     const base = [...new Set(litteraux(source).flatMap(mots))].sort();
     writeFileSync(CHEMIN_BASE_TEST2, `${JSON.stringify(base, null, 2)}\n`, 'utf8');
   });
