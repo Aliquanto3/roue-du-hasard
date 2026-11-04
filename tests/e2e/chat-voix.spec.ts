@@ -97,6 +97,10 @@ test('appui maintenu : la transcription arrive dans le champ, puis suit le chemi
   // L'utilisateur peut corriger avant d'envoyer.
   await commande(page).fill('Ajoute Zoé Martin');
   await commande(page).press('Enter');
+  // Nom nouveau dicté (6.3, C4) : jamais ajouté en silence, confirmation d'abord.
+  await expect(fil(page)).toContainText('Je n’ai pas ce nom dans la liste : « Zoé Martin »');
+  await expect(page.locator('.ligne__nom')).toHaveCount(2);
+  await page.getByRole('button', { name: 'Confirmer' }).click();
   await expect(fil(page)).toContainText('C’est fait.');
   await expect(page.locator('.ligne__nom')).toHaveCount(3);
   await expect(page.locator('.ligne__nom').last()).toHaveValue('Zoé Martin');
@@ -120,6 +124,31 @@ test('une commande à confirmer dictée passe par la confirmation, comme une com
   await expect(page.locator('.ligne__nom')).toHaveCount(3);
   await page.getByRole('button', { name: 'Confirmer' }).click();
   await expect(page.locator('.ligne__nom')).toHaveCount(1);
+});
+
+test('prénom écorché (« Thibaut » pour Thibault) : commande corrigée et confirmation affichées, puis exécution (6.3)', async ({ page }) => {
+  await ouvrir(page);
+  await page.getByLabel('Coller une liste de noms').fill('Thibault\nLéa');
+  await page.getByRole('button', { name: 'Ajouter la liste' }).click();
+  await expect(page.locator('.ligne__nom')).toHaveCount(2);
+  await simulerStt(page, 'Supprime Thibaut.');
+  await maintenir(page);
+  await expect(commande(page)).toHaveValue('Supprime Thibaut');
+  await commande(page).press('Enter');
+  await expect(fil(page)).toContainText('Vous vouliez dire Thibault ?');
+  await expect(fil(page)).toContainText('« Supprime Thibault »');
+  await expect(page.locator('.ligne__nom')).toHaveCount(2);
+  await page.getByRole('button', { name: 'Confirmer' }).click();
+  await expect(fil(page)).toContainText('C’est fait.');
+  await expect(page.locator('.ligne__nom')).toHaveCount(1);
+  await expect(page.locator('.ligne__nom').first()).toHaveValue('Léa');
+
+  // Inspection : la correction (avant, après, score, méthode) et la commande corrigée.
+  await page.getByRole('button', { name: 'Inspecter' }).click();
+  const fenetre = page.getByRole('dialog', { name: 'Inspection du chat' });
+  await fenetre.locator('.inspection__message summary').first().click();
+  await expect(fenetre).toContainText(/Correction : « Thibaut » devient « Thibault » \(score 0\.\d\d, proche, à confirmer\)/u);
+  await expect(fenetre).toContainText('Commande corrigée envoyée à la cascade : « Supprime Thibault »');
 });
 
 test('au clavier : Espace maintenu enregistre, le relâchement transcrit', async ({ page }) => {

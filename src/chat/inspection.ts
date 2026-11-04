@@ -6,6 +6,7 @@
 import { confirmationRequise, type Plan } from './outils';
 import { MAX_ECHANGES, estimerJetons, type MessageOllama, type TraceSlm } from './slm';
 import type { TraceDecision } from './decision';
+import type { Correction } from './oral';
 import {
   estEtapes,
   formeValide,
@@ -84,6 +85,10 @@ export interface TranscriptionInspectee {
   /** Réponse brute du STT, avant nettoyage et correction éventuelle. */
   readonly brut: string;
   readonly latenceMs: number;
+  /** Corrections de prénoms (6.3), absentes si aucune : avant, après, score, méthode. */
+  readonly corrections?: readonly Correction[];
+  /** Commande envoyée à la cascade après les corrections. */
+  readonly corrigee?: string;
 }
 
 export interface DonneesEntree {
@@ -373,6 +378,14 @@ type Stockage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 const verdictValide = (v: unknown): v is Verdict =>
   estObjet(v) && (v['valeur'] === 'juste' || v['valeur'] === 'erreur') && (v['cause'] === undefined || v['cause'] === 'ecoute' || v['cause'] === 'decision');
 
+const correctionValide = (v: unknown): boolean =>
+  estObjet(v) &&
+  estTexte(v['avant']) &&
+  estTexte(v['apres']) &&
+  estNombre(v['score']) &&
+  (v['methode'] === 'exact' || v['methode'] === 'phonetique' || v['methode'] === 'proche') &&
+  typeof v['appliquee'] === 'boolean';
+
 const EXECUTIONS: readonly string[] = ['execute', 'attente-confirmation', 'attente-precision', 'non-execute', 'annule', 'perime'];
 const ETAGES: readonly string[] = ['regles', 'decision', 'slm'];
 const estTexte = (v: unknown): v is string => typeof v === 'string';
@@ -420,7 +433,11 @@ const entreeValide = (v: unknown): v is EntreeInspection =>
   EXECUTIONS.includes(v['execution'] as string) &&
   estNombre(v['latenceMs']) &&
   (v['transcription'] === undefined ||
-    (estObjet(v['transcription']) && estTexte(v['transcription']['brut']) && estNombre(v['transcription']['latenceMs']))) &&
+    (estObjet(v['transcription']) &&
+      estTexte(v['transcription']['brut']) &&
+      estNombre(v['transcription']['latenceMs']) &&
+      (v['transcription']['corrigee'] === undefined || estTexte(v['transcription']['corrigee'])) &&
+      (v['transcription']['corrections'] === undefined || tableauDe(v['transcription']['corrections'], correctionValide)))) &&
   (v['verdict'] === null || verdictValide(v['verdict'])) &&
   (v['attendu'] === null || formeValide(v['attendu'])) &&
   (v['clarification'] === undefined ||

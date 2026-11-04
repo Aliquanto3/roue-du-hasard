@@ -13,6 +13,7 @@
  * - Confirmation : `confirmationRequise` appliquée à la décision obtenue, comparée à `confirmation`.
  */
 import type { Etat } from '../domain/etat';
+import { correctionsAConfirmer, rapprocher } from '../chat/oral';
 import { confirmationRequise, planifier } from '../chat/outils';
 import {
   estClarifier,
@@ -118,7 +119,12 @@ export function comparer(ligne: LigneCorpus, obtenue: Decision): Verdict {
     const raison = compareEtape(ea[i] as DecisionAction, eo[i] as DecisionAction);
     if (raison !== '') return echec(ea.length > 1 ? `étape ${i + 1} : ${raison}` : raison);
   }
-  if (confirmationRequise(obtenue) !== ligne.confirmation) {
+  // Commande dictée : une correction de prénom sur une action destructive se confirme toujours (6.3).
+  const confirmation =
+    confirmationRequise(obtenue) ||
+    (ligne.categorie === 'transcription_orale' &&
+      correctionsAConfirmer(rapprocher(ligne.commande, ligne.etat.noms), eo.map((e) => e.action)).length > 0);
+  if (confirmation !== ligne.confirmation) {
     return echec(`confirmation ${String(!ligne.confirmation)} au lieu de ${String(ligne.confirmation)}`);
   }
   return REUSSI;

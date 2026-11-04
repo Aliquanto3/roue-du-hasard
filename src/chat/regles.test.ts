@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import { creerActions, creerMagasin } from '../actions';
 import { confirmationRequise, planifier } from './outils';
-import { cleFrancaise, decideRegles, extraireNoms, fabriqueRegles, normaliser, resoudreNom } from './regles';
+import { cle, cleFrancaise, decideRegles, distance, extraireNoms, fabriqueRegles, normaliser, resoudreNom } from './regles';
 import type { Decision, EtatChat } from './types';
 
 const noms = ['Marie', 'Paul', 'Léa', 'Zoé'];
@@ -231,5 +231,16 @@ describe('fabriqueRegles', () => {
       trace: { entree: 'tourne la roue', sortie: 'lancer' },
     });
     expect(await e.decider('blabla incompréhensible', etat(), signal)).toBeNull();
+  });
+});
+
+describe('cle et distance (exportées pour oral.ts)', () => {
+  it('cle : sans accents, casse, apostrophes ni points', () => {
+    expect(cle("  D'Éloïse. ")).toBe('deloise');
+  });
+  it('distance de Levenshtein', () => {
+    expect(distance('thibaut', 'thibault')).toBe(1);
+    expect(distance('', 'abc')).toBe(3);
+    expect(distance('paul', 'paul')).toBe(0);
   });
 });

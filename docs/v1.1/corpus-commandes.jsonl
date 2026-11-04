@@ -184,7 +184,7 @@
 {"id":"imp-12","lot":"dev","categorie":"lancement_impossible","commande":"relance","etat":{"noms":["Marie","Paul"],"rotation":true},"attendu":{"action":"refuser"},"confirmation":false}
 {"id":"imp-13","lot":"test","categorie":"lancement_impossible","commande":"défais le tout dernier tirage","etat":{"noms":["Marie","Paul"],"rotation":true},"attendu":{"action":"refuser"},"confirmation":false}
 {"id":"imp-14","lot":"test","categorie":"lancement_impossible","commande":"lance","etat":{"noms":["Marie","Paul"],"rotation":false},"attendu":{"action":"lancer","params":{}},"confirmation":false}
-{"id":"ora-01","lot":"dev","categorie":"transcription_orale","commande":"retire euh mari","etat":{"noms":["Marie","Paul","Zoé","Léa"],"rotation":false},"attendu":{"action":"supprimer","params":{"nom":"Marie"}},"confirmation":false}
+{"id":"ora-01","lot":"dev","categorie":"transcription_orale","commande":"retire euh mari","etat":{"noms":["Marie","Paul","Zoé","Léa"],"rotation":false},"attendu":{"action":"supprimer","params":{"nom":"Marie"}},"confirmation":true}
 {"id":"ora-02","lot":"test","categorie":"transcription_orale","commande":"euh ajoute heu Théo","etat":{"noms":["Marie","Paul"],"rotation":false},"attendu":{"action":"ajouter","params":{"nom":"Théo"}},"confirmation":false}
 {"id":"ora-03","lot":"dev","categorie":"transcription_orale","commande":"mets pol en bleu","etat":{"noms":["Marie","Paul","Zoé","Léa"],"rotation":false},"attendu":{"action":"definirCouleur","params":{"nom":"Paul","couleur":"#1D4ED8"}},"confirmation":false}
 {"id":"ora-04","lot":"test","categorie":"transcription_orale","commande":"lance euh la roue","etat":{"noms":["Marie","Paul","Zoé","Léa"],"rotation":false},"attendu":{"action":"lancer","params":{}},"confirmation":false}
