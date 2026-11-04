@@ -1,6 +1,6 @@
 # Roue du hasard
 
-> À retirer à la release : ce README décrit la V1 prévue. La version `v1.0.0` et la page pour téléphone ne sont pas encore publiées : certaines fonctions et les liens ci-dessous ne seront actifs qu'à ce moment-là.
+Version **1.0.0** ([notes de la release](https://github.com/Aliquanto3/roue-du-hasard/releases/tag/v1.0.0)). Testée et garantie sous **Windows avec Google Chrome** ; macOS, Linux, les autres navigateurs et les téléphones sont prévus en V1.2 : ils peuvent fonctionner, sans garantie.
 
 Une roue qui désigne au hasard qui reçoit un cadeau : vous saisissez les noms des invités (et, si vous voulez, la liste des cadeaux), vous lancez la roue, et le gagnant est annoncé en grand avec des confettis. Aucune installation, aucun compte, aucun droit administrateur : un seul fichier `roue.html` suffit.
 
@@ -33,7 +33,7 @@ curl -fLO https://github.com/Aliquanto3/roue-du-hasard/releases/latest/download/
 
 ## Sur téléphone
 
-Ouvrez <https://aliquanto3.github.io/roue-du-hasard/> ou scannez ce code. La page se charge une fois depuis GitHub Pages (connexion nécessaire à ce moment-là) ; ensuite, vos noms ne quittent jamais le téléphone.
+Ouvrez <https://aliquanto3.github.io/roue-du-hasard/> ou scannez ce code (l'usage sur téléphone n'est pas encore garanti, voir plus haut). La page se charge une fois depuis GitHub Pages (connexion nécessaire à ce moment-là) ; ensuite, vos noms ne quittent jamais le téléphone.
 
 ![QR code vers https://aliquanto3.github.io/roue-du-hasard/](docs/qr-telephone.svg)
 
