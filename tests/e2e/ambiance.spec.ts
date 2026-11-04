@@ -49,7 +49,7 @@ test('la CSP du harnais est celle du fichier livré', () => {
 });
 
 test('son et confettis sous la CSP du dépôt : aucune erreur, violation ni requête, canvas retiré', async ({ page }) => {
-  test.setTimeout(20_000);
+  test.setTimeout(30_000);
   const erreurs: string[] = [];
   const requetes: string[] = [];
   page.on('pageerror', (e) => erreurs.push(e.message));
@@ -80,7 +80,10 @@ test('son et confettis sous la CSP du dépôt : aucune erreur, violation ni requ
   await expect.poll(() => canvasPeint(page)).toBe(true);
   await page.click('#confettis');
   await expect(canvas).toHaveCount(1);
-  await expect(canvas).toHaveCount(0, { timeout: 6000 });
+  // Durée prévue 3,5 s ; Firefox sous Windows a dépassé 6 s en CI (images d'animation espacées).
+  const t0 = Date.now();
+  await expect(canvas).toHaveCount(0, { timeout: 12_000 });
+  console.log(`confettis retirés après ${String(Date.now() - t0)} ms`);
 
   expect(await page.evaluate(() => (window as unknown as { violations: string[] }).violations)).toEqual([]);
   expect(erreurs).toEqual([]);
