@@ -192,30 +192,24 @@ const unique = (noms: readonly string[]): string[] => {
   return noms.filter((n) => (vus.has(cle(n)) ? false : (vus.add(cle(n)), true)));
 };
 
-/** Résout une forme saisie contre les noms de la liste (voir `docs/v1.1/README.md`, prénoms déformés). */
-export function resoudreNom(brut: string, noms: readonly string[]): Resolution {
-  const c = cle(brut.replace(/[.!?]+$/u, (m) => (/(?:^|\s)\p{L}\.$/u.test(brut) ? m : '')));
-  if (c === '') return { t: 'absent' };
+/** Palier de rapprochement d'une forme saisie avec les noms de la liste, du plus sûr au plus lâche. */
+export type Palier = 'exact' | 'prefixe' | 'strict' | 'souple' | 'proche';
+
+/** Premier palier qui trouve des noms (réutilisé par `oral.ts` pour ses scores) ; `null` si aucun. */
+export function paliersNoms(c: string, noms: readonly string[]): { readonly palier: Palier; readonly noms: string[] } | null {
   const exacts = noms.filter((n) => cle(n) === c);
-  if (exacts.length === 1) return { t: 'ok', nom: exacts[0] as string };
-  if (exacts.length > 1) return { t: 'clarifier', candidats: exacts };
+  if (exacts.length > 0) return { palier: 'exact', noms: exacts };
   const prefixes = noms.filter((n) => cle(n).startsWith(`${c} `) || cle(n).startsWith(`${c}-`));
-  if (prefixes.length > 0) return { t: 'clarifier', candidats: prefixes };
-  // Correction directe seulement si la clé stricte (h et y gardés) désigne un seul nom : « Anne » et « Hanne »,
-  // « Maya » et « Maïa » sont deux prénoms réels qui se prononcent pareil, donc `clarifier`.
+  if (prefixes.length > 0) return { palier: 'prefixe', noms: prefixes };
   const ks = cleFrancaise(c, false);
   if (ks.length >= 2) {
     const stricts = noms.filter((n) => cleFrancaise(n, false) === ks);
-    const du = unique(stricts);
-    if (du.length === 1) {
-      return stricts.length === 1 ? { t: 'ok', nom: stricts[0] as string } : { t: 'clarifier', candidats: stricts };
-    }
-    if (du.length > 1) return { t: 'clarifier', candidats: du };
+    if (stricts.length > 0) return { palier: 'strict', noms: stricts };
   }
   const k = cleFrancaise(c);
   if (k.length >= 2) {
     const souples = unique(noms.filter((n) => cleFrancaise(n) === k));
-    if (souples.length > 0) return { t: 'clarifier', candidats: souples };
+    if (souples.length > 0) return { palier: 'souple', noms: souples };
   }
   const proches = unique(
     noms.filter((n) => {
@@ -224,7 +218,25 @@ export function resoudreNom(brut: string, noms: readonly string[]): Resolution {
       return contenu || distance(f, c) <= (Math.max(f.length, c.length) > 5 ? 2 : 1);
     }),
   );
-  return proches.length > 0 ? { t: 'clarifier', candidats: proches } : { t: 'absent' };
+  return proches.length > 0 ? { palier: 'proche', noms: proches } : null;
+}
+
+/** Résout une forme saisie contre les noms de la liste (voir `docs/v1.1/README.md`, prénoms déformés). */
+export function resoudreNom(brut: string, noms: readonly string[]): Resolution {
+  const c = cle(brut.replace(/[.!?]+$/u, (m) => (/(?:^|\s)\p{L}\.$/u.test(brut) ? m : '')));
+  if (c === '') return { t: 'absent' };
+  const trouve = paliersNoms(c, noms);
+  if (trouve === null) return { t: 'absent' };
+  const { palier, noms: liste } = trouve;
+  if (palier === 'exact') return liste.length === 1 ? { t: 'ok', nom: liste[0] as string } : { t: 'clarifier', candidats: liste };
+  // Correction directe seulement si la clé stricte (h et y gardés) désigne un seul nom : « Anne » et « Hanne »,
+  // « Maya » et « Maïa » sont deux prénoms réels qui se prononcent pareil, donc `clarifier`.
+  if (palier === 'strict') {
+    const du = unique(liste);
+    if (du.length === 1) return liste.length === 1 ? { t: 'ok', nom: liste[0] as string } : { t: 'clarifier', candidats: liste };
+    return { t: 'clarifier', candidats: du };
+  }
+  return { t: 'clarifier', candidats: liste };
 }
 
 // --- Extraction littérale des nouveaux noms ------------------------------------------------------------
@@ -357,9 +369,9 @@ function resoudreMorceaux(morceaux: readonly Texte[], etat: EtatChat, regle: str
 const debut = (re: RegExp, t: Texte): Texte | null => apres(t, re);
 
 // Données : ajouter, coller, renommer.
-const V_AJOUTER = /^(?:ajout\w*|rajout\w*|inscri\w*|incorpor\w*|integr\w*|add)\b/;
-const V_COLLER = /^(?:coll\w*|import\w*|insere\w*|charge\w*)\b/;
-const V_RENOMMER = /^(?:renomm\w*|chang\w* (?:le )?(?:nom|prenom)(?: de| d)?)\b/;
+export const V_AJOUTER = /^(?:ajout\w*|rajout\w*|inscri\w*|incorpor\w*|integr\w*|add)\b/;
+export const V_COLLER = /^(?:coll\w*|import\w*|insere\w*|charge\w*)\b/;
+export const V_RENOMMER = /^(?:renomm\w*|chang\w* (?:le )?(?:nom|prenom)(?: de| d)?)\b/;
 const DEBUT_DONNEES = new RegExp(`${V_AJOUTER.source}|${V_COLLER.source}|${V_RENOMMER.source}`);
 
 function ajouter(t: Texte, etat: EtatChat): Res | undefined {
@@ -547,7 +559,7 @@ function exporter(t: Texte): Res | undefined {
 }
 
 // Couleur d'une personne.
-const V_COULEUR = /^(?:met\w*|pass\w*|chang\w*|donn\w*|defini\w*|appliqu\w*|fais|fait|rend\w*)\b/;
+export const V_COULEUR = /^(?:met\w*|pass\w*|chang\w*|donn\w*|defini\w*|appliqu\w*|fais|fait|rend\w*)\b/;
 
 function definirCouleur(t: Texte, etat: EtatChat): Res | undefined {
   let reste = debut(V_COULEUR, t);
@@ -593,7 +605,7 @@ function definirCouleur(t: Texte, etat: EtatChat): Res | undefined {
 }
 
 // Suppression.
-const V_SUPPRIMER = /^(?:supprim\w*|suprim\w*|retir\w*|enlev\w*|vir\w*|efface\w*|elimin\w*|ote\w*|degag\w*|jett\w*|exclu\w*)\b/;
+export const V_SUPPRIMER = /^(?:supprim\w*|suprim\w*|retir\w*|enlev\w*|vir\w*|efface\w*|elimin\w*|ote\w*|degag\w*|jett\w*|exclu\w*)\b/;
 
 function supprimer(t: Texte, etat: EtatChat): Res | undefined {
   let reste = debut(V_SUPPRIMER, t);
@@ -627,7 +639,7 @@ function supprimer(t: Texte, etat: EtatChat): Res | undefined {
 }
 
 // Lancement.
-const V_LANCER = /^(?:lanc\w*|relanc\w*|tourn\w*|demarr\w*|go|c est parti|on y va|tire au sort|fais tourner|fait tourner|faites tourner)\b/;
+export const V_LANCER = /^(?:lanc\w*|relanc\w*|tourn\w*|demarr\w*|go|c est parti|on y va|tire au sort|fais tourner|fait tourner|faites tourner)\b/;
 const OBJET_LANCER =
   /^(?:(?:la |une |le |ma |notre |un )?(?:roue|tirage|nouveau tirage|partie|loterie|tombola|machine)(?: de la chance)?|ca|cela|tout)?(?: (?:vite|maintenant))*$/;
 

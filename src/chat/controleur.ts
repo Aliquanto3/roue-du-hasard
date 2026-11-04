@@ -8,9 +8,9 @@ import type { Actions } from '../actions';
 import type { Cascade } from './cascade';
 import { SEUIL_DECISION_DEFAUT } from './decision';
 import { construireEntree, decrirePlan, type Execution, type Inspection, type TranscriptionInspectee } from './inspection';
-import { estNomNouveau, rapprocher, type Rapprochement } from './oral';
+import { correctionsAConfirmer, estNomNouveau, rapprocher, type Rapprochement } from './oral';
 import { executerPlan, planifier, type Etape, type Plan } from './outils';
-import { extraireNoms } from './regles';
+import { cle, extraireNoms } from './regles';
 import { TEXTES_CHAT } from './textes';
 import { estClarifier, estEtapes, type Decision, type DecisionAction, type EtatChat, type Etage,
   type RaisonIndisponible,
@@ -185,26 +185,32 @@ export function creerControleur(deps: DepsControleur): Controleur {
   const appels = (decision: Decision): readonly DecisionAction[] =>
     estEtapes(decision) ? decision.actions : [decision as DecisionAction];
 
-  /** Noms à ajouter ou à donner qui ne sont pas dans la liste (commande dictée : le STT écorche les prénoms inconnus). */
-  const nomsNouveaux = (decision: Decision, noms: readonly string[]): string[] => {
-    const nouveaux: string[] = [];
+  /**
+   * Noms à ajouter ou à donner qui ne sont pas dans la liste (commande dictée : le STT écorche les prénoms
+   * inconnus). Jugés sur la commande brute : un nom que le rapprochement aurait ramené à un nom existant
+   * (`avant` d'une correction non exacte) reste un nom nouveau, donc confirmé.
+   */
+  const nomsNouveaux = (decision: Decision, noms: readonly string[], rapproche: Rapprochement): string[] => {
+    const bruts: string[] = [];
     for (const a of appels(decision)) {
       const p = a.params ?? {};
-      if (a.action === 'ajouter' && typeof p['nom'] === 'string') nouveaux.push(p['nom']);
-      else if (a.action === 'renommer' && typeof p['nouveau'] === 'string') nouveaux.push(p['nouveau']);
-      else if (a.action === 'coller' && typeof p['texte'] === 'string') nouveaux.push(...extraireNoms(p['texte']));
+      if (a.action === 'ajouter' && typeof p['nom'] === 'string') bruts.push(p['nom']);
+      else if (a.action === 'renommer' && typeof p['nouveau'] === 'string') bruts.push(p['nouveau']);
+      else if (a.action === 'coller' && typeof p['texte'] === 'string') bruts.push(...extraireNoms(p['texte']));
     }
-    return nouveaux.filter((n) => n.trim() !== '' && estNomNouveau(n, noms));
+    const entendus = bruts.map(
+      (n) => rapproche.corrections.find((c) => c.methode !== 'exact' && cle(c.apres) === cle(n))?.avant ?? n,
+    );
+    return entendus.filter((n) => n.trim() !== '' && estNomNouveau(n, noms));
   };
 
-  /** Question à poser avant d'exécuter une commande dictée, ou `null` : correction sous le seuil, puis nom nouveau. */
+  /** Question à poser avant d'exécuter une commande dictée, ou `null` : nom nouveau, puis correction à confirmer. */
   const questionDictee = (rapproche: Rapprochement, decision: Decision, noms: readonly string[]): string | null => {
-    if (rapproche.aConfirmer) {
-      const prenoms = [...new Set(rapproche.corrections.filter((c) => !c.appliquee).map((c) => c.apres))];
-      return TEXTES_CHAT.vousVouliezDire(prenoms, rapproche.texte);
-    }
-    const nouveaux = nomsNouveaux(decision, noms);
-    return nouveaux.length > 0 ? TEXTES_CHAT.nomNouveau(nouveaux) : null;
+    const nouveaux = nomsNouveaux(decision, noms, rapproche);
+    if (nouveaux.length > 0) return TEXTES_CHAT.nomNouveau(nouveaux);
+    const aConfirmer = correctionsAConfirmer(rapproche, appels(decision).map((a) => a.action));
+    if (aConfirmer.length === 0) return null;
+    return TEXTES_CHAT.vousVouliezDire([...new Set(aConfirmer.map((c) => c.apres))], rapproche.texte);
   };
 
   const suivre = (

@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { comparer, decisionEffective } from '../banc/comparateur';
 import { lireCorpus } from '../banc/cli';
 import {
+  correctionsAConfirmer,
   estNomNouveau,
   rapprocher,
   SCORE_EXACT,
@@ -97,6 +98,22 @@ describe('rapprocher', () => {
     expect(r.corrections).toHaveLength(1);
   });
 
+  it('verbes de regles.ts : « intègre », « incorpore », « add », « colle » protègent le nom qui suit', () => {
+    for (const verbe of ['intègre', 'incorpore', 'add', 'colle', 'importe']) {
+      expect(rapprocher(`${verbe} Mari`, noms)).toEqual({ texte: `${verbe} Mari`, corrections: [], aConfirmer: false });
+    }
+  });
+
+  it('« change le nom de pol en Mari » : pol est corrigé, le nouveau nom reste tel quel', () => {
+    const r = rapprocher('change le nom de pol en Mari', noms);
+    expect(r.texte).toBe('change le nom de Paul en Mari');
+    expect(r.corrections).toHaveLength(1);
+  });
+
+  it('un verbe de commande n’est pas rapproché d’un prénom', () => {
+    expect(rapprocher('annule vide efface', ['Anule', 'Vide', 'Efface2']).corrections).toEqual([]);
+  });
+
   it('un seuil plus haut met tout sous confirmation, un seuil plus bas rien', () => {
     expect(rapprocher('retire mari', noms, 0.95).aConfirmer).toBe(true);
     expect(rapprocher('supprime Thibaut', ['Thibault'], 0.5).aConfirmer).toBe(false);
@@ -104,6 +121,21 @@ describe('rapprocher', () => {
 
   it('rien d’entendu qui ressemble : texte inchangé', () => {
     expect(rapprocher('lance la roue', noms)).toEqual({ texte: 'lance la roue', corrections: [], aConfirmer: false });
+  });
+});
+
+describe('correctionsAConfirmer', () => {
+  const r = rapprocher('retire mari', noms);
+  it('action non destructive : seuil seul (0,9 passe)', () => {
+    expect(correctionsAConfirmer(r, ['lancer'])).toEqual([]);
+  });
+  it('action destructive : toute correction non exacte est confirmée, même à 0,9', () => {
+    expect(correctionsAConfirmer(r, ['supprimer'])).toHaveLength(1);
+    expect(correctionsAConfirmer(r, ['renommer'])).toHaveLength(1);
+    expect(correctionsAConfirmer(r, ['effacerHistorique'])).toHaveLength(1);
+  });
+  it('une correction exacte (accent seul) n’est jamais confirmée', () => {
+    expect(correctionsAConfirmer(rapprocher('retire zoe', noms), ['supprimer'])).toEqual([]);
   });
 });
 

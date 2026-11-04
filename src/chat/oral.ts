@@ -13,7 +13,7 @@
  * sont pas rapprochés (un nom nouveau ressemble souvent à un nom existant sans l'être), mais le
  * contrôleur les fait toujours confirmer (`estNomNouveau`).
  */
-import { cle, cleFrancaise, distance, normaliser } from './regles';
+import { cle, distance, normaliser, paliersNoms, V_AJOUTER, V_COLLER, V_COULEUR, V_LANCER, V_RENOMMER, V_SUPPRIMER } from './regles';
 
 /**
  * Seuil de correction silencieuse, réglé sur le lot `dev` (catégorie « transcription orale ») :
@@ -55,19 +55,23 @@ export interface Rapprochement {
   readonly aConfirmer: boolean;
 }
 
-/** Mots de la commande ou de la langue qui ne sont jamais un prénom (verbes, mots-outils, couleurs). */
+/**
+ * Mots de la langue ou de la commande qui ne sont jamais un prénom (mots-outils, couleurs, objets de la
+ * roue). Les verbes viennent de `regles.ts` (`estVerbe`), pas d'une liste copiée ici.
+ */
 const MOTS_COMMUNS: ReadonlySet<string> = new Set(
   (
     'euh heu hum ben bah les des mon ton son sur par pas une aux ces mes tes ses nos vos que qui dans avec pour sans vers elle lui eux moi toi nous vous ' +
-    'tout tous plus bien alors donc puis mais ' +
-    'supprime supprimer retire retirer enleve enlever efface effacer vire virer ajoute ajouter rajoute inscris ' +
-    'renomme renommer remplace remplacer change changer mets mettre met passe passer lance lancer tourne tourner ' +
-    'montre montrer affiche afficher donne donner tire tirer fais faire peux veux voudrais ' +
+    'tout tous plus bien alors donc puis mais annule annuler vide vider efface ' +
     'couleur rouge bleu vert orange rose violet noir blanc jaune gris ' +
     'roue liste noms nom cadeau cadeaux suivant historique trois deux rendu mode premier dernier ' +
     'comme tirage personne personnes participant participants'
   ).split(' '),
 );
+
+const VERBES: readonly RegExp[] = [V_AJOUTER, V_COLLER, V_RENOMMER, V_SUPPRIMER, V_LANCER, V_COULEUR];
+/** Vrai si le texte normalisé commence par un verbe de commande reconnu par les règles. */
+const estVerbe = (formeNormalisee: string): boolean => VERBES.some((v) => v.test(formeNormalisee));
 
 interface Mot {
   readonly debut: string;
@@ -86,17 +90,22 @@ const decouper = (texte: string): Mot[] =>
       return { debut: r?.[1] ?? '', coeur: r?.[2] ?? m, fin: r?.[3] ?? '' };
     });
 
-const VERBES_AJOUT = /^(?:ajout|rajout|inscri)/;
-const VERBES_RENOMMAGE = /^(?:renomm|rebaptis|appell)/;
 const LIENS_NOM_NOUVEAU = new Set(['en', 'par', 'comme']);
 
-/** Indice du premier mot qui est une donnée nouvelle (nom à ajouter ou à donner) ; `mots.length` sinon. */
+/** Indice du premier mot dont le texte (normalisé, jusqu'à la fin) commence par un verbe `verbe`, sinon -1. */
+const premierVerbe = (formes: readonly string[], verbe: RegExp): number =>
+  formes.findIndex((_, i) => verbe.test(formes.slice(i).join(' ')));
+
+/**
+ * Indice du premier mot qui est une donnée nouvelle (nom à ajouter, coller ou donner) ; `mots.length`
+ * sinon. Les verbes sont ceux de `regles.ts` (ajouter, coller, renommer, y compris « change le nom de »).
+ */
 function debutDonneeNouvelle(mots: readonly Mot[]): number {
   const formes = mots.map((m) => normaliser(m.coeur));
-  const ajout = formes.findIndex((f) => VERBES_AJOUT.test(f));
-  const renommage = formes.findIndex((f) => VERBES_RENOMMAGE.test(f));
+  const ajout = Math.min(...[V_AJOUTER, V_COLLER].map((v) => premierVerbe(formes, v)).map((i) => (i < 0 ? mots.length : i + 1)));
+  const renommage = premierVerbe(formes, V_RENOMMER);
   const lien = renommage < 0 ? -1 : formes.findIndex((f, i) => i > renommage && LIENS_NOM_NOUVEAU.has(f));
-  return Math.min(ajout < 0 ? mots.length : ajout + 1, lien < 0 ? mots.length : lien + 1);
+  return Math.min(ajout, lien < 0 ? mots.length : lien + 1);
 }
 
 interface Candidat {
@@ -114,35 +123,36 @@ function meilleur(forme: string, noms: readonly string[]): Candidat | null {
     const exact = noms.find((n) => mots(cle(n)) === mots(c));
     return exact === undefined ? null : { nom: exact, score: SCORE_EXACT, methode: 'exact' };
   }
-  if (c.length < LONGUEUR_MIN && !noms.some((n) => cle(n) === c)) return null;
-  const ks = cleFrancaise(c, false);
-  const k = cleFrancaise(c);
-  const candidats: Candidat[] = [];
-  for (const nom of noms) {
-    const f = cle(nom);
-    const longueur = Math.max(f.length, c.length);
-    if (f === c) candidats.push({ nom, score: SCORE_EXACT, methode: 'exact' });
-    else if (ks.length >= 2 && cleFrancaise(f, false) === ks) candidats.push({ nom, score: SCORE_PHONETIQUE, methode: 'phonetique' });
-    else if (k.length >= 2 && cleFrancaise(f) === k) candidats.push({ nom, score: SCORE_PHONETIQUE_SOUPLE, methode: 'phonetique' });
-    else {
+  // Paliers de `resoudreNom` (exact, préfixe, clé stricte, clé souple, proche) : un seul fil de règles.
+  const trouve = paliersNoms(c, noms);
+  if (trouve === null || trouve.palier === 'prefixe') return null;
+  if (trouve.palier !== 'exact' && c.length < LONGUEUR_MIN) return null;
+  const distincts = new Set(trouve.noms.map((n) => cle(n)));
+  // Deux prénoms différents au même palier (Marie et Mari) : à la cascade de demander lequel.
+  const nom = trouve.noms[0] as string;
+  if (distincts.size > 1) return null;
+  switch (trouve.palier) {
+    case 'exact':
+      return { nom, score: SCORE_EXACT, methode: 'exact' };
+    case 'strict':
+      return { nom, score: SCORE_PHONETIQUE, methode: 'phonetique' };
+    case 'souple':
+      return { nom, score: SCORE_PHONETIQUE_SOUPLE, methode: 'phonetique' };
+    default: {
+      const f = cle(nom);
+      const longueur = Math.max(f.length, c.length);
       const d = distance(f, c);
-      if (d <= (longueur > 5 ? 2 : 1)) {
-        candidats.push({ nom, score: SCORE_PROCHE_MIN + SCORE_PROCHE_AMPLITUDE * (1 - d / longueur), methode: 'proche' });
-      }
+      if (d > (longueur > 5 ? 2 : 1)) return null;
+      return { nom, score: SCORE_PROCHE_MIN + SCORE_PROCHE_AMPLITUDE * (1 - d / longueur), methode: 'proche' };
     }
   }
-  if (candidats.length === 0) return null;
-  const maxi = Math.max(...candidats.map((x) => x.score));
-  const meilleurs = candidats.filter((x) => x.score === maxi);
-  // Deux prénoms différents au même rang (Anne et Hanne) : à la cascade de demander lequel.
-  if (new Set(meilleurs.map((x) => cle(x.nom))).size > 1) return null;
-  return meilleurs[0] ?? null;
 }
 
 /** Rapproche chaque mot ou groupe de mots d'une commande dictée d'un prénom de la liste. */
 export function rapprocher(commande: string, noms: readonly string[], seuil: number = SEUIL_CORRECTION): Rapprochement {
   const mots = decouper(commande);
   const limite = debutDonneeNouvelle(mots);
+  const formes = mots.map((m) => normaliser(m.coeur));
   const sortie: string[] = [];
   const corrections: Correction[] = [];
   let i = 0;
@@ -156,7 +166,9 @@ export function rapprocher(commande: string, noms: readonly string[], seuil: num
         if (groupe.some((m, j) => (j < n - 1 && m.fin !== '') || (j > 0 && m.debut !== ''))) continue;
         if (n === 1 && MOTS_COMMUNS.has(normaliser(mot.coeur))) continue;
         const candidat = meilleur(groupe.map((m) => m.coeur).join(' '), noms);
-        if (candidat !== null) trouve = { candidat, n };
+        // Un verbe de commande n'est jamais rapproché d'un prénom, sauf s'il en est déjà un (exact).
+        const verbe = n === 1 && estVerbe(formes.slice(i).join(' '));
+        if (candidat !== null && !(verbe && candidat.methode !== 'exact')) trouve = { candidat, n };
       }
     }
     if (trouve === null) {
@@ -172,6 +184,25 @@ export function rapprocher(commande: string, noms: readonly string[], seuil: num
     i += trouve.n;
   }
   return { texte: sortie.join(' '), corrections, aConfirmer: corrections.some((c) => !c.appliquee) };
+}
+
+/** Actions qui détruisent ou changent une donnée : une correction orale non exacte y est toujours confirmée. */
+export const ACTIONS_DESTRUCTIVES: ReadonlySet<string> = new Set([
+  'supprimer',
+  'renommer',
+  'effacerHistorique',
+  'reinitialiserCouleurs',
+  'retirerGagnants',
+  'annulerDernierTirage',
+]);
+
+/**
+ * Corrections à faire confirmer : celles sous le seuil et, pour une action destructive, toute correction
+ * non exacte quel que soit son score (« supprime Mari » ne supprime pas Marie sans question).
+ */
+export function correctionsAConfirmer(r: Rapprochement, actions: readonly string[]): Correction[] {
+  const destructive = actions.some((a) => ACTIONS_DESTRUCTIVES.has(a));
+  return r.corrections.filter((c) => c.methode !== 'exact' && (!c.appliquee || destructive));
 }
 
 /** Vrai si le nom n'est pas dans la liste (comparaison sans accents ni casse). */
