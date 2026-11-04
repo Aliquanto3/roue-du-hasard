@@ -23,7 +23,8 @@ import './fenetre-inspection.css';
 
 export interface FenetreInspection {
   readonly dialogue: HTMLDialogElement;
-  ouvrir(): void;
+  /** `declencheur` : élément refocalisé à la fermeture (WebKit ne donne pas le focus au bouton sur un clic). */
+  ouvrir(declencheur?: HTMLElement): void;
   fermer(): void;
   basculer(): void;
   estOuverte(): boolean;
@@ -287,12 +288,17 @@ export function creerFenetreInspection(
       const resume = creer('summary', 'inspection__resume', d);
       resume.textContent = `${e.commande} — ${e.etage ?? T.etageAucun} — ${libelleVerdict(e)}`;
       const corps = creer('div', 'inspection__corps', d);
+      let construitOuvert = false;
       const construire = (): void => {
+        construitOuvert = d.open;
         corps.replaceChildren();
         if (d.open) rendreDetail(corps, e);
       };
       construire();
       d.addEventListener('toggle', () => {
+        // L'ouverture posée par le rendu émet un `toggle` après coup (Firefox, WebKit) : sans changement
+        // réel, ne pas recréer les boutons, le focus rendu après le verdict serait perdu.
+        if (d.open === construitOuvert) return;
         if (d.open) ouverts.add(e.id);
         else ouverts.delete(e.id);
         construire();
@@ -335,9 +341,9 @@ export function creerFenetreInspection(
 
   // --- Ouverture, fermeture, clavier ---
   let declencheur: HTMLElement | null = null;
-  const ouvrir = (): void => {
+  const ouvrir = (explicite?: HTMLElement): void => {
     if (dialogue.open) return;
-    declencheur = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    declencheur = explicite ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
     rendre();
     if (typeof dialogue.showModal === 'function') dialogue.showModal();
     else dialogue.setAttribute('open', '');

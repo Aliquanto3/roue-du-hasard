@@ -102,7 +102,7 @@ export function creerPanneauChat(parent: HTMLElement, options: OptionsPanneauCha
     inspecter.setAttribute('aria-haspopup', 'dialog');
     inspecter.setAttribute('aria-keyshortcuts', RACCOURCI_INSPECTION);
     inspecter.addEventListener('click', () => {
-      fenetre.ouvrir();
+      fenetre.ouvrir(inspecter);
     });
   }
 
