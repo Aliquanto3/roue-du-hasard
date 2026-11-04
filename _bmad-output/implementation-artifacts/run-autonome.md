@@ -231,3 +231,7 @@ Ordre de reprise :
 - 2026-11-04 · 6.2 · review · Opus : relais /stt sans constat (Host, Origin, /load fermé, 2 Mo, réponse amont bornée à 1 Mo) ; 7 low corrigés ; bouton Parler laissé actif pendant la rotation (comme la saisie, refus par la roue) : à confirmer par Anaël · 0ce37e9
 - 2026-11-04 · 6.2 · CI · rouge : chat-panneau.spec.ts:67 à 568 px (bouton Parler à moitié hors fenêtre) ; correction demandée · 0ce37e9
 - 2026-11-04 16:24 · 5.10 · CI · job macOS Chromium annulé deux fois sans runner (15 min d'attente), 8/9 verts ; troisième relance · d1d63f2
+- 2026-11-04 · 6.2 · CI · 938aeac puis 5ad11f3 : chat-panneau 568 px corrigé sous Chromium et Firefox, reste WebKit Ubuntu (tiroir remesuré après les polices) ; reproduction Linux par Docker demandée · 5ad11f3
+- 2026-11-04 · run · CI · runners macOS indisponibles depuis 14:47 UTC (jobs annulés sans runner après 15 min, toutes branches) ·
+- 2026-11-04 17:25 · 5.10 · décision · fusion sur les 6 jobs Linux et Windows verts, macOS sans runner (logique indépendante de la plateforme) ; la CI de main revérifiera macOS · 3c3e620
+- 2026-11-04 17:25 · 5.10 · fusion · PR #41 fusionnée (étape B : contrat réel, seuils, règle plusieurs noms) · 464be8b
