@@ -19,6 +19,7 @@ import {
   type EtatChat,
   type OptionsEtages,
   type PasseMain,
+  type RaisonIndisponible,
   type ResultatEtage,
 } from './types';
 
@@ -151,7 +152,7 @@ export type EtatDecision = 'inconnu' | 'disponible' | 'indisponible';
 export interface EtageDecision extends Etage {
   readonly nom: 'decision';
   etat(): EtatDecision;
-  raisonIndisponible(): string | null;
+  raisonIndisponible(): RaisonIndisponible | null;
   derniereTrace(): TraceDecision | null;
 }
 
@@ -234,7 +235,7 @@ export function creerEtageDecision(
   adaptateur: AdaptateurDecision = ADAPTATEUR_SYSTEMONE,
 ): EtageDecision {
   let etatDecision: EtatDecision = 'inconnu';
-  let raison: string | null = null;
+  let raison: RaisonIndisponible | null = null;
   let trace: TraceDecision | null = null;
   const delaiMs = options.delaiMs ?? DELAI_DEFAUT_MS;
   const seuil = options.seuilDecision ?? SEUIL_DECISION_DEFAUT;
@@ -311,23 +312,25 @@ export function creerEtageDecision(
           signal: controleur.signal,
         });
         if (!reponse.ok) {
-          const absent = reponse.status === 403 || reponse.status === 404;
-          const raisonHttp =
-            reponse.status === 403
-              ? 'accès refusé (403) : vérifier les origines autorisées du serveur'
-              : reponse.status === 404
-                ? `modèle ${modele} ou route ${adaptateur.chemin} non disponible (404)`
-                : `erreur HTTP ${String(reponse.status)}`;
+          const refuse = reponse.status === 403;
+          const manquant = reponse.status === 404;
+          const raisonHttp = refuse
+            ? 'accès refusé (403) : vérifier les origines autorisées du serveur'
+            : manquant
+              ? `modèle ${modele} ou route ${adaptateur.chemin} non disponible (404)`
+              : `erreur HTTP ${String(reponse.status)}`;
           appels.push({
             questions,
             reponseBrute: null,
             dureeMs: performance.now() - t0,
           });
-          if (absent) {
+          if (refuse || manquant) {
             etatDecision = 'indisponible';
-            raison = raisonHttp;
+            raison = refuse
+              ? { code: 'origine-refusee', detail: raisonHttp }
+              : { code: 'modele-absent', detail: raisonHttp, modele };
           }
-          throw new Passe(absent ? 'indisponible' : 'erreur-http', raisonHttp);
+          throw new Passe(refuse || manquant ? 'indisponible' : 'erreur-http', raisonHttp);
         }
         const brut = await reponse.text();
         appels.push({
@@ -448,8 +451,8 @@ export function creerEtageDecision(
         }
         const message = erreur instanceof Error ? erreur.message : String(erreur);
         etatDecision = 'indisponible';
-        raison = `serveur de décision injoignable : ${message}`;
-        return passer('indisponible', raison);
+        raison = { code: 'ollama-absent', detail: `serveur de décision injoignable : ${message}` };
+        return passer('indisponible', raison.detail);
       } finally {
         clearTimeout(minuteur);
         if (surAnnulation) signal.removeEventListener('abort', surAnnulation);

@@ -297,15 +297,23 @@ describe('étage decision', () => {
     const e1 = creerEtageDecision(opts(refuse));
     expect(((await e1.decider('x', etat, signal)) as PasseMain).raison).toBe('indisponible');
     expect(e1.etat()).toBe('indisponible');
-    expect(e1.raisonIndisponible()).toBe('serveur de décision injoignable : fetch failed');
+    expect(e1.raisonIndisponible()).toEqual({
+      code: 'ollama-absent',
+      detail: 'serveur de décision injoignable : fetch failed',
+    });
 
     const e2 = creerEtageDecision(opts(reponse('', 404)));
     expect(((await e2.decider('x', etat, signal)) as PasseMain).raison).toBe('indisponible');
-    expect(e2.raisonIndisponible()).toBe('modèle m ou route /v1/systemone non disponible (404)');
+    expect(e2.raisonIndisponible()).toEqual({
+      code: 'modele-absent',
+      detail: 'modèle m ou route /v1/systemone non disponible (404)',
+      modele: 'm',
+    });
 
     const e3 = creerEtageDecision(opts(reponse('', 403)));
     expect(((await e3.decider('x', etat, signal)) as PasseMain).raison).toBe('indisponible');
-    expect(e3.raisonIndisponible()).toContain('403');
+    expect(e3.raisonIndisponible()?.code).toBe('origine-refusee');
+    expect(e3.raisonIndisponible()?.detail).toContain('403');
 
     const e4 = creerEtageDecision(opts(reponse('', 500)));
     expect(((await e4.decider('x', etat, signal)) as PasseMain).raison).toBe('erreur-http');

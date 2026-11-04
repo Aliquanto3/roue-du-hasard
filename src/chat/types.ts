@@ -99,6 +99,17 @@ export interface EtatChat {
   readonly historique?: readonly { readonly commande: string; readonly reponse: string }[];
 }
 
+/** Cause d'indisponibilité d'un étage modèle : un code stable, que l'interface traduit en conseil. */
+export type CodeIndisponible = 'ollama-absent' | 'origine-refusee' | 'modele-absent';
+
+export interface RaisonIndisponible {
+  readonly code: CodeIndisponible;
+  /** Détail lisible (journal, fenêtre d'inspection) ; ne sert jamais à décider. */
+  readonly detail: string;
+  /** Modèle manquant, pour `modele-absent`. */
+  readonly modele?: string;
+}
+
 export type NomEtage = 'regles' | 'decision' | 'slm';
 
 /** Données de trace fournies par l'étage ; la cascade y ajoute l'étage et la durée. */
