@@ -24,6 +24,12 @@ import {
 } from './types';
 
 export const SEUIL_DECISION_DEFAUT = 0.6;
+/**
+ * Seuil du `noul` « ambigu », distinct de `seuilDecision` : le `noul` de tev1:0.8b est peu discriminant
+ * (0,77 pour « supprime Paul », sans ambiguïté ; 0,66 pour « supprime Paul ou Marie »). 0,9 : on ne demande
+ * une clarification que sur un signal net ; sinon le nom se juge au seuil de décision. À régler sur un nouveau banc dev.
+ */
+export const SEUIL_AMBIGU_DEFAUT = 0.9;
 export const OPTION_AUCUN = 'aucun';
 /**
  * Écart toléré entre 1 et la somme des probabilités d'une question `choice` ; au-delà, la réponse
@@ -122,7 +128,7 @@ export const ADAPTATEUR_SYSTEMONE: AdaptateurDecision = {
         continue;
       }
       const probas = lireProbas(r['probabilities']);
-      if (probas === null || q.options.some((o) => !(o in probas))) return null;
+      if (probas === null || q.options.some((o) => !Object.hasOwn(probas, o))) return null;
       if (Object.keys(probas).some((o) => !q.options.includes(o))) {
         return {
           code: 'forme-invalide',
@@ -136,6 +142,10 @@ export const ADAPTATEUR_SYSTEMONE: AdaptateurDecision = {
           rejet: `somme des probabilités ${String(somme)} hors de 1 ± ${String(TOLERANCE_SOMME)}`,
         };
       }
+      if (!estProba(r['confidence'])) return null;
+      const choix = r['choice'];
+      const max = Math.max(...Object.values(probas));
+      if (typeof choix !== 'string' || !Object.hasOwn(probas, choix) || probas[choix] !== max) return null;
       sortie.push({ id: q.id, type: 'choice', probabilites: probas });
     }
     return sortie;
@@ -251,6 +261,7 @@ export function creerEtageDecision(
   let trace: TraceDecision | null = null;
   const delaiMs = options.delaiMs ?? DELAI_DEFAUT_MS;
   const seuil = options.seuilDecision ?? SEUIL_DECISION_DEFAUT;
+  const seuilAmbigu = options.seuilAmbigu ?? SEUIL_AMBIGU_DEFAUT;
 
   return {
     nom: 'decision',
@@ -429,7 +440,7 @@ export function creerEtageDecision(
           const probasNom: Record<string, number> = Object.fromEntries(
             Object.entries(rNom.probabilites).map(([k, p]) => [origine.get(k) ?? k, p]),
           );
-          if (rAmbigu.probabilite >= seuil) {
+          if (rAmbigu.probabilite >= seuilAmbigu) {
             const tries = [...candidats].sort((a, b) => (probasNom[b] ?? 0) - (probasNom[a] ?? 0));
             return rendre({ action: 'clarifier', candidats: tries.slice(0, 3) }, rAmbigu.probabilite);
           }

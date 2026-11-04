@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
 import { ETAGES_ENREGISTRES } from './cascade';
-import { candidatsNoms, construireMessagesDecision, creerEtageDecision, type QuestionDecision } from './decision';
+import { ADAPTATEUR_SYSTEMONE, candidatsNoms, construireMessagesDecision, creerEtageDecision, type QuestionDecision } from './decision';
 import { OUTILS, planifier } from './outils';
 import { DEBUT_DONNEES, FIN_DONNEES, neutraliser } from './slm';
 import type { EtatChat, OptionsEtages, PasseMain, ResultatEtage } from './types';
@@ -235,7 +235,7 @@ describe('étage decision', () => {
         serveur({
           outil: { supprimer: 0.9 },
           nom: { Ana: 0.3, Bob: 0.5, Chloé: 0.2 },
-          ambigu: 0.8,
+          ambigu: 0.95,
         }),
       ),
       'supprime Ana, Bob ou Chloé',
@@ -244,7 +244,7 @@ describe('étage decision', () => {
       action: 'clarifier',
       candidats: ['Bob', 'Ana', 'Chloé'],
     });
-    expect(r.confiance).toBe(0.8);
+    expect(r.confiance).toBe(0.95);
   });
 
   it('aucun nom cité (ou liste vide) : passe la main sans poser la question du nom', async () => {
@@ -275,7 +275,8 @@ describe('étage decision', () => {
       const tout = Object.fromEntries(
         [...OUTILS.filter((o) => o.construire !== null).map((o) => o.nom), 'aucun'].map((o) => [o, 0]),
       );
-      return { answers: { outil: { type: 'choice', probabilities: { ...tout, ...p } } } };
+      const probabilities = { ...tout, ...p };
+      return { answers: { outil: { type: 'choice', choice: 'lancer', probabilities, confidence: 0.5 } } };
     };
     const cas: [unknown, string][] = [
       [complet({ lancer: 0.9, aucun: 0.9 }), 'forme-invalide'],
@@ -419,7 +420,7 @@ describe('étage decision', () => {
     expect(((await decider(opts(reponse(reel)), 'annule')) as PasseMain).raison).toBe('reponse-invalide');
   });
 
-  it('réponses réelles de tev1:0.8b : nom et ambigu lus, `noul` au-dessus du seuil donne clarifier', async () => {
+  it('réponses réelles de tev1:0.8b : nom et ambigu lus, `noul` au-dessus de seuilAmbigu donne clarifier', async () => {
     // Relevé réel pour « supprime Paul ou Marie » ; l'étage 1 (outil) est servi par le simulateur.
     const reelNom = {
       model: 'tev1:0.8b',
@@ -440,14 +441,54 @@ describe('étage decision', () => {
         ? Promise.resolve(new Response(JSON.stringify(reelNom)))
         : sim(url, init)) as unknown as typeof fetch;
     const e: EtatChat = { noms: ['Paul', 'Marie'], rotation: false };
-    const etage = creerEtageDecision(opts(f));
+    const etage = creerEtageDecision(opts(f, { seuilAmbigu: 0.6 }));
     const r = (await etage.decider('supprime Paul ou Marie', e, signal)) as ResultatEtage;
     expect(r.decision).toEqual({ action: 'clarifier', candidats: ['Paul', 'Marie'] });
     expect(r.confiance).toBe(0.6605770613094323);
     expect(etage.derniereTrace()?.probabilites['ambigu']).toBe(0.6605770613094323);
-    // Sous le seuil (0,7 > 0,66) : on lit le nom, 0,54 < 0,7 donc incertain.
-    const sous = (await decider(opts(f, { seuilDecision: 0.7 }), 'supprime Paul ou Marie', e)) as PasseMain;
-    expect(sous.raison).toBe('incertain');
+    // Seuil par défaut (0,9) : pas de clarification, le nom (0,54) est sous le seuil de décision (0,6).
+    const defaut = (await decider(opts(f), 'supprime Paul ou Marie', e)) as PasseMain;
+    expect(defaut.raison).toBe('incertain');
+  });
+
+  it('« supprime Paul » : noul réel à 0,77, sans ambiguïté, n’est pas clarifié (seuilAmbigu 0,9)', async () => {
+    const reel = {
+      model: 'tev1:0.8b',
+      answers: {
+        nom: { type: 'choice', choice: 'Paul', probabilities: { Paul: 1.0 }, confidence: 1.0 },
+        ambigu: { type: 'noul', noul: 0.7741634886809781 },
+      },
+      usage: { input_tokens: 209, output_tokens: 0 },
+    };
+    const sim = serveur({ outil: { supprimer: 0.9 } });
+    const f = ((url: string, init: RequestInit) =>
+      decoder(init.body as string).questions[0]?.id === 'nom'
+        ? Promise.resolve(new Response(JSON.stringify(reel)))
+        : sim(url, init)) as unknown as typeof fetch;
+    const e: EtatChat = { noms: ['Paul', 'Marie'], rotation: false };
+    const r = (await decider(opts(f), 'supprime Paul', e)) as ResultatEtage;
+    expect(r.decision).toEqual({ action: 'supprimer', params: { nom: 'Paul' } });
+    // En abaissant seuilAmbigu sous 0,77, la clarification revient.
+    const bas = (await decider(opts(f, { seuilAmbigu: 0.7 }), 'supprime Paul', e)) as ResultatEtage;
+    expect(bas.decision).toEqual({ action: 'clarifier', candidats: ['Paul'] });
+  });
+
+  it('adaptateur : réponse réelle de tev1:0.8b lue telle quelle (6 options demandées, 6 rendues)', () => {
+    const reel = JSON.parse(
+      '{"model":"tev1:0.8b","answers":{"outil":{"type":"choice","choice":"aucun","probabilities":{"ajouter":0.037321567359738114,"supprimer":0.1807320322546993,"renommer":0.02531162563702895,"lancer":0.013418617857988667,"definirCouleur":0.0016486169835586786,"aucun":0.7415675399069862},"confidence":0.6898810478883834}},"usage":{"input_tokens":203,"output_tokens":0}}',
+    ) as { answers: { outil: Record<string, unknown> } };
+    const options = ['ajouter', 'supprimer', 'renommer', 'lancer', 'definirCouleur', 'aucun'];
+    const q: QuestionDecision = { id: 'outil', type: 'choice', question: '?', options };
+    const lu = ADAPTATEUR_SYSTEMONE.reponses(reel, [q]);
+    expect(lu).toEqual([{ id: 'outil', type: 'choice', probabilites: reel.answers.outil['probabilities'] }]);
+    // Une option demandée absente de la réponse : rejet (les serveurs relevés les rendent toutes).
+    expect(ADAPTATEUR_SYSTEMONE.reponses(reel, [{ ...q, options: [...options, 'toString'] }])).toBeNull();
+    // Le choix doit être l'argmax ; la confiance, un nombre de [0, 1].
+    const modif = (o: Record<string, unknown>) => ({ answers: { outil: { ...reel.answers.outil, ...o } } });
+    expect(ADAPTATEUR_SYSTEMONE.reponses(modif({ choice: 'ajouter' }), [q])).toBeNull();
+    expect(ADAPTATEUR_SYSTEMONE.reponses(modif({ choice: 'zzz' }), [q])).toBeNull();
+    expect(ADAPTATEUR_SYSTEMONE.reponses(modif({ confidence: 1.5 }), [q])).toBeNull();
+    expect(ADAPTATEUR_SYSTEMONE.reponses(modif({ confidence: 'x' }), [q])).toBeNull();
   });
 
   it('nom hostile : donnée échappée, jamais une instruction, jamais deux fins de bloc', async () => {

@@ -81,6 +81,8 @@ export interface OptionsEtages {
   readonly urlDecision?: string;
   /** Probabilité minimale pour agir (0,6 par défaut, réglé sur le banc dev de `tev1:0.8b`) ; en dessous, l'étage passe la main (`incertain`). */
   readonly seuilDecision?: number;
+  /** Probabilité minimale du `noul` « ambigu » pour demander une clarification (0,9 par défaut). */
+  readonly seuilAmbigu?: number;
 }
 
 /** Fabrique d'un étage ; c'est elle que l'on enregistre dans la cascade. */
