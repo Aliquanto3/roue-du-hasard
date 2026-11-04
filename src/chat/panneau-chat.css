@@ -1,0 +1,157 @@
+/* Panneau de chat (5.5) : jetons et thèmes de page.css. Colonne du panneau en écran large, tiroir bas en étroit. */
+.chat {
+  display: grid;
+  gap: 0.5rem;
+  min-width: 0;
+  padding: 0.75rem;
+  border: 2px solid var(--bord);
+  border-radius: 0.75rem;
+  background: var(--surface);
+  color: var(--texte);
+}
+.chat__titre {
+  margin: 0;
+  font-size: 1.125rem;
+}
+.chat__bascule {
+  width: 100%;
+  text-align: left;
+}
+.chat__corps {
+  display: grid;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.chat__corps[hidden] {
+  display: none;
+}
+.chat__avis {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--alerte);
+  border-radius: 0.5rem;
+  color: var(--alerte);
+  font-size: 0.9375rem;
+  overflow-wrap: anywhere;
+}
+.chat__avis[hidden] {
+  display: none;
+}
+.chat__fil {
+  display: grid;
+  gap: 0.375rem;
+  align-content: start;
+  margin: 0;
+  padding: 0.5rem;
+  max-height: 14rem;
+  overflow-y: auto;
+  overflow-x: hidden;
+  list-style: none;
+  border: 1px solid var(--bord);
+  border-radius: 0.5rem;
+  background: var(--champ);
+}
+.chat__message {
+  overflow-wrap: anywhere;
+}
+.chat__auteur {
+  color: var(--texte-doux);
+  font-weight: 700;
+}
+.chat__message--moi .chat__texte {
+  color: var(--texte);
+}
+.chat__etat {
+  margin: 0;
+  min-height: 0;
+  color: var(--texte-doux);
+  font-size: 0.9375rem;
+}
+.chat__attente {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.chat__attente[hidden] {
+  display: none;
+}
+.chat__attente[role='group'] {
+  display: grid;
+  width: 100%;
+  padding: 0.75rem;
+  border: 2px solid var(--alerte);
+  border-radius: 0.5rem;
+}
+.chat__recap-titre {
+  margin: 0;
+  font-weight: 700;
+}
+.chat__recap {
+  margin: 0;
+  padding-left: 1.25rem;
+  overflow-wrap: anywhere;
+}
+.chat__recap-barre {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.chat__choix {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.chat__formulaire {
+  display: grid;
+  gap: 0.25rem;
+}
+.chat__rangee {
+  display: flex;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.chat__rangee > .chat__saisie {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.chat__saisie:disabled,
+.chat__envoyer:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+.chat__reglages {
+  min-width: 0;
+}
+.chat__reglages-titre {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-weight: 600;
+}
+.chat__reglage {
+  display: grid;
+  gap: 0.25rem;
+  margin-bottom: 0.5rem;
+}
+
+/* Écran étroit : tiroir fixé en bas, replié par défaut ; la roue reste visible au-dessus. */
+@media (max-width: 51.99rem) {
+  .chat {
+    position: fixed;
+    inset-inline: 0;
+    bottom: 0;
+    z-index: 5;
+    border-radius: 0.75rem 0.75rem 0 0;
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+    max-height: 45vh;
+    max-height: 45dvh;
+    overflow-y: auto;
+  }
+  .chat__fil {
+    max-height: 7rem;
+  }
+  #app[data-chat] .page {
+    padding-bottom: 5rem;
+  }
+}
