@@ -69,11 +69,11 @@ async function nomSousPointeur(page: Page): Promise<string | null> {
 }
 
 async function sansDefilementHorizontal(page: Page): Promise<void> {
-  const [defilable, vue] = await page.evaluate(() => [
-    document.documentElement.scrollWidth,
-    document.documentElement.clientWidth,
-  ]);
-  expect(defilable).toBeLessThanOrEqual(vue as number);
+  // Interrogé jusqu'à stabilité : juste après un changement de fenêtre, WebKit peut encore
+  // renvoyer la mise en page précédente. Un vrai débordement, lui, persiste et fait échouer.
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth))
+    .toBeLessThanOrEqual(0);
 }
 
 /** Pixel sondé, taille du canvas et couleurs des lignes : message d'échec des contrôles « sous le pointeur ». */

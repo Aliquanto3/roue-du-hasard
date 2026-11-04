@@ -254,11 +254,30 @@ for (const [largeur, hauteur] of LARGEURS) {
       const defile = await page.evaluate(() => window.scrollY);
       return [l?.x, (l?.y ?? 0) + defile, l?.height, r?.x, (r?.y ?? 0) + defile];
     };
-    const avant = await positions();
+    // Attend deux mesures identiques consécutives : polices et transitions terminées.
+    const stables = async (): Promise<(number | undefined)[]> => {
+      let derniere = await positions();
+      await expect
+        .poll(async () => {
+          const courante = await positions();
+          const egal = JSON.stringify(courante) === JSON.stringify(derniere);
+          derniere = courante;
+          return egal;
+        })
+        .toBe(true);
+      return derniere;
+    };
+    const avant = await stables();
     expect(avant[1]).toBeDefined();
     await ajouterNoms(page, 'Ana\nBob');
     await expect(page.locator('#roue-indice')).toBeHidden();
-    expect(await positions()).toEqual(avant);
+    const apres = await stables();
+    // Tolérance d'1 px : Firefox arrondit parfois autrement une position sous-pixel (424 contre
+    // 423 observé en CI). Une place réservée qui disparaît décale de plusieurs dizaines de px.
+    expect(apres).toHaveLength(avant.length);
+    apres.forEach((v, i) => {
+      expect(Math.abs((v ?? Number.NaN) - (avant[i] ?? Number.NaN)), `mesure ${String(i)}`).toBeLessThanOrEqual(1);
+    });
   });
 }
 
