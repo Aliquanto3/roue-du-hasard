@@ -7,8 +7,10 @@
 import type { Actions } from '../actions';
 import type { Cascade } from './cascade';
 import { SEUIL_DECISION_DEFAUT } from './decision';
-import { construireEntree, decrirePlan, type Execution, type Inspection } from './inspection';
-import { executerPlan, planifier, type Etape, type Plan } from './outils';
+import { construireEntree, decrirePlan, type Execution, type Inspection, type TranscriptionInspectee } from './inspection';
+import { ACTIONS_DESTRUCTIVES, correctionsAConfirmer, estNomNouveau, nomsNonEntendus, rapprocher, type Rapprochement } from './oral';
+import { executerPlan, OUTILS, planifier, type Etape, type Plan } from './outils';
+import { cle, extraireNoms } from './regles';
 import { TEXTES_CHAT } from './textes';
 import { estClarifier, estEtapes, type Decision, type DecisionAction, type EtatChat, type Etage,
   type RaisonIndisponible,
@@ -46,11 +48,16 @@ export interface DepsControleur {
   readonly seuilDecision?: number;
 }
 
+/** Commande dictée (6.2) : transcription brute et latence du STT, pour l'inspection. */
+export interface OrigineCommande {
+  readonly transcription?: TranscriptionInspectee;
+}
+
 export interface Controleur {
   etat(): EtatPanneau;
   abonner(fn: () => void): () => void;
   /** Envoie une commande ; annule celle qui est en cours. Résolu quand la commande est traitée. */
-  envoyer(texte: string): Promise<void>;
+  envoyer(texte: string, origine?: OrigineCommande): Promise<void>;
   /** Réponse à une clarification : le candidat choisi remplace le nom ambigu de la décision. */
   choisir(candidat: string): void;
   confirmer(): void;
@@ -178,7 +185,48 @@ export function creerControleur(deps: DepsControleur): Controleur {
   const appels = (decision: Decision): readonly DecisionAction[] =>
     estEtapes(decision) ? decision.actions : [decision as DecisionAction];
 
-  const suivre = (commande: string, decision: Decision, plan: Plan, id: string | null): Execution => {
+  /**
+   * Noms à ajouter ou à donner qui ne sont pas dans la liste (commande dictée : le STT écorche les prénoms
+   * inconnus). Jugés sur la commande brute : un nom que le rapprochement aurait ramené à un nom existant
+   * (`avant` d'une correction non exacte) reste un nom nouveau, donc confirmé.
+   */
+  const nomsNouveaux = (decision: Decision, noms: readonly string[], rapproche: Rapprochement): string[] => {
+    const bruts: string[] = [];
+    for (const a of appels(decision)) {
+      const p = a.params ?? {};
+      if (a.action === 'ajouter' && typeof p['nom'] === 'string') bruts.push(p['nom']);
+      else if (a.action === 'renommer' && typeof p['nouveau'] === 'string') bruts.push(p['nouveau']);
+      else if (a.action === 'coller' && typeof p['texte'] === 'string') bruts.push(...extraireNoms(p['texte']));
+    }
+    const entendus = bruts.map(
+      (n) => rapproche.corrections.find((c) => c.methode !== 'exact' && cle(c.apres) === cle(n))?.avant ?? n,
+    );
+    return entendus.filter((n) => n.trim() !== '' && estNomNouveau(n, noms));
+  };
+
+  /** Question à poser avant d'exécuter une commande dictée, ou `null` : nom nouveau, puis correction à confirmer. */
+  const questionDictee = (rapproche: Rapprochement, decision: Decision, noms: readonly string[]): string | null => {
+    const nouveaux = nomsNouveaux(decision, noms, rapproche);
+    if (nouveaux.length > 0) return TEXTES_CHAT.nomNouveau(nouveaux);
+    const actions = appels(decision);
+    const aConfirmer = correctionsAConfirmer(rapproche, actions.map((a) => a.action));
+    if (aConfirmer.length > 0) return TEXTES_CHAT.vousVouliezDire([...new Set(aConfirmer.map((c) => c.apres))], rapproche.texte);
+    // Filet : sur une action destructive, un nom visé absent de la commande corrigée a été rapproché par la
+    // cascade elle-même, sans score ; il est confirmé comme une correction orale.
+    const vises = actions
+      .filter((a) => ACTIONS_DESTRUCTIVES.has(a.action))
+      .flatMap((a) => OUTILS.find((o) => o.nom === a.action)?.noms(a.params ?? {}) ?? []);
+    const nonEntendus = nomsNonEntendus(rapproche.texte, vises);
+    return nonEntendus.length === 0 ? null : TEXTES_CHAT.nomRapproche(nonEntendus);
+  };
+
+  const suivre = (
+    commande: string,
+    decision: Decision,
+    plan: Plan,
+    id: string | null,
+    question: string | null = null,
+  ): Execution => {
     if (plan.genre === 'refuser') {
       // Les règles refusent « lancer » avec moins de 2 noms par `indisponible` : on donne le message de l'interface.
       const moinsDeDeux =
@@ -196,13 +244,13 @@ export function creerControleur(deps: DepsControleur): Controleur {
       entreeAttente = id;
       majInspection(id, 'attente-precision');
       return 'attente-precision';
-    } else if (plan.confirmation) {
+    } else if (plan.confirmation || question !== null) {
       suite = { decision, empreinte: empreinte() };
       attente = {
         genre: 'confirmer',
         recapitulatif: appels(decision).map((a) => TEXTES_CHAT.etape(a.action, a.params)),
       };
-      repondre(commande, TEXTES_CHAT.confirmer);
+      repondre(commande, question ?? TEXTES_CHAT.confirmer);
       entreeAttente = id;
       majInspection(id, 'attente-confirmation');
       return 'attente-confirmation';
@@ -229,7 +277,7 @@ export function creerControleur(deps: DepsControleur): Controleur {
       abonnes.add(fn);
       return () => abonnes.delete(fn);
     },
-    async envoyer(texte) {
+    async envoyer(texte, origine) {
       const commande = texte.trim();
       if (commande === '') return;
       if (attente !== null) majInspection(entreeAttente, 'annule');
@@ -244,8 +292,11 @@ export function creerControleur(deps: DepsControleur): Controleur {
       let decision: Decision;
       let resultat: ResultatCascade | null = null;
       const etatEnvoye = etatChat();
+      // Commande dictée : prénoms rapprochés de la liste avant la cascade (6.3).
+      const rapproche = origine?.transcription === undefined ? null : rapprocher(commande, etatEnvoye.noms);
+      const aDecider = rapproche?.texte ?? commande;
       try {
-        resultat = await deps.cascade.decider(commande, etatEnvoye, controle.signal);
+        resultat = await deps.cascade.decider(aDecider, etatEnvoye, controle.signal);
         decision = resultat.decision;
       } catch {
         decision = { action: 'refuser', code: 'incompris' };
@@ -268,9 +319,28 @@ export function creerControleur(deps: DepsControleur): Controleur {
                 plan,
                 execution: 'non-execute',
                 seuilDecision: deps.seuilDecision ?? SEUIL_DECISION_DEFAUT,
+                ...(origine?.transcription === undefined
+                  ? {}
+                  : {
+                      transcription: {
+                        ...origine.transcription,
+                        ...(rapproche === null || rapproche.corrections.length === 0
+                          ? {}
+                          : { corrections: rapproche.corrections, corrigee: rapproche.texte }),
+                      },
+                    }),
               }),
             );
-      suivre(commande, decision, plan, id);
+      const question = rapproche === null ? null : questionDictee(rapproche, decision, etatEnvoye.noms);
+      if (
+        question === null &&
+        rapproche !== null &&
+        plan.genre !== 'refuser' &&
+        rapproche.corrections.some((c) => c.methode !== 'exact')
+      ) {
+        repondre(commande, TEXTES_CHAT.commandeCorrigee(rapproche.texte));
+      }
+      suivre(commande, decision, plan, id, question);
       notifier();
     },
     choisir(candidat) {

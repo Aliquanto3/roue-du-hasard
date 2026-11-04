@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
 import { ETAGES_ENREGISTRES } from './cascade';
-import { candidatsNoms, construireMessagesDecision, creerEtageDecision, type QuestionDecision } from './decision';
+import { ADAPTATEUR_SYSTEMONE, candidatsNoms, construireMessagesDecision, creerEtageDecision, type QuestionDecision } from './decision';
 import { OUTILS, planifier } from './outils';
 import { DEBUT_DONNEES, FIN_DONNEES, neutraliser } from './slm';
 import type { EtatChat, OptionsEtages, PasseMain, ResultatEtage } from './types';
@@ -10,14 +10,35 @@ const etat: EtatChat = { noms: ['Ana', 'Bob', 'Chloé'], rotation: false };
 const signal = new AbortController().signal;
 const optionsDe = (q: QuestionDecision | undefined): readonly string[] => (q?.type === 'choice' ? q.options : []);
 
+/** Requête décodée : le corps réel est `{ model, state, questions: { id: { type, instructions, criteria? } } }`. */
 interface Requete {
   url: string;
   corps: {
     model: string;
-    messages: { role: string; content: string }[];
+    state: string;
     questions: QuestionDecision[];
+    brut: unknown;
   };
 }
+
+interface QuestionBrute {
+  type: 'choice' | 'noul';
+  instructions: string;
+  criteria?: Record<string, string>;
+}
+
+function decoder(body: string): Requete['corps'] {
+  const brut = JSON.parse(body) as { model: string; state: string; questions: Record<string, QuestionBrute> };
+  const questions = Object.entries(brut.questions).map(([id, q]): QuestionDecision =>
+    q.type === 'choice'
+      ? { id, type: 'choice', question: q.instructions, options: Object.keys(q.criteria ?? {}) }
+      : { id, type: 'noul', question: q.instructions },
+  );
+  return { model: brut.model, state: brut.state, questions, brut };
+}
+
+/** Partie « état » du `state` envoyé : sans les consignes, qui citent les délimiteurs. */
+const partieEtat = (state: string): string => (state.split('\nÉtat (')[1] ?? '').split('\nCommande : ')[0] ?? '';
 
 type Probas = Record<string, number>;
 interface Scenario {
@@ -38,18 +59,21 @@ function repartir(options: readonly string[], source: Probas): Probas {
 /** Serveur simulé : répond d'après le scénario. */
 function serveur(sc: Scenario, requetes: Requete[] = []): typeof fetch {
   return ((url: string, init: RequestInit) => {
-    const corps = JSON.parse(init.body as string) as Requete['corps'];
+    const corps = decoder(init.body as string);
     requetes.push({ url, corps });
-    const answers = corps.questions.map((q) => {
-      if (q.type === 'noul') return { id: q.id, type: 'noul', probability: sc.ambigu ?? 0 };
-      const source = (q.id === 'outil' ? sc.outil : sc.nom) ?? {};
-      return {
-        id: q.id,
-        type: 'choice',
-        probabilities: repartir(q.options, source),
-      };
-    });
-    return Promise.resolve(new Response(JSON.stringify({ answers, usage: { total_tokens: 1 } })));
+    // Forme constatée sur tev1:0.8b : answers est un objet indexé par id.
+    const answers = Object.fromEntries(
+      corps.questions.map((q) => {
+        if (q.type === 'noul') return [q.id, { type: 'noul', noul: sc.ambigu ?? 0 }];
+        const source = (q.id === 'outil' ? sc.outil : sc.nom) ?? {};
+        const probabilities = repartir(q.options, source);
+        const [choice = ''] = Object.entries(probabilities).sort((a, b) => b[1] - a[1])[0] ?? [];
+        return [q.id, { type: 'choice', choice, probabilities, confidence: 0.5 }];
+      }),
+    );
+    return Promise.resolve(
+      new Response(JSON.stringify({ model: 'm', answers, usage: { input_tokens: 1, output_tokens: 0 } })),
+    );
   }) as unknown as typeof fetch;
 }
 
@@ -132,13 +156,13 @@ describe('étage decision', () => {
     expect(JSON.stringify(requetes[0]?.corps.questions)).not.toMatch(/gagnant/);
   });
 
-  it('seuil : outil sous le seuil par défaut (0,5) passe la main, incertain', async () => {
-    const r = (await decider(opts(serveur({ outil: { supprimer: 0.49, exporter: 0.48, aucun: 0.03 } })))) as PasseMain;
+  it('seuil : outil sous le seuil par défaut (0,6) passe la main, incertain', async () => {
+    const r = (await decider(opts(serveur({ outil: { supprimer: 0.59, exporter: 0.38, aucun: 0.03 } })))) as PasseMain;
     expect(r.decision).toBeNull();
     expect(r.raison).toBe('incertain');
-    // À 0,5 pile, on agit.
+    // À 0,6 pile, on agit.
     const ok = (await decider(
-      opts(serveur({ outil: { supprimer: 0.5, exporter: 0.25, aucun: 0.25 }, nom: { Bob: 1 } })),
+      opts(serveur({ outil: { supprimer: 0.6, exporter: 0.2, aucun: 0.2 }, nom: { Bob: 1 } })),
     )) as ResultatEtage;
     expect(ok.decision).toEqual({
       action: 'supprimer',
@@ -149,13 +173,13 @@ describe('étage decision', () => {
   it('seuil : nom sous le seuil configurable passe la main, incertain', async () => {
     const f = serveur({
       outil: { supprimer: 0.95, aucun: 0.05 },
-      nom: { Bob: 0.7, Ana: 0.3 },
+      nom: { Bob: 0.97 },
     });
-    const cmd = 'supprime Bob ou Ana';
-    const r = (await decider(opts(f, { seuilDecision: 0.8 }), cmd)) as PasseMain;
+    const cmd = 'supprime Bob';
+    const r = (await decider(opts(f, { seuilDecision: 0.98 }), cmd)) as PasseMain;
     expect(r.raison).toBe('incertain');
     expect(r.trace.sortie).toContain('answers');
-    expect(((await decider(opts(f, { seuilDecision: 0.7 }), cmd)) as ResultatEtage).decision).toEqual({
+    expect(((await decider(opts(f, { seuilDecision: 0.9 }), cmd)) as ResultatEtage).decision).toEqual({
       action: 'supprimer',
       params: { nom: 'Bob' },
     });
@@ -205,22 +229,19 @@ describe('étage decision', () => {
     expect(plan).toEqual({ genre: 'clarifier', candidats: ['Marie', 'Marie'] });
   });
 
-  it('ambiguïté (noul au-dessus du seuil) : clarifier avec les candidats les plus probables', async () => {
+  it('ambiguïté (noul au-dessus du seuil) : clarifier', async () => {
     const r = (await decider(
       opts(
         serveur({
           outil: { supprimer: 0.9 },
-          nom: { Ana: 0.3, Bob: 0.5, Chloé: 0.2 },
-          ambigu: 0.8,
+          nom: { Bob: 1 },
+          ambigu: 0.95,
         }),
       ),
-      'supprime Ana, Bob ou Chloé',
+      'supprime Bob',
     )) as ResultatEtage;
-    expect(r.decision).toEqual({
-      action: 'clarifier',
-      candidats: ['Bob', 'Ana', 'Chloé'],
-    });
-    expect(r.confiance).toBe(0.8);
+    expect(r.decision).toEqual({ action: 'clarifier', candidats: ['Bob'] });
+    expect(r.confiance).toBe(0.95);
   });
 
   it('aucun nom cité (ou liste vide) : passe la main sans poser la question du nom', async () => {
@@ -251,7 +272,8 @@ describe('étage decision', () => {
       const tout = Object.fromEntries(
         [...OUTILS.filter((o) => o.construire !== null).map((o) => o.nom), 'aucun'].map((o) => [o, 0]),
       );
-      return { answers: [{ id: 'outil', type: 'choice', probabilities: { ...tout, ...p } }] };
+      const probabilities = { ...tout, ...p };
+      return { answers: { outil: { type: 'choice', choice: 'lancer', probabilities, confidence: 0.5 } } };
     };
     const cas: [unknown, string][] = [
       [complet({ lancer: 0.9, aucun: 0.9 }), 'forme-invalide'],
@@ -324,21 +346,13 @@ describe('étage decision', () => {
     const cas: [unknown, string][] = [
       ['pas du json', 'json-invalide'],
       [{}, 'reponse-invalide'],
-      [{ answers: [] }, 'reponse-invalide'],
-      [{ answers: [{ id: 'outil', type: 'noul', probability: 1 }] }, 'reponse-invalide'],
-      [
-        {
-          answers: [{ id: 'outil', type: 'choice', probabilities: { supprimer: 1.5 } }],
-        },
-        'reponse-invalide',
-      ],
-      [
-        {
-          answers: [{ id: 'outil', type: 'choice', probabilities: { supprimer: 1 } }],
-        },
-        'reponse-invalide',
-      ],
-      [{ answers: [{ id: 'outil', type: 'choice' }] }, 'reponse-invalide'],
+      [{ answers: {} }, 'reponse-invalide'],
+      // Ancienne forme supposée (liste), jamais servie : rejetée.
+      [{ answers: [{ id: 'outil', type: 'choice', probabilities: { supprimer: 1 } }] }, 'reponse-invalide'],
+      [{ answers: { outil: { type: 'noul', noul: 1 } } }, 'reponse-invalide'],
+      [{ answers: { outil: { type: 'choice', probabilities: { supprimer: 1.5 } } } }, 'reponse-invalide'],
+      [{ answers: { outil: { type: 'choice', probabilities: { supprimer: 1 } } } }, 'reponse-invalide'],
+      [{ answers: { outil: { type: 'choice' } } }, 'reponse-invalide'],
     ];
     for (const [corps, code] of cas) {
       const r = (await decider(opts(reponse(corps)))) as PasseMain;
@@ -347,29 +361,194 @@ describe('étage decision', () => {
     }
   });
 
-  it('accepte aussi des probabilités en liste [{ option, probability }]', async () => {
-    const f = ((_u: string, init: RequestInit) => {
-      const q = {
-        options: optionsDe((JSON.parse(init.body as string) as Requete['corps']).questions[0]),
-      };
-      return Promise.resolve(
-        new Response(
-          JSON.stringify({
-            answers: [
-              {
-                id: 'outil',
-                type: 'choice',
-                probabilities: q.options.map((o) => ({
-                  option: o,
-                  probability: o === 'exporter' ? 1 : 0,
-                })),
-              },
-            ],
-          }),
-        ),
-      );
-    }) as unknown as typeof fetch;
-    expect(((await decider(opts(f), 'exporte')) as ResultatEtage).decision).toEqual({ action: 'exporter', params: {} });
+  it('corps de requête constaté : state en chaîne, questions indexées par id, criteria pour choice', async () => {
+    const requetes: Requete[] = [];
+    await decider(opts(serveur({ outil: { supprimer: 0.9 }, nom: { Bob: 1 } }, requetes)), 'supprime Bob');
+    const [premier, second] = requetes.map((r) => r.corps.brut as Record<string, unknown>);
+    expect(Object.keys(premier ?? {}).sort()).toEqual(['model', 'questions', 'state']);
+    expect(typeof premier?.['state']).toBe('string');
+    expect(Object.keys(premier?.['questions'] as object)).toEqual(['outil']);
+    const outil = (premier?.['questions'] as Record<string, QuestionBrute>)['outil'];
+    expect(outil?.type).toBe('choice');
+    expect(outil?.instructions).toBe('Quel outil la commande demande-t-elle ?');
+    expect(Object.keys(outil?.criteria ?? {}).at(-1)).toBe('aucun');
+    expect(second?.['questions']).toEqual({
+      nom: {
+        type: 'choice',
+        instructions: 'Quelle personne de la liste est visée ?',
+        criteria: { Bob: 'Bob' },
+      },
+      ambigu: {
+        type: 'noul',
+        instructions: 'Plusieurs personnes de la liste pourraient-elles être visées ?',
+      },
+    });
+  });
+
+  it('réponses réelles de tev1:0.8b (relevées le 2026-11-04) : « annule » donne aucun-outil', async () => {
+    const reel = {
+      model: 'tev1:0.8b',
+      answers: {
+        outil: {
+          type: 'choice',
+          choice: 'aucun',
+          probabilities: {
+            ajouter: 0.037321567359738114,
+            supprimer: 0.1807320322546993,
+            renommer: 0.02531162563702895,
+            lancer: 0.013418617857988667,
+            definirCouleur: 0.0016486169835586786,
+            aucun: 0.7415675399069862,
+          },
+          confidence: 0.6898810478883834,
+        },
+      },
+      usage: { input_tokens: 203, output_tokens: 0 },
+    };
+    // Le relevé ne portait que 6 options : les autres outils exécutables sont ajoutés à 0 (la somme reste 1).
+    const tout = Object.fromEntries(OUTILS.filter((o) => o.construire !== null).map((o) => [o.nom, 0]));
+    const complet = {
+      ...reel,
+      answers: { outil: { ...reel.answers.outil, probabilities: { ...tout, ...reel.answers.outil.probabilities } } },
+    };
+    const r = (await decider(opts(reponse(complet)), 'annule le dernier tirage')) as PasseMain;
+    expect(r.raison).toBe('aucun-outil');
+    // Une option demandée mais absente de la réponse reste rejetée.
+    expect(((await decider(opts(reponse(reel)), 'annule')) as PasseMain).raison).toBe('reponse-invalide');
+  });
+
+  it('plusieurs noms cités avec une action à un seul nom : clarifier sans seuil ni second appel', async () => {
+    const requetes: Requete[] = [];
+    const e: EtatChat = { noms: ['Marie', 'Paul', 'Zoé'], rotation: false };
+    // Même un modèle très affirmatif ne supprime pas : le nom n'est pas interrogé.
+    const f = serveur({ outil: { supprimer: 0.99 }, nom: { Paul: 1 } }, requetes);
+    const r = (await decider(opts(f), 'supprime Paul ou Marie', e)) as ResultatEtage;
+    expect(r.decision).toEqual({ action: 'clarifier', candidats: ['Paul', 'Marie'] });
+    expect(r.confiance).toBe(0.99);
+    expect(requetes).toHaveLength(1);
+    // Même avec un seuil de décision très bas, la règle l'emporte.
+    const bas = (await decider(opts(f, { seuilDecision: 0.1 }), 'supprime Paul ou Marie', e)) as ResultatEtage;
+    expect(bas.decision).toEqual({ action: 'clarifier', candidats: ['Paul', 'Marie'] });
+    // Quatre noms : au plus trois candidats, dans l'ordre de la commande.
+    const e4: EtatChat = { noms: ['Ana', 'Bob', 'Chloé', 'Dan'], rotation: false };
+    const trois = (await decider(opts(f), 'renomme Dan, Chloé, Bob ou Ana', e4)) as ResultatEtage;
+    expect(trois.decision).toEqual({ action: 'clarifier', candidats: ['Dan', 'Chloé', 'Bob'] });
+  });
+
+  it('exclusion : « retire Marie mais pas Marie-Claire » ne vise que Marie, sans clarifier', async () => {
+    const e: EtatChat = { noms: ['Marie', 'Marie-Claire', 'Paul'], rotation: false };
+    const f = serveur({ outil: { supprimer: 0.9 }, nom: { Marie: 1 } });
+    for (const cmd of [
+      'retire Marie mais pas Marie-Claire',
+      'supprime Marie sauf Marie-Claire',
+      'supprime Marie excepté Marie-Claire',
+      'supprime Marie hormis Marie-Claire',
+      'supprime Marie à part Marie-Claire',
+      'supprime Marie, pas Marie-Claire',
+      'supprime Marie mais garde Marie-Claire',
+    ]) {
+      const r = (await decider(opts(f), cmd, e)) as ResultatEtage;
+      expect(r.decision, cmd).toEqual({ action: 'supprimer', params: { nom: 'Marie' } });
+    }
+  });
+
+  it('« mais » seul ou « mais aussi » : les deux noms comptent, clarifier', async () => {
+    const e: EtatChat = { noms: ['Marie', 'Paul', 'Zoé'], rotation: false };
+    const f = serveur({ outil: { supprimer: 0.95 }, nom: { Paul: 1 } });
+    for (const cmd of ['supprime Paul mais aussi Marie', 'supprime Paul, mais Marie aussi', 'supprime Paul mais Marie']) {
+      const r = (await decider(opts(f), cmd, e)) as ResultatEtage;
+      expect(r.decision, cmd).toEqual({ action: 'clarifier', candidats: cmd.includes('Paul') ? ['Paul', 'Marie'] : [] });
+    }
+  });
+
+  it('requête : jamais de forme qui provoque « Value looks like object » (state chaîne, questions objet)', () => {
+    const questions: QuestionDecision[] = [
+      { id: 'outil', type: 'choice', question: 'Quel outil ?', options: ['lancer', 'aucun'] },
+      { id: 'ambigu', type: 'noul', question: 'Ambigu ?' },
+    ];
+    const corps = ADAPTATEUR_SYSTEMONE.requete('m', construireMessagesDecision('lance', etat), questions) as Record<
+      string,
+      unknown
+    >;
+    // L'erreur du serveur vient d'un `state` ou de `questions` qui n'est pas du JSON d'objets attendu.
+    expect(typeof corps['state']).toBe('string');
+    expect(corps['state']).not.toBe('');
+    expect(Array.isArray(corps['questions'])).toBe(false);
+    expect(corps['questions']).toEqual({
+      outil: { type: 'choice', instructions: 'Quel outil ?', criteria: { lancer: 'lancer', aucun: 'aucun' } },
+      ambigu: { type: 'noul', instructions: 'Ambigu ?' },
+    });
+    // Le corps passe un aller-retour JSON sans perte (aucune valeur non sérialisable).
+    expect(JSON.parse(JSON.stringify(corps))).toEqual(corps);
+  });
+
+  it('nom composé : « Marie-Claire » ne compte pas pour « Marie » ; un seul nom cité reste inchangé', async () => {
+    const e: EtatChat = { noms: ['Marie', 'Marie-Claire', 'Paul'], rotation: false };
+    expect(candidatsNoms('supprime Marie-Claire', e.noms)).toEqual(['Marie-Claire']);
+    expect(candidatsNoms('supprime Marie ou Marie-Claire', e.noms)).toEqual(['Marie', 'Marie-Claire']);
+    const requetes: Requete[] = [];
+    const f = serveur({ outil: { supprimer: 0.9 }, nom: { 'Marie-Claire': 1 } }, requetes);
+    const r = (await decider(opts(f), 'supprime Marie-Claire', e)) as ResultatEtage;
+    expect(r.decision).toEqual({ action: 'supprimer', params: { nom: 'Marie-Claire' } });
+    expect(requetes).toHaveLength(2);
+    const seul = (await decider(opts(serveur({ outil: { supprimer: 0.9 }, nom: { Paul: 1 } })), 'supprime Paul', e)) as ResultatEtage;
+    expect(seul.decision).toEqual({ action: 'supprimer', params: { nom: 'Paul' } });
+  });
+
+  it('réponse réelle de tev1:0.8b pour « supprime Paul » : noul 0,77 sous seuilAmbigu, sans effet', async () => {
+    const reel = {
+      model: 'tev1:0.8b',
+      answers: {
+        nom: { type: 'choice', choice: 'Paul', probabilities: { Paul: 1.0 }, confidence: 1.0 },
+        ambigu: { type: 'noul', noul: 0.7741634886809781 },
+      },
+      usage: { input_tokens: 209, output_tokens: 0 },
+    };
+    const sim = serveur({ outil: { supprimer: 0.9 } });
+    const f = ((url: string, init: RequestInit) =>
+      decoder(init.body as string).questions[0]?.id === 'nom'
+        ? Promise.resolve(new Response(JSON.stringify(reel)))
+        : sim(url, init)) as unknown as typeof fetch;
+    const e: EtatChat = { noms: ['Paul', 'Marie'], rotation: false };
+    const etage = creerEtageDecision(opts(f));
+    const r = (await etage.decider('supprime Paul', e, signal)) as ResultatEtage;
+    expect(r.decision).toEqual({ action: 'supprimer', params: { nom: 'Paul' } });
+    expect(etage.derniereTrace()?.probabilites['ambigu']).toBe(0.7741634886809781);
+    // En abaissant seuilAmbigu sous 0,77, la clarification revient.
+    const bas = (await decider(opts(f, { seuilAmbigu: 0.7 }), 'supprime Paul', e)) as ResultatEtage;
+    expect(bas.decision).toEqual({ action: 'clarifier', candidats: ['Paul'] });
+  });
+
+  it('adaptateur : réponse réelle de tev1:0.8b lue telle quelle (6 options demandées, 6 rendues)', () => {
+    const reel = JSON.parse(
+      '{"model":"tev1:0.8b","answers":{"outil":{"type":"choice","choice":"aucun","probabilities":{"ajouter":0.037321567359738114,"supprimer":0.1807320322546993,"renommer":0.02531162563702895,"lancer":0.013418617857988667,"definirCouleur":0.0016486169835586786,"aucun":0.7415675399069862},"confidence":0.6898810478883834}},"usage":{"input_tokens":203,"output_tokens":0}}',
+    ) as { answers: { outil: Record<string, unknown> } };
+    const options = ['ajouter', 'supprimer', 'renommer', 'lancer', 'definirCouleur', 'aucun'];
+    const q: QuestionDecision = { id: 'outil', type: 'choice', question: '?', options };
+    const lu = ADAPTATEUR_SYSTEMONE.reponses(reel, [q]);
+    expect(lu).toEqual([{ id: 'outil', type: 'choice', probabilites: reel.answers.outil['probabilities'] }]);
+    // Une option demandée absente de la réponse : rejet (les serveurs relevés les rendent toutes).
+    expect(ADAPTATEUR_SYSTEMONE.reponses(reel, [{ ...q, options: [...options, 'toString'] }])).toBeNull();
+    // Le choix doit être l'argmax ; la confiance, un nombre de [0, 1].
+    const modif = (o: Record<string, unknown>) => ({ answers: { outil: { ...reel.answers.outil, ...o } } });
+    expect(ADAPTATEUR_SYSTEMONE.reponses(modif({ choice: 'ajouter' }), [q])).toBeNull();
+    expect(ADAPTATEUR_SYSTEMONE.reponses(modif({ choice: 'zzz' }), [q])).toBeNull();
+    expect(ADAPTATEUR_SYSTEMONE.reponses(modif({ confidence: 1.5 }), [q])).toBeNull();
+    expect(ADAPTATEUR_SYSTEMONE.reponses(modif({ confidence: 'x' }), [q])).toBeNull();
+  });
+
+  it('adaptateur : un nom « __proto__ » est une option comme une autre', () => {
+    const corps = JSON.parse(
+      '{"answers":{"nom":{"type":"choice","choice":"__proto__","probabilities":{"__proto__":0.7,"Bob":0.3},"confidence":0.4}}}',
+    ) as unknown;
+    const q: QuestionDecision = { id: 'nom', type: 'choice', question: '?', options: ['__proto__', 'Bob'] };
+    const lu = ADAPTATEUR_SYSTEMONE.reponses(corps, [q]);
+    expect(Array.isArray(lu) ? lu[0] : lu).toMatchObject({ id: 'nom', type: 'choice' });
+    const probas = Array.isArray(lu) && lu[0]?.type === 'choice' ? lu[0].probabilites : {};
+    expect(Object.entries(probas)).toEqual([
+      ['__proto__', 0.7],
+      ['Bob', 0.3],
+    ]);
   });
 
   it('nom hostile : donnée échappée, jamais une instruction, jamais deux fins de bloc', async () => {
@@ -399,9 +578,7 @@ describe('étage decision', () => {
       action: 'supprimer',
       params: { nom: hostile },
     });
-    expect((requetes[0]?.corps.messages[1]?.content.split('\nCommande : ')[0] ?? '').split(FIN_DONNEES)).toHaveLength(
-      2,
-    );
+    expect(partieEtat(requetes[0]?.corps.state ?? '').split(FIN_DONNEES)).toHaveLength(2);
   });
 
   it('candidatsNoms : noms entiers aux frontières de mot, sans doublon, sans troncature', () => {

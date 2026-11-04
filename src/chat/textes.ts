@@ -72,6 +72,32 @@ export const TEXTES_CHAT = {
   confirmationAbandonnee: 'Confirmation annulée : une nouvelle commande a été envoyée, rien n’a été fait.',
   commandeAnnulee: 'Commande annulée.',
   ambigu: 'Plusieurs personnes portent ce nom : renommez-en une, ou demandez « supprime les deux ».',
+  parler: 'Parler',
+  parlerAide: 'Maintenez le bouton enfoncé (ou Espace, ou Entrée) pour dicter une commande, puis relâchez.',
+  voixEcoute: 'J’écoute…',
+  voixTranscription: 'Transcription…',
+  voixPrete: 'Transcription placée dans le champ : corrigez-la si besoin, puis envoyez.',
+  /** Refus de la voix, en texte seulement ; le chat écrit continue de fonctionner. */
+  voixRefus: {
+    'micro-absent': 'Aucun micro n’est disponible. Vous pouvez écrire la commande.',
+    'micro-refuse': 'Le micro est refusé : autorisez-le pour ce site dans le navigateur, ou écrivez la commande.',
+    'enregistrement-impossible': 'L’enregistrement a échoué. Réessayez, ou écrivez la commande.',
+    'stt-absent': 'La transcription locale ne répond pas : lancez « npm run stt », ou écrivez la commande.',
+    delai: 'La transcription a pris trop de temps. Réessayez, ou écrivez la commande.',
+    'reponse-invalide': 'La transcription a répondu de façon inattendue. Réessayez, ou écrivez la commande.',
+    annule: 'Transcription annulée.',
+    vide: 'Je n’ai rien entendu. Réessayez en parlant plus près du micro.',
+  },
+  /** Correction d'un prénom entendu de travers (6.3) : confirmation obligatoire sous le seuil. */
+  vousVouliezDire: (prenoms: readonly string[], commande: string): string =>
+    `Vous vouliez dire ${prenoms.join(' et ')} ? La commande deviendrait : « ${commande} ». Confirmer ?`,
+  /** Nom visé rapproché par la cascade et non entendu tel quel (commande dictée, action destructive). */
+  nomRapproche: (prenoms: readonly string[]): string => `Vous vouliez dire ${prenoms.join(' et ')} ? Confirmer ?`,
+  /** Correction appliquée sans question (score au-dessus du seuil), affichée. */
+  commandeCorrigee: (commande: string): string => `J’ai compris : « ${commande} ».`,
+  /** Nom dicté absent de la liste : jamais ajouté en silence, le STT écorche les prénoms inconnus. */
+  nomNouveau: (noms: readonly string[]): string =>
+    `Je n’ai pas ce nom dans la liste : ${noms.map((n) => `« ${n} »`).join(', ')}. L’orthographe est-elle la bonne ? Confirmer, ou annulez et corrigez la commande.`,
   reglagesTitre: 'Réglages du modèle',
   reglageSlm: 'Modèle de langage (SLM)',
   reglageDecision: 'Modèle de décision',

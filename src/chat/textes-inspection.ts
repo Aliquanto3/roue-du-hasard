@@ -77,4 +77,8 @@ export const TEXTES_INSPECTION = {
   action: (libelle: string): string => `Action : ${libelle}`,
   execution: (e: Execution): string => EXECUTIONS[e],
   etatEnvoye: 'État vu par le chat',
+  transcription: (brut: string, ms: number): string => `Transcription brute : « ${brut.trim()} » (STT : ${ms.toFixed(0)} ms)`,
+  correction: (c: { avant: string; apres: string; score: number; methode: string; appliquee: boolean }): string =>
+    `Correction : « ${c.avant} » devient « ${c.apres} » (score ${c.score.toFixed(2)}, ${c.methode}, ${c.appliquee ? 'appliquée' : 'à confirmer'})`,
+  commandeCorrigee: (commande: string): string => `Commande corrigée envoyée à la cascade : « ${commande} »`,
 } as const;

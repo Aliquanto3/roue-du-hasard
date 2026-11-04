@@ -161,17 +161,27 @@ describe('construireEntree', () => {
 
   it('étage décision : probabilités par option, seuil rapporté, historique non transmis', async () => {
     const f = ((_u: string, init: RequestInit) => {
-      const corps = JSON.parse(init.body as string) as { questions: { id: string; type: string; options?: string[] }[] };
-      const answers = corps.questions.map((q) => {
-        if (q.type === 'noul') return { id: q.id, type: 'noul', probability: 0.05 };
-        const options = q.options ?? [];
-        const choisi = q.id === 'outil' ? 'supprimer' : 'Bob';
-        return {
-          id: q.id,
-          type: 'choice',
-          probabilities: Object.fromEntries(options.map((o) => [o, options.length === 1 ? 1 : o === choisi ? 0.9 : 0.1 / (options.length - 1)])),
-        };
-      });
+      const corps = JSON.parse(init.body as string) as {
+        questions: Record<string, { type: string; criteria?: Record<string, string> }>;
+      };
+      const answers = Object.fromEntries(
+        Object.entries(corps.questions).map(([id, q]) => {
+          if (q.type === 'noul') return [id, { type: 'noul', noul: 0.05 }];
+          const options = Object.keys(q.criteria ?? {});
+          const choisi = id === 'outil' ? 'supprimer' : 'Bob';
+          return [
+            id,
+            {
+              type: 'choice',
+              choice: choisi,
+              probabilities: Object.fromEntries(
+                options.map((o) => [o, options.length === 1 ? 1 : o === choisi ? 0.9 : 0.1 / (options.length - 1)]),
+              ),
+              confidence: 0.5,
+            },
+          ];
+        }),
+      );
       return Promise.resolve(new Response(JSON.stringify({ answers })));
     }) as unknown as typeof fetch;
     const etage = creerEtageDecision({ modeleDecision: 'm', fetch: f });
@@ -533,6 +543,11 @@ describe('robustesse du stockage et plafond en taille', () => {
       copie((e) => (e['latenceMs'] = 'vite')),
       copie((e) => (e['horodatage'] = 3)),
       copie((e) => (e['attendu'] = { action: 7 })),
+      copie((e) => (e['transcription'] = { brut: 4, latenceMs: 1 })),
+      copie((e) => (e['transcription'] = { brut: 'a', latenceMs: 'vite' })),
+      copie((e) => (e['transcription'] = { brut: 'a', latenceMs: 1, corrigee: 3 })),
+      copie((e) => (e['transcription'] = { brut: 'a', latenceMs: 1, corrections: [{ avant: 'a', apres: 'b', score: 'haut', methode: 'proche', appliquee: true }] })),
+      copie((e) => (e['transcription'] = { brut: 'a', latenceMs: 1, corrections: [{ avant: 'a', apres: 'b', score: 1, methode: 'magie', appliquee: true }] })),
     ];
     s.setItem(CLE_INSPECTION, JSON.stringify([...alterees, bonne[0]]));
     const j = creerInspection({ stockage: () => s });

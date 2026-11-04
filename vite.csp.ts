@@ -10,10 +10,13 @@ export const CSP_ROUE = [
   "form-action 'none'",
 ].join('; ');
 
-/** CSP de `roue-chat.html` : celle de `roue.html`, avec Ollama en local comme seule connexion. */
+/**
+ * CSP de `roue-chat.html` : celle de `roue.html`, avec Ollama en local et la même origine (`/stt`, relais
+ * de la transcription, 6.2) comme seules connexions. Jamais le port du STT en direct.
+ */
 export const CSP_CHAT = CSP_ROUE.replace(
   "connect-src 'none'",
-  'connect-src http://localhost:11434 http://127.0.0.1:11434',
+  "connect-src 'self' http://localhost:11434 http://127.0.0.1:11434",
 );
 
 /** CSP injectée au build seulement : le serveur de dev a besoin de HMR (websocket). */

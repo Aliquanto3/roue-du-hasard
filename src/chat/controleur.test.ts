@@ -507,6 +507,115 @@ describe('enregistrement pour la fenêtre d’inspection (5.7)', () => {
     expect(e?.etages[0]).toMatchObject({ etage: 'regles', regle: 'regle-x' });
   });
 
+  it('commande dictée : la transcription brute et la latence du STT sont dans l’entrée, sinon absentes (6.2)', async () => {
+    const { c, inspection, actions } = avecInspection({ 'ajoute Léo': appel('ajouter', { nom: 'Léo' }) });
+    await c.envoyer('ajoute Léo', { transcription: { brut: ' Ajoute Léo.\n', latenceMs: 165 } });
+    // Nom nouveau dicté : jamais ajouté en silence (6.3, C4).
+    expect(actions.magasin.lire().participants).toHaveLength(0);
+    c.confirmer();
+    await c.envoyer('ajoute Léo');
+    const [dictee, tapee] = inspection.entrees();
+    expect(dictee?.transcription).toEqual({ brut: ' Ajoute Léo.\n', latenceMs: 165 });
+    expect(dictee?.execution).toBe('execute');
+    expect(tapee?.transcription).toBeUndefined();
+    expect(actions.magasin.lire().participants).toHaveLength(2);
+  });
+
+  it('commande dictée, prénom mal entendu sous le seuil : commande corrigée montrée avec confirmation, puis exécutée (6.3)', async () => {
+    const { c, inspection, actions } = avecInspection({ 'supprime Thibault': appel('supprimer', { nom: 'Thibault' }) }, ['Thibault', 'Léa']);
+    await c.envoyer('supprime Thibaut', { transcription: { brut: 'Supprime Thibaut.', latenceMs: 90 } });
+    expect(actions.magasin.lire().participants).toHaveLength(2);
+    expect(c.etat().attente).toMatchObject({ genre: 'confirmer', recapitulatif: ['Supprimer : Thibault'] });
+    expect(c.etat().messages.at(-1)?.texte).toBe(TEXTES_CHAT.vousVouliezDire(['Thibault'], 'supprime Thibault'));
+    c.confirmer();
+    expect(actions.magasin.lire().participants.map((p) => p.nom)).toEqual(['Léa']);
+    const [e] = inspection.entrees();
+    expect(e?.commande).toBe('supprime Thibaut');
+    expect(e?.execution).toBe('execute');
+    expect(e?.transcription?.corrigee).toBe('supprime Thibault');
+    expect(e?.transcription?.corrections).toHaveLength(1);
+    expect(e?.transcription?.corrections?.[0]).toMatchObject({ avant: 'Thibaut', apres: 'Thibault', appliquee: false });
+  });
+
+  it('commande dictée, prénom mal entendu au-dessus du seuil : corrigée, affichée, exécutée sans question (6.3)', async () => {
+    const { c } = avecInspection(
+      { 'mets Paul en bleu': appel('definirCouleur', { nom: 'Paul', couleur: '#1D4ED8' }) },
+      ['Paul', 'Léa'],
+    );
+    await c.envoyer('mets pol en bleu', { transcription: { brut: 'mets pol en bleu', latenceMs: 90 } });
+    expect(c.etat().attente).toBeNull();
+    expect(c.etat().messages.map((m) => m.texte)).toEqual([
+      'mets pol en bleu',
+      TEXTES_CHAT.commandeCorrigee('mets Paul en bleu'),
+      TEXTES_CHAT.fait,
+    ]);
+  });
+
+  it('commande dictée avec un nom nouveau : confirmation, annulable, jamais ajouté en silence (6.3)', async () => {
+    const { c, actions } = avecInspection({ 'ajoute Camille': appel('ajouter', { nom: 'Camille' }) }, ['Ana']);
+    await c.envoyer('ajoute Camille', { transcription: { brut: 'ajoute Camille', latenceMs: 90 } });
+    expect(c.etat().messages.at(-1)?.texte).toBe(TEXTES_CHAT.nomNouveau(['Camille']));
+    expect(c.etat().attente?.genre).toBe('confirmer');
+    c.annuler();
+    expect(actions.magasin.lire().participants).toHaveLength(1);
+    // Tapée, la même commande s'exécute sans question.
+    await c.envoyer('ajoute Camille');
+    expect(actions.magasin.lire().participants).toHaveLength(2);
+  });
+
+  it('commande dictée « intègre Mari » avec Marie dans la liste : nom nouveau, confirmé, pas de doublon en silence (6.3)', async () => {
+    const { c, actions } = avecInspection({ 'intègre Mari': appel('ajouter', { nom: 'Mari' }) }, ['Marie']);
+    await c.envoyer('intègre Mari', { transcription: { brut: 'intègre Mari', latenceMs: 1 } });
+    expect(actions.magasin.lire().participants).toHaveLength(1);
+    expect(c.etat().messages.at(-1)?.texte).toBe(TEXTES_CHAT.nomNouveau(['Mari']));
+  });
+
+  it('commande dictée « change le nom de pol en Mari » : renommage vers un nom nouveau confirmé (6.3)', async () => {
+    const { c, actions } = avecInspection(
+      { 'change le nom de Paul en Mari': appel('renommer', { nom: 'Paul', nouveau: 'Mari' }) },
+      ['Paul', 'Marie'],
+    );
+    await c.envoyer('change le nom de pol en Mari', { transcription: { brut: 'x', latenceMs: 1 } });
+    expect(actions.magasin.lire().participants.map((p) => p.nom)).toEqual(['Paul', 'Marie']);
+    expect(c.etat().messages.at(-1)?.texte).toBe(TEXTES_CHAT.nomNouveau(['Mari']));
+  });
+
+  it('nom d’ajout corrigé vers un nom existant par un étage (verbe inconnu des règles) : reste un nom nouveau (6.3)', async () => {
+    const { c, actions } = avecInspection({ 'mets Marie': appel('ajouter', { nom: 'Marie' }) }, ['Marie']);
+    await c.envoyer('mets mari', { transcription: { brut: 'x', latenceMs: 1 } });
+    expect(actions.magasin.lire().participants).toHaveLength(1);
+    expect(c.etat().messages.at(-1)?.texte).toBe(TEXTES_CHAT.nomNouveau(['mari']));
+  });
+
+  it('commande dictée « supprime Mari » : correction à 0,9 mais action destructive, donc confirmée (6.3)', async () => {
+    const { c, actions } = avecInspection({ 'supprime Marie': appel('supprimer', { nom: 'Marie' }) }, ['Marie', 'Paul']);
+    await c.envoyer('supprime Mari', { transcription: { brut: 'x', latenceMs: 1 } });
+    expect(actions.magasin.lire().participants).toHaveLength(2);
+    expect(c.etat().messages.at(-1)?.texte).toBe(TEXTES_CHAT.vousVouliezDire(['Marie'], 'supprime Marie'));
+    c.confirmer();
+    expect(actions.magasin.lire().participants.map((p) => p.nom)).toEqual(['Paul']);
+  });
+
+  it('commande dictée « supprime Virgini » : nom rapproché par la cascade et non par l’oral, confirmé (6.3)', async () => {
+    // « virgini » ressemble au verbe « virer » : `rapprocher` le laisse, la cascade en fait Virginie.
+    const { c, actions } = avecInspection({ 'supprime Virgini': appel('supprimer', { nom: 'Virginie' }) }, ['Virginie', 'Paul']);
+    await c.envoyer('supprime Virgini', { transcription: { brut: 'x', latenceMs: 1 } });
+    expect(actions.magasin.lire().participants).toHaveLength(2);
+    expect(c.etat().messages.at(-1)?.texte).toBe(TEXTES_CHAT.nomRapproche(['Virginie']));
+    c.confirmer();
+    expect(actions.magasin.lire().participants.map((p) => p.nom)).toEqual(['Paul']);
+    // Tapée, la même commande s'exécute sans question.
+    const tapee = avecInspection({ 'supprime Virgini': appel('supprimer', { nom: 'Virginie' }) }, ['Virginie', 'Paul']);
+    await tapee.c.envoyer('supprime Virgini');
+    expect(tapee.actions.magasin.lire().participants).toHaveLength(1);
+  });
+
+  it('commande dictée : « ajoute » d’un nom déjà dans la liste n’est pas un nom nouveau', async () => {
+    const { c } = avecInspection({ 'ajoute Ana': appel('ajouter', { nom: 'Ana' }) }, ['Ana']);
+    await c.envoyer('ajoute Ana', { transcription: { brut: 'ajoute Ana', latenceMs: 90 } });
+    expect(c.etat().attente).toBeNull();
+  });
+
   it('refus du plan : non exécutée ; commande non comprise : refus, aucun étage', async () => {
     const { c, inspection } = avecInspection({ 'supprime Zed': appel('supprimer', { nom: 'Zed' }) }, ['Ana']);
     await c.envoyer('supprime Zed');

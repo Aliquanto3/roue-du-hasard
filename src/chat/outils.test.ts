@@ -12,11 +12,13 @@ import {
   planifier,
   validerParametres,
 } from './outils';
+import { correctionsAConfirmer, rapprocher } from './oral';
 import { TEXTES_CHAT } from './textes';
 import { estClarifier, estEtapes, estRefus, type Decision } from './types';
 
 interface LigneCorpus {
   id: string;
+  categorie: string;
   commande: string;
   etat: { noms: string[]; cadeaux?: string[]; rotation: boolean };
   attendu: Decision;
@@ -91,9 +93,14 @@ describe('corpus', () => {
         expect(plan).toEqual({ genre: 'clarifier', candidats: a.candidats });
       } else {
         expect(plan.genre).toBe('etapes');
-        expect(confirmationRequise(a)).toBe(ligne.confirmation);
+        // Transcription orale (6.3) : `confirmation` couvre aussi la correction de prénom sur une action
+        // destructive, confirmée par `oral.ts` en plus de `planifier`.
+        const parOral =
+          ligne.categorie === 'transcription_orale' &&
+          correctionsAConfirmer(rapprocher(ligne.commande, ligne.etat.noms), (estEtapes(a) ? a.actions : [a]).map((e) => e.action)).length > 0;
+        expect(confirmationRequise(a) || parOral).toBe(ligne.confirmation);
         if (plan.genre === 'etapes') {
-          expect(plan.confirmation).toBe(ligne.confirmation);
+          expect(plan.confirmation || parOral).toBe(ligne.confirmation);
           expect(plan.etapes.length).toBe(estEtapes(a) ? a.actions.length : 1);
         }
       }
