@@ -200,3 +200,6 @@ Ordre de reprise :
 - 2026-11-04 08:48 · 7.1 · décision · main fusionnée dans la branche par l'orchestrateur, sans conflit, 754 tests unitaires verts ; CI sur 9 jobs lancée · 3433fb6
 - 2026-11-04 09:00 · 7.1 · CI · rouge sur 9 jobs après intégration de 7.2 (bouton Projection : tabulation, positions, recouvrement à 568 px) ; correction confiée au PC 2 · 3433fb6
 - 2026-11-04 09:00 · run · décision · passation vers le PC 2 : état poussé, prompt de reprise donné à Anaël ; fin du travail sur le PC 1 ·
+- 2026-11-04 09:04 · run · décision · reprise sur le PC 2 : main f11aef4, npm ci, Ollama 0.40.13 (OLLAMA_ORIGINS localhost:5200), GPU 0/6144 Mo ; tev1:0.8b, lfm3:1.7b et lfm2.5:8b (étiquettes exactes) en téléchargement ; llama-server absent ; Anaël donne le feu vert au run autonome ·
+- 2026-11-04 09:04 · 7.1 · dev · lancé (Opus, correction du code après 7.2 sur la branche existante) · 3433fb6
+- 2026-11-04 09:04 · 5.10 · dev · étape B lancée (contrat réel tev1:0.8b, mesure GPU, llama-server, Julia-1 et Laya) ·
