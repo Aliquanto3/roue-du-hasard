@@ -7,7 +7,7 @@ Une roue qui désigne au hasard qui reçoit un cadeau : vous saisissez les noms 
 ## Un clic
 
 1. Sur la page de la [dernière release](https://github.com/Aliquanto3/roue-du-hasard/releases/latest), téléchargez le fichier `roue.html` (dans la liste « Assets »). Ne prenez pas les archives « Source code ».
-2. Double-cliquez dessus : il s'ouvre dans votre navigateur.
+2. Ouvrez-le avec **Google Chrome**, le seul navigateur garanti : clic droit sur le fichier, **Ouvrir avec**, puis **Google Chrome**. Un double-clic l'ouvre dans votre navigateur par défaut, qui est souvent Edge sous Windows 11 : cela peut marcher, sans garantie.
 
 ## Une ligne de commande
 
@@ -16,8 +16,10 @@ Si vous préférez le terminal, une seule ligne télécharge le fichier et l'ouv
 **Windows**, dans PowerShell (appuyez sur la touche Windows, tapez `PowerShell`, puis Entrée ; la commande ne fonctionne pas dans l'invite de commandes) :
 
 ```powershell
-irm https://github.com/Aliquanto3/roue-du-hasard/releases/latest/download/roue.html -OutFile roue.html; start roue.html
+irm https://github.com/Aliquanto3/roue-du-hasard/releases/latest/download/roue.html -OutFile roue.html; Start-Process chrome (Resolve-Path roue.html)
 ```
+
+Si Chrome n'est pas trouvé, la commande affiche une erreur : le fichier est quand même téléchargé, ouvrez-le alors avec le clic droit, **Ouvrir avec**, **Google Chrome**.
 
 **macOS** :
 
