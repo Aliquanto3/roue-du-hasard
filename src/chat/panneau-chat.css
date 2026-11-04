@@ -145,7 +145,7 @@
     border-radius: 0.75rem 0.75rem 0 0;
     padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
     max-height: 35vh;
-    max-height: 35dvh;
+    max-height: var(--tiroir-max, 35dvh);
     overflow-y: auto;
   }
   .chat {
@@ -183,6 +183,8 @@
   #app:has(.chat[data-ouvert='true']) .page {
     --taille-roue-max: calc(100vh - 15rem - 35vh);
     --taille-roue-max: calc(100dvh - 15rem - 35dvh);
+    /* Mesure faite par panneau-chat.ts (espace réellement libre) ; la réserve ci-dessus n'est qu'un repli. */
+    --taille-roue-max: var(--roue-libre, calc(100dvh - 15rem - 35dvh));
     padding-bottom: 35vh;
     padding-bottom: 35dvh;
   }

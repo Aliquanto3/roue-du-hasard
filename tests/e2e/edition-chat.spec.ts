@@ -19,12 +19,15 @@ test('l’édition chat se charge sans violation de CSP et la roue fonctionne', 
   const erreurs: string[] = [];
   page.on('pageerror', (e) => erreurs.push(e.message));
   page.on('console', (m) => {
-    if (m.type() === 'error') erreurs.push(m.text());
+    if (m.type() === 'error' && !m.text().includes('http://localhost:5200/favicon.ico')) erreurs.push(m.text());
   });
   await page.addInitScript(() => {
     const w = window as unknown as { violationsCsp: string[] };
     w.violationsCsp = [];
     document.addEventListener('securitypolicyviolation', (e) => {
+      // Firefox applique la CSP à la requête automatique de /favicon.ico (default-src 'none') et la signale ;
+      // Chromium et WebKit non. Aucune icône n'est déclarée : ce n'est pas une ressource de la page.
+      if (e.blockedURI === 'http://localhost:5200/favicon.ico') return;
       w.violationsCsp.push(`${e.violatedDirective} ${e.blockedURI}`);
     });
   });

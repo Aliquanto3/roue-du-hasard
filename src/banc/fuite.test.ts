@@ -9,10 +9,18 @@
  * sont donc admis d'office. Un mot ou un radical est « attesté » si un mot d'une commande `dev` le
  * commence. Un mot non attesté en `dev` mais présent dans une commande `test` est une fuite, sauf s'il
  * figure dans `EXCEPTIONS`, avec sa justification.
+ *
+ * Lot `test2` : les mots déjà présents dans `regles.ts` à sa création ne peuvent pas venir de lui ; ils
+ * sont figés dans `fuite-base-test2.json`. Le test échoue seulement pour un mot absent de cette base,
+ * absent de `dev` et présent dans `test2`. La base se fige une seule fois, à la création du lot
+ * (`FUITE_GENERER_BASE=1`), et ne se régénère jamais pour faire passer un test.
  */
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { lireCorpus } from './cli';
+import { lireCorpus, lireCorpusDuLot } from './cli';
+
+const CHEMIN_BASE_TEST2 = fileURLToPath(new URL('./fuite-base-test2.json', import.meta.url));
 
 /** Mots admis bien qu'absents de `dev` : une justification par mot. */
 const EXCEPTIONS: Readonly<Record<string, string>> = {
@@ -87,10 +95,11 @@ function litteraux(source: string): string[] {
 
 describe('séparation des lots : regles.ts', () => {
   const corpus = lireCorpus();
-  const vocabulaire = (lot: 'dev' | 'test'): string[] =>
-    corpus.filter((l) => l.lot === lot).flatMap((l) => mots(l.commande));
+  const vocabulaire = (lot: 'dev' | 'test' | 'test2'): string[] =>
+    lireCorpusDuLot(lot).filter((l) => l.lot === lot).flatMap((l) => mots(l.commande));
   const dev = vocabulaire('dev');
   const test = vocabulaire('test');
+  const test2 = vocabulaire('test2');
   const source = readFileSync(new URL('../chat/regles.ts', import.meta.url), 'utf8');
   const attesteEn = (lexique: readonly string[], radical: string): boolean => lexique.some((m) => m.startsWith(radical));
 
@@ -102,10 +111,33 @@ describe('séparation des lots : regles.ts', () => {
     expect(fuites).toEqual([]);
   });
 
+  // Outil de création, pas un contrôle : ignoré sans FUITE_GENERER_BASE=1. Une base existante n'est
+  // jamais écrasée, sauf avec FUITE_REGENERER_BASE_SCIEMMENT=1 (réservé à la création d'un nouveau lot).
+  it.skipIf(process.env['FUITE_GENERER_BASE'] !== '1')('génère la base figée du lot test2', () => {
+    if (existsSync(CHEMIN_BASE_TEST2) && process.env['FUITE_REGENERER_BASE_SCIEMMENT'] !== '1') {
+      throw new Error(
+        'fuite-base-test2.json existe déjà : elle ne se régénère jamais pour faire passer un test. ' +
+          'FUITE_REGENERER_BASE_SCIEMMENT=1 est réservé à la création d’un nouveau lot.',
+      );
+    }
+    const base = [...new Set(litteraux(source).flatMap(mots))].sort();
+    writeFileSync(CHEMIN_BASE_TEST2, `${JSON.stringify(base, null, 2)}\n`, 'utf8');
+  });
+
+  it('aucun nouveau mot des règles ne vient seulement du lot test2 (lot tenu à l’écart)', () => {
+    const base = new Set(JSON.parse(readFileSync(CHEMIN_BASE_TEST2, 'utf8')) as string[]);
+    const fuites = [...new Set(litteraux(source).flatMap(mots))].filter(
+      (r) => !base.has(r) && !attesteEn(dev, r) && attesteEn(test2, r) && !Object.hasOwn(EXCEPTIONS, r),
+    );
+    expect(fuites).toEqual([]);
+  });
+
   it('les tests unitaires des règles ne reprennent aucune commande exacte du lot test', () => {
     const forme = (s: string): string =>
       s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-    const exactes = new Set(corpus.filter((l) => l.lot === 'test').map((l) => forme(l.commande)));
+    const exactes = new Set(
+      [...corpus.filter((l) => l.lot === 'test'), ...lireCorpusDuLot('test2')].map((l) => forme(l.commande)),
+    );
     const tests = readFileSync(new URL('../chat/regles.test.ts', import.meta.url), 'utf8');
     const reprises = litteraux(tests)
       .flatMap((l) => l.split('\n'))

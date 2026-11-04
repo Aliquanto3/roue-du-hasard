@@ -81,7 +81,9 @@ test('verdict, tableau de bord, erreur d’écoute, export, effacement', async (
   await expect(messages.nth(2)).toContainText('Plan : 1 étape(s)');
   await expect(messages.nth(2)).toContainText('Action : ajouter — exécutée');
   await expect(messages.nth(2)).toContainText('Latence totale');
-  await messages.nth(2).getByRole('button', { name: 'Juste', exact: true }).click();
+  // Au clavier : WebKit ne donne pas le focus à un bouton sur un clic. Le focus doit rester sur « Juste » après le rendu.
+  await messages.nth(2).getByRole('button', { name: 'Juste', exact: true }).focus();
+  await page.keyboard.press('Enter');
   await expect(messages.nth(2).getByRole('button', { name: 'Juste', exact: true })).toBeFocused();
   await expect(messages.nth(2).getByRole('button', { name: 'Juste', exact: true })).toHaveAttribute('aria-pressed', 'true');
 
