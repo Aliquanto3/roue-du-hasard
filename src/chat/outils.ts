@@ -12,10 +12,11 @@
  */
 import type { Actions, CodeRefus, NomAction, Resultat } from '../actions';
 import type { Etat } from '../domain/etat';
-import { estClarifier, estEtapes, estRefus, type Decision, type DecisionAction } from './types';
+import { estClarifier, estEtapes, estRefus, formeValide, type Decision, type DecisionAction } from './types';
 
 // --- Schémas ---------------------------------------------------------------
 
+// Note : Ollama ignore `pattern` et `additionalProperties` ; la validation locale (`validerParametres`) suffit.
 export interface Propriete {
   readonly type: 'string' | 'boolean' | 'integer';
   readonly description: string;
@@ -289,38 +290,49 @@ function etapesDe(decision: Decision): readonly DecisionAction[] {
 
 /** Vrai pour `effacerHistorique`, `reinitialiserCouleurs` et plusieurs suppressions de personnes. */
 export function confirmationRequise(decision: Decision): boolean {
+  if (!formeValide(decision)) return false;
   const etapes = etapesDe(decision);
   const suppressions = etapes.filter((e) => e.action === 'supprimer').length;
   return suppressions >= 2 || etapes.some((e) => e.action === 'effacerHistorique' || e.action === 'reinitialiserCouleurs');
 }
 
+/** Actions qui font disparaître ou changer le nom visé : une autre étape sur la même personne n'aurait plus de sens. */
+const CHANGE_LA_CIBLE: ReadonlySet<string> = new Set(['supprimer', 'renommer']);
+
 /**
- * Valide la décision et la transforme en plan. Les noms sont résolus contre `etat.participants` :
- * plusieurs personnes du même nom donnent `clarifier`, sauf quand la décision vise chacune
- * (« supprime les deux Marie » : autant d'étapes que d'homonymes).
+ * Valide la décision (forme comprise : la sortie d'un modèle n'est pas fiable) et la transforme en
+ * plan. Les noms sont résolus contre `etat.participants` :
+ * - plusieurs personnes du même nom donnent `clarifier`, sauf la demande explicite de chacune
+ *   (« supprime les deux Marie » : autant d'étapes `supprimer` que d'homonymes, rien d'autre) ;
+ * - deux étapes sur la même personne, dont une la supprime ou la renomme, sont refusées
+ *   (`conflit-etapes`).
  */
 export function planifier(decision: Decision, etat: Etat): Plan {
+  if (!formeValide(decision)) return refuser('forme-invalide');
   if (estEtapes(decision) && decision.actions.length === 0) return refuser('incompris');
   if (estRefus(decision)) return refuser(decision.code ?? 'incompris');
   if (estClarifier(decision)) {
     return { genre: 'clarifier', candidats: decision.candidats };
   }
-  const demandes: { appel: DecisionAction; outil: Outil; params: Readonly<Record<string, unknown>> }[] = [];
+  const demandes: { outil: Outil; params: Readonly<Record<string, unknown>> }[] = [];
   for (const appel of etapesDe(decision)) {
     const outil = PAR_NOM.get(appel.action);
     if (!outil) return refuser('action-inconnue');
-    const params = (appel as { params?: unknown }).params ?? {};
+    const params = appel.params ?? {};
     if (validerParametres(outil.parametres, params) !== null) return refuser('parametres-invalides');
     if (outil.construire === null) return refuser('indisponible');
-    demandes.push({ appel, outil, params: params as Readonly<Record<string, unknown>> });
+    demandes.push({ outil, params });
   }
 
-  // Combien d'étapes visent chaque nom (pour distinguer « les deux Marie » de « Marie »).
-  const visees = new Map<string, number>();
+  // Outils des étapes qui visent chaque nom, pour distinguer « les deux Marie » de « Marie ».
+  const visees = new Map<string, string[]>();
   for (const { outil, params } of demandes) {
-    for (const nom of outil.noms(params)) visees.set(formeComparable(nom), (visees.get(formeComparable(nom)) ?? 0) + 1);
+    for (const nom of outil.noms(params)) {
+      const forme = formeComparable(nom);
+      visees.set(forme, [...(visees.get(forme) ?? []), outil.nom]);
+    }
   }
-  const utilises = new Set<string>();
+  const utilises = new Map<string, string[]>();
   const etapes: Etape[] = [];
   for (const { outil, params } of demandes) {
     const ids: string[] = [];
@@ -331,13 +343,18 @@ export function planifier(decision: Decision, etat: Etat): Plan {
         const proches = voisins(nom, etat);
         return proches.length > 0 ? { genre: 'clarifier', candidats: proches } : refuser('nom-absent');
       }
-      let choisi = trouves.length === 1 ? trouves[0] : undefined;
+      let choisi = trouves[0];
       if (trouves.length > 1) {
-        if (visees.get(forme) !== trouves.length) return { genre: 'clarifier', candidats: trouves.map((p) => p.nom) };
+        const outils = visees.get(forme) ?? [];
+        if (outils.length !== trouves.length || outils.some((o) => o !== 'supprimer')) {
+          return { genre: 'clarifier', candidats: trouves.map((p) => p.nom) };
+        }
         choisi = trouves.find((p) => !utilises.has(p.id));
       }
       if (!choisi) return refuser('nom-absent');
-      utilises.add(choisi.id);
+      const avant = utilises.get(choisi.id) ?? [];
+      if (avant.length > 0 && [...avant, outil.nom].some((o) => CHANGE_LA_CIBLE.has(o))) return refuser('conflit-etapes');
+      utilises.set(choisi.id, [...avant, outil.nom]);
       ids.push(choisi.id);
     }
     // `construire` n'est jamais null ici : testé plus haut.
@@ -350,17 +367,22 @@ export function planifier(decision: Decision, etat: Etat): Plan {
 
 export interface ResultatExecution {
   readonly resultats: readonly Resultat[];
-  /** Code du premier refus d'`actions.ts` (les étapes suivantes ne sont pas exécutées), sinon `null`. */
+  /** Code du premier refus d'`actions.ts`, sinon `null`. En cas de refus, aucune étape n'a été appliquée. */
   readonly refus: CodeRefus | null;
 }
 
-/** Exécute les étapes dans l'ordre par `Actions.executer`, et s'arrête au premier refus. */
+/**
+ * Exécute le plan en tout ou rien, par `Actions.executer` seulement : les étapes sont d'abord
+ * essayées à blanc (`Actions.essayer`, copie de l'état) ; au premier refus, rien n'est appliqué et
+ * `resultats` s'arrête à l'étape refusée ; sinon elles sont appliquées dans l'ordre.
+ */
 export function executerPlan(etapes: readonly Etape[], actions: Actions): ResultatExecution {
-  const resultats: Resultat[] = [];
+  const essai = actions.essayer();
+  const simules: Resultat[] = [];
   for (const e of etapes) {
-    const resultat = e.executer(actions);
-    resultats.push(resultat);
-    if (!resultat.ok) return { resultats, refus: resultat.code };
+    const resultat = e.executer(essai);
+    simules.push(resultat);
+    if (!resultat.ok) return { resultats: simules, refus: resultat.code };
   }
-  return { resultats, refus: null };
+  return { resultats: etapes.map((e) => e.executer(actions)), refus: null };
 }

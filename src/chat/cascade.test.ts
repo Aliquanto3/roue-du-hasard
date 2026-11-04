@@ -94,4 +94,32 @@ describe('cascade', () => {
     expect(r.decision).toEqual({ action: 'refuser', code: 'annule' });
     expect(r.traces).toHaveLength(1);
   });
+
+  it('ignore une décision rendue après l’annulation', async () => {
+    const c = new AbortController();
+    const lent: Etage = {
+      nom: 'slm',
+      decider() {
+        c.abort();
+        return Promise.resolve(resultat(LANCER));
+      },
+    };
+    const r = await decider('lance', etat, c.signal, { maintenant, etages: [lent] });
+    expect(r.decision).toEqual({ action: 'refuser', code: 'annule' });
+    expect(r.etage).toBeNull();
+    expect(r.traces).toEqual([{ etage: 'slm', entree: 'lance', sortie: '{"action":"lancer"}', dureeMs: 5 }]);
+  });
+
+  it('construit les étages avec les options données', async () => {
+    const vues: unknown[] = [];
+    const fabrique = (options: { modele?: string }): Etage => {
+      vues.push(options);
+      return etage('slm', resultat(LANCER));
+    };
+    const r = await decider('lance', etat, signal, { fabriques: [fabrique], options: { modele: 'qwen' } });
+    expect(vues).toEqual([{ modele: 'qwen' }]);
+    expect(r.etage).toBe('slm');
+    await decider('lance', etat, signal, { fabriques: [fabrique] });
+    expect(vues[1]).toEqual({});
+  });
 });

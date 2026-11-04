@@ -314,3 +314,79 @@ describe('exécution par actions.ts', () => {
     expect(main).not.toMatch(/chat\//u);
   });
 });
+
+describe('plans à plusieurs étapes', () => {
+  const s = (nom: string): never => appel('supprimer', { nom }) as never;
+
+  it('refuse deux étapes sur la même personne quand l’une la supprime ou la renomme', () => {
+    const b = banc(['Ana', 'Bob']);
+    const conflit = { genre: 'refuser', code: 'conflit-etapes' };
+    expect(planifier({ actions: [s('Ana'), appel('renommer', { nom: 'ana', nouveau: 'Zoé' }) as never] }, b.etat())).toEqual(conflit);
+    expect(planifier({ actions: [appel('renommer', { nom: 'Ana', nouveau: 'Zoé' }) as never, s('Ana')] }, b.etat())).toEqual(conflit);
+    expect(planifier({ actions: [s('Ana'), s('Ana')] }, b.etat())).toEqual(conflit);
+    // Sans suppression ni renommage, deux étapes sur la même personne restent permises.
+    const couleurs = {
+      actions: [
+        appel('definirCouleur', { nom: 'Ana', couleur: '#111111' }) as never,
+        appel('reinitialiserCouleur', { nom: 'Ana' }) as never,
+      ],
+    };
+    expect(planifier(couleurs, b.etat()).genre).toBe('etapes');
+  });
+
+  it('deux homonymes et deux actions différentes donnent clarifier ; seul « supprime les deux » passe', () => {
+    const b = banc(['Marie', 'Marie', 'Paul']);
+    const attendu = { genre: 'clarifier', candidats: ['Marie', 'Marie'] };
+    expect(planifier({ actions: [s('Marie'), appel('renommer', { nom: 'Marie', nouveau: 'Mia' }) as never] }, b.etat())).toEqual(attendu);
+    const deux = [appel('reinitialiserCouleur', { nom: 'Marie' }) as never, appel('reinitialiserCouleur', { nom: 'Marie' }) as never];
+    expect(planifier({ actions: deux }, b.etat())).toEqual(attendu);
+    expect(planifier({ actions: [s('Marie'), s('Marie')] }, b.etat()).genre).toBe('etapes');
+  });
+
+  it('s’exécute en tout ou rien : un refus tardif n’applique aucune étape', () => {
+    const b = banc(['Ana', 'Bob']);
+    const avant = b.etat();
+    const r = executer(b, { actions: [appel('ajouter', { nom: 'Cléo' }) as never, appel('annulerDernierTirage') as never] });
+    expect(r.refus).toBe('historique-vide');
+    expect(r.resultats).toEqual([{ ok: true }, { ok: false, code: 'historique-vide' }]);
+    expect(b.etat()).toBe(avant);
+    expect(b.lances).toEqual([]);
+    const ok = executer(b, { actions: [appel('ajouter', { nom: 'Cléo' }) as never, appel('couperSon', { coupe: true }) as never] });
+    expect(ok.refus).toBeNull();
+    expect(nomsDe(b)).toEqual(['Ana', 'Bob', 'Cléo']);
+  });
+
+  it('l’essai à blanc ne lance pas la roue', () => {
+    const b = banc(['Ana', 'Bob']);
+    executer(b, { actions: [appel('lancer') as never, appel('couperSon', { coupe: true }) as never] });
+    expect(b.lances).toEqual([0]);
+  });
+});
+
+describe('forme des décisions venues d’un étage', () => {
+  it('refuse avec forme-invalide ce qui n’a pas la forme attendue', () => {
+    const b = banc(['Ana', 'Bob']);
+    const mauvaises: unknown[] = [
+      { actions: 'supprime tout' },
+      { actions: { action: 'lancer' } },
+      { actions: [null] },
+      { actions: [{ action: 3 }] },
+      { action: 'lancer', params: ['x'] },
+      { action: 'lancer', params: 'x' },
+      { action: 'clarifier', candidats: 'Ana' },
+      { action: 'clarifier', candidats: [1] },
+      { action: 'refuser', code: 4 },
+      { params: {} },
+      null,
+      'lancer',
+    ];
+    for (const m of mauvaises) {
+      expect(planifier(m as Decision, b.etat())).toEqual({ genre: 'refuser', code: 'forme-invalide' });
+      expect(confirmationRequise(m as Decision)).toBe(false);
+    }
+  });
+
+  it('accepte des paramètres absents', () => {
+    expect(planifier({ action: 'lancer' }, banc(['Ana', 'Bob']).etat()).genre).toBe('etapes');
+  });
+});

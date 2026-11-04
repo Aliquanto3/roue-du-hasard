@@ -477,11 +477,27 @@ export interface Actions {
   /** Pourquoi « Relancer » serait refusé maintenant (après le retrait éventuel du gagnant), `null` s'il est permis. */
   relancementInterdit(): CodeRefus | null;
   readonly magasin: Magasin;
+  /**
+   * Essai à blanc : mêmes règles et mêmes refus, sur une copie de l'état courant. Ni la roue, ni
+   * l'annonce, ni le téléchargement ne sont touchés, et l'état réel ne change pas.
+   */
+  essayer(): Actions;
 }
 
 export function creerActions(ctx: Contexte): Actions {
   return {
     magasin: ctx.magasin,
+    essayer() {
+      const annonce = annonceDe(ctx);
+      return creerActions({
+        magasin: creerMagasin(ctx.magasin.lire()),
+        enRotation: ctx.enRotation,
+        lancer: () => undefined,
+        annonce: { ouverte: () => annonce.ouverte(), ouvrir: () => undefined, fermer: () => undefined },
+        ...(ctx.tirer ? { tirer: ctx.tirer } : {}),
+        ...(ctx.maintenant ? { maintenant: ctx.maintenant } : {}),
+      });
+    },
     executer<N extends NomAction>(nom: N, params: ParametresActions[N]): Resultat {
       const action: Action<N> = ACTIONS[nom];
       // Verrou F8 : toute action (sauf les réglages `SANS_VERROU`) est refusée pendant une rotation, aucune interface ne peut le contourner.

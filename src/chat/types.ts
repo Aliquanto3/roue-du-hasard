@@ -11,7 +11,8 @@
 /** Une action cible avec ses paramètres (noms de personnes en clair : `outils.ts` les résout en id). */
 export interface DecisionAction {
   readonly action: string;
-  readonly params: Readonly<Record<string, unknown>>;
+  /** Absent : équivaut à `{}`. */
+  readonly params?: Readonly<Record<string, unknown>>;
 }
 
 /** Plusieurs étapes, exécutées dans l'ordre. */
@@ -44,6 +45,35 @@ export const estEtapes = (d: Decision): d is DecisionEtapes & Decision => 'actio
 export const estRefus = (d: Decision): d is DecisionRefus & Decision => !('actions' in d) && d.action === 'refuser';
 export const estClarifier = (d: Decision): d is DecisionClarifier & Decision =>
   !('actions' in d) && d.action === 'clarifier';
+
+const estObjet = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+const estAppel = (v: unknown): boolean =>
+  estObjet(v) && typeof v['action'] === 'string' && (v['params'] === undefined || estObjet(v['params']));
+
+/**
+ * Vérifie la forme d'une décision venue d'un étage (la sortie d'un modèle n'est pas fiable) :
+ * `planifier` refuse avec le code `forme-invalide` ce qui ne la respecte pas.
+ */
+export function formeValide(d: unknown): d is Decision {
+  if (!estObjet(d)) return false;
+  if ('actions' in d) return Array.isArray(d['actions']) && d['actions'].every(estAppel);
+  if (!estAppel(d)) return false;
+  if (d['action'] === 'clarifier') {
+    return Array.isArray(d['candidats']) && d['candidats'].every((c) => typeof c === 'string');
+  }
+  if (d['action'] === 'refuser') return d['code'] === undefined || typeof d['code'] === 'string';
+  return true;
+}
+
+/** Réglages communs aux étages, fournis à chaque fabrique (le SLM de la 5.6 y lira client, URL et modèle). */
+export interface OptionsEtages {
+  readonly urlOllama?: string;
+  readonly modele?: string;
+  readonly fetch?: typeof fetch;
+}
+
+/** Fabrique d'un étage ; c'est elle que l'on enregistre dans la cascade. */
+export type FabriqueEtage = (options: OptionsEtages) => Etage;
 
 /** L'état vu par le chat, même forme que `etat` du corpus. */
 export interface EtatChat {

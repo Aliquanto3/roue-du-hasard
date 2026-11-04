@@ -9,6 +9,8 @@ export const REFUS_CHAT: Readonly<Record<string, string>> = {
   annule: 'Commande annulée.',
   'nom-absent': 'Je ne trouve personne de ce nom dans la liste.',
   'action-inconnue': 'Je ne sais pas faire cela.',
+  'forme-invalide': 'La réponse du moteur n’a pas la forme attendue.',
+  'conflit-etapes': 'Deux étapes visent la même personne : précisez une seule demande à la fois.',
   'parametres-invalides': 'La commande est incomplète ou mal formée.',
 };
 

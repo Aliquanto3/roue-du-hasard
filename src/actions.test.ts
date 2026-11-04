@@ -264,3 +264,20 @@ describe('afficherCadeauSuivant', () => {
     expect(banc().actions.executer('afficherCadeauSuivant', {})).toEqual({ ok: true, cadeauSuivant: null });
   });
 });
+
+describe('essayer', () => {
+  it('applique les actions sur une copie : mêmes refus, état et roue intacts', () => {
+    const b = banc();
+    b.actions.executer('coller', { texte: 'Ana,Bob' });
+    const avant = b.actions.magasin.lire();
+    const essai = b.actions.essayer();
+    expect(essai.executer('ajouter', { nom: 'Cléo' })).toEqual({ ok: true });
+    expect(essai.executer('lancer', {})).toEqual({ ok: true });
+    expect(essai.executer('annulerDernierTirage', {})).toEqual({ ok: false, code: 'historique-vide' });
+    expect(essai.magasin.lire().participants).toHaveLength(3);
+    expect(b.actions.magasin.lire()).toBe(avant);
+    expect(b.lances).toEqual([]);
+    b.rotation.active = true;
+    expect(b.actions.essayer().executer('ajouter', { nom: 'X' })).toEqual({ ok: false, code: 'rotation-en-cours' });
+  });
+});
