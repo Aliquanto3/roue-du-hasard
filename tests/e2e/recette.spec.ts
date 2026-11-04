@@ -275,8 +275,13 @@ for (const [largeur, hauteur] of LARGEURS) {
     // Tolérance d'1 px : Firefox arrondit parfois autrement une position sous-pixel (424 contre
     // 423 observé en CI). Une place réservée qui disparaît décale de plusieurs dizaines de px.
     expect(apres).toHaveLength(avant.length);
+    // Positions y (indices 1 et 4) à 1 px près ; x et hauteur restent exacts.
     apres.forEach((v, i) => {
-      expect(Math.abs((v ?? Number.NaN) - (avant[i] ?? Number.NaN)), `mesure ${String(i)}`).toBeLessThanOrEqual(1);
+      if (i === 1 || i === 4) {
+        expect(Math.abs((v ?? Number.NaN) - (avant[i] ?? Number.NaN)), `mesure ${String(i)}`).toBeLessThanOrEqual(1);
+      } else {
+        expect(v, `mesure ${String(i)}`).toBe(avant[i]);
+      }
     });
   });
 }

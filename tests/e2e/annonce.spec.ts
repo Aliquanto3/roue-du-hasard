@@ -69,11 +69,14 @@ async function nomSousPointeur(page: Page): Promise<string | null> {
 }
 
 async function sansDefilementHorizontal(page: Page): Promise<void> {
-  // Interrogé jusqu'à stabilité : juste après un changement de fenêtre, WebKit peut encore
-  // renvoyer la mise en page précédente. Un vrai débordement, lui, persiste et fait échouer.
-  await expect
-    .poll(() => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth))
-    .toBeLessThanOrEqual(0);
+  // Fin des animations et transitions avant la mesure : juste après un changement de fenêtre
+  // ou l'ouverture de l'annonce, la mise en page peut être transitoire.
+  await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished.catch(() => undefined))));
+  const [defilable, vue] = await page.evaluate(() => [
+    document.documentElement.scrollWidth,
+    document.documentElement.clientWidth,
+  ]);
+  expect(defilable).toBeLessThanOrEqual(vue as number);
 }
 
 /** Pixel sondé, taille du canvas et couleurs des lignes : message d'échec des contrôles « sous le pointeur ». */

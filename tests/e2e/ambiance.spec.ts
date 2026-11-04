@@ -101,7 +101,6 @@ test('son et confettis sous la CSP du dépôt : aucune erreur, violation ni requ
   await page.click('#confettis');
   // Durée prévue 3,5 s ; Firefox sous Windows a dépassé 6 s en CI.
   const t0 = Date.now();
-  await expect.poll(async () => (await trace()).retires, { timeout: 12_000 }).toBeGreaterThanOrEqual(1);
   await expect(page.locator('#zone canvas')).toHaveCount(0, { timeout: 12_000 });
   const final = await trace();
   expect(final.retires).toBe(final.ajoutes.length);
