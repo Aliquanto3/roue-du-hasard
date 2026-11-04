@@ -156,9 +156,10 @@ describe('verrou F8 : toute action est refusée pendant une rotation', () => {
     exporter: {},
     afficherCadeauSuivant: {},
     importer: { etat: etatInitial() },
+    modeProjection: { actif: true },
   };
-  // Réglages d'affichage et de son : permis pendant une rotation (testés plus bas).
-  const REGLAGES: readonly NomAction[] = ['basculerRendu', 'couperSon', 'afficherCadeauSuivant'];
+  // Réglages d'affichage et de son, mode projection : permis pendant une rotation (testés plus bas).
+  const REGLAGES: readonly NomAction[] = ['basculerRendu', 'couperSon', 'afficherCadeauSuivant', 'modeProjection'];
 
   for (const nom of (Object.keys(params) as NomAction[]).filter((n) => !REGLAGES.includes(n))) {
     it(`${nom} renvoie rotation-en-cours et ne change rien`, () => {
@@ -181,6 +182,64 @@ describe('verrou F8 : toute action est refusée pendant une rotation', () => {
       expect(action.description).not.toBe('');
       if (!REGLAGES.includes(cle as NomAction)) expect(action.refusPossibles).toContain('rotation-en-cours');
     }
+  });
+});
+
+describe('mode projection (F18)', () => {
+  function bancProjection() {
+    const magasin = creerMagasin();
+    const rotation = { active: false };
+    const appels: boolean[] = [];
+    let active = false;
+    const actions = creerActions({
+      magasin,
+      enRotation: () => rotation.active,
+      lancer: () => undefined,
+      projection: {
+        active: () => active,
+        definir: (a) => {
+          appels.push(a);
+          active = a;
+        },
+      },
+    });
+    return { actions, rotation, appels, active: () => active };
+  }
+
+  it('entre puis sort du mode, sans toucher à l’état ni au stockage', () => {
+    const b = bancProjection();
+    const avant = b.actions.magasin.lire();
+    expect(b.actions.executer('modeProjection', { actif: true })).toEqual({ ok: true });
+    expect(b.active()).toBe(true);
+    expect(b.actions.executer('modeProjection', { actif: false })).toEqual({ ok: true });
+    expect(b.active()).toBe(false);
+    expect(b.appels).toEqual([true, false]);
+    expect(b.actions.magasin.lire()).toBe(avant);
+  });
+
+  it('reste permis pendant une rotation, comme dans le corpus', () => {
+    const b = bancProjection();
+    b.rotation.active = true;
+    expect(b.actions.executer('modeProjection', { actif: true })).toEqual({ ok: true });
+    expect(b.active()).toBe(true);
+    expect(b.actions.executer('ajouter', { nom: 'X' })).toEqual({ ok: false, code: 'rotation-en-cours' });
+    expect(b.actions.executer('modeProjection', { actif: false })).toEqual({ ok: true });
+    expect(b.active()).toBe(false);
+  });
+
+  it('une valeur non booléenne vaut « sortir » ; sans contrôle (tests), l’action ne fait rien', () => {
+    const b = bancProjection();
+    b.actions.executer('modeProjection', { actif: 'oui' as unknown as boolean });
+    expect(b.appels).toEqual([false]);
+    const seul = creerActions({ magasin: creerMagasin(), enRotation: () => false, lancer: () => undefined });
+    expect(seul.executer('modeProjection', { actif: true })).toEqual({ ok: true });
+  });
+
+  it('l’essai à blanc ne touche pas au vrai mode', () => {
+    const b = bancProjection();
+    expect(b.actions.essayer().executer('modeProjection', { actif: true })).toEqual({ ok: true });
+    expect(b.appels).toEqual([]);
+    expect(b.active()).toBe(false);
   });
 });
 
