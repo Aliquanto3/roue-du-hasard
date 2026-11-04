@@ -438,9 +438,26 @@ describe('étage decision', () => {
   it('exclusion : « retire Marie mais pas Marie-Claire » ne vise que Marie, sans clarifier', async () => {
     const e: EtatChat = { noms: ['Marie', 'Marie-Claire', 'Paul'], rotation: false };
     const f = serveur({ outil: { supprimer: 0.9 }, nom: { Marie: 1 } });
-    for (const cmd of ['retire Marie mais pas Marie-Claire', 'supprime Marie sauf Marie-Claire']) {
+    for (const cmd of [
+      'retire Marie mais pas Marie-Claire',
+      'supprime Marie sauf Marie-Claire',
+      'supprime Marie excepté Marie-Claire',
+      'supprime Marie hormis Marie-Claire',
+      'supprime Marie à part Marie-Claire',
+      'supprime Marie, pas Marie-Claire',
+      'supprime Marie mais garde Marie-Claire',
+    ]) {
       const r = (await decider(opts(f), cmd, e)) as ResultatEtage;
       expect(r.decision, cmd).toEqual({ action: 'supprimer', params: { nom: 'Marie' } });
+    }
+  });
+
+  it('« mais » seul ou « mais aussi » : les deux noms comptent, clarifier', async () => {
+    const e: EtatChat = { noms: ['Marie', 'Paul', 'Zoé'], rotation: false };
+    const f = serveur({ outil: { supprimer: 0.95 }, nom: { Paul: 1 } });
+    for (const cmd of ['supprime Paul mais aussi Marie', 'supprime Paul, mais Marie aussi', 'supprime Paul mais Marie']) {
+      const r = (await decider(opts(f), cmd, e)) as ResultatEtage;
+      expect(r.decision, cmd).toEqual({ action: 'clarifier', candidats: cmd.includes('Paul') ? ['Paul', 'Marie'] : [] });
     }
   });
 

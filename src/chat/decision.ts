@@ -192,7 +192,7 @@ function parametresDemandes(outil: Outil): {
 }
 
 /** Début d'une exclusion : ce qui suit n'est pas visé par l'action. */
-const MARQUEUR_EXCLUSION = /(?<![\p{L}])(?:mais|sauf|excepté|excepte|hormis)(?![\p{L}])/iu;
+const MARQUEUR_EXCLUSION = /(?<![\p{L}])(?:mais\s+(?:garde|conserve|laisse|ne)|sauf|excepté|excepte|hormis|à\s+part|a\s+part|pas)(?![\p{L}])/iu;
 
 /** Noms de la liste cités en entier dans la commande, sans doublon de forme ; aucun si aucun n'est cité. */
 export function candidatsNoms(commande: string, noms: readonly string[]): string[] {
