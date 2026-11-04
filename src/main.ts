@@ -1,4 +1,4 @@
-import { creerActions, creerMagasin } from './actions';
+import { creerActions, creerMagasin, type Actions } from './actions';
 import { retirerDernierGagnant } from './domain/etat';
 import { couleursParDefaut } from './domain/palette';
 import { creerPersistance } from './domain/persistance';
@@ -155,8 +155,18 @@ export function render(root: HTMLElement): Roue {
     donnees.avertirSansSauvegarde();
   }
   root.dataset['ready'] = 'true';
+  application = { actions, roue, root };
   return roue;
 }
+
+/** Ce que l'édition chat (`main-chat.ts`) branche sur l'application : la table d'actions, la roue et la racine. */
+export interface Application {
+  readonly actions: Actions;
+  readonly roue: Roue;
+  readonly root: HTMLElement;
+}
+/** Dernière application rendue ; `null` hors navigateur. Lecture seule pour les importeurs. */
+export let application: Application | null = null;
 
 const root = document.getElementById('app');
 if (root) render(root);
