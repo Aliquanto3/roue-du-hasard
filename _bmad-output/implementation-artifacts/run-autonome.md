@@ -222,3 +222,8 @@ Ordre de reprise :
 - 2026-11-04 14:42 · 6.2 · dev · lancé (spec docs/specs/6.2-bouton-parler.md, relais /stt same-origin) ·
 - 2026-11-04 14:42 · run · dev · stabilisation des E2E instables lancée (recette:245, ambiance:51, annonce:688) ·
 - 2026-11-04 14:44 · run · décision · vérification de l'édition chat par Chromium Playwright local (le Chrome connecté n'atteint pas localhost de ce poste) : 4 tailles sans erreur ni défilement horizontal ; à 320×568 la barre du chat fermé cache Relief et Son au départ (défilement possible), à juger en 7.3 ·
+- 2026-11-04 14:57 · run · fusion · stabilisation des E2E instables, PR #43 fusionnée, CI verte sur 9 jobs · e6e52b1
+- 2026-11-04 14:57 · 5.10 · décision · main intégrée dans la branche (E2E stabilisés) · d1d63f2
+- 2026-11-04 · 5.10 · CI · rouge : relief.spec.ts:144 macOS Chromium (42 ms pour 39,5, performance du runner) ; job relancé · d1d63f2
+- 2026-11-04 · 6.2 · dev · fini, PR #44 : bouton Parler, relais /stt (Host, Origin, POST, multipart, 2 Mo, 502), connect-src 'self' ; roue-chat.html 160 Ko · 802f8be
+- 2026-11-04 15:48 · 6.2 · second-avis · lancé ; revue Opus ensuite (relais et CSP) · 802f8be
