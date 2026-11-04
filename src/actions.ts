@@ -488,12 +488,25 @@ export function creerActions(ctx: Contexte): Actions {
   return {
     magasin: ctx.magasin,
     essayer() {
-      const annonce = annonceDe(ctx);
+      // La copie suit aussi la rotation et l'annonce : après « lancer », la vraie roue tourne et
+      // refuse la suite ; un essai qui l'ignorerait laisserait un plan à moitié appliqué.
+      let lancee = false;
+      let ouverte = annonceDe(ctx).ouverte();
       return creerActions({
         magasin: creerMagasin(ctx.magasin.lire()),
-        enRotation: ctx.enRotation,
-        lancer: () => undefined,
-        annonce: { ouverte: () => annonce.ouverte(), ouvrir: () => undefined, fermer: () => undefined },
+        enRotation: () => lancee || ctx.enRotation(),
+        lancer: () => {
+          lancee = true;
+        },
+        annonce: {
+          ouverte: () => ouverte,
+          ouvrir: () => {
+            ouverte = true;
+          },
+          fermer: () => {
+            ouverte = false;
+          },
+        },
         ...(ctx.tirer ? { tirer: ctx.tirer } : {}),
         ...(ctx.maintenant ? { maintenant: ctx.maintenant } : {}),
       });

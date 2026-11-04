@@ -272,8 +272,10 @@ describe('essayer', () => {
     const avant = b.actions.magasin.lire();
     const essai = b.actions.essayer();
     expect(essai.executer('ajouter', { nom: 'Cléo' })).toEqual({ ok: true });
-    expect(essai.executer('lancer', {})).toEqual({ ok: true });
     expect(essai.executer('annulerDernierTirage', {})).toEqual({ ok: false, code: 'historique-vide' });
+    expect(essai.executer('lancer', {})).toEqual({ ok: true });
+    // Comme la vraie roue, la copie tourne après « lancer » : la suite du plan est refusée.
+    expect(essai.executer('ajouter', { nom: 'Dan' })).toEqual({ ok: false, code: 'rotation-en-cours' });
     expect(essai.magasin.lire().participants).toHaveLength(3);
     expect(b.actions.magasin.lire()).toBe(avant);
     expect(b.lances).toEqual([]);

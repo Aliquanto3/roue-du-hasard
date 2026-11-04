@@ -42,7 +42,11 @@ function banc(noms: readonly string[] = [], cadeaux: readonly string[] = []): Ba
   const actions = creerActions({
     magasin,
     enRotation: () => rotation.active,
-    lancer: (i) => lances.push(i),
+    // Comme la vraie roue : la rotation commence dès le lancement.
+    lancer: (i) => {
+      lances.push(i);
+      rotation.active = true;
+    },
     tirer: () => 0,
   });
   for (const nom of noms) actions.executer('ajouter', { nom });
@@ -354,6 +358,17 @@ describe('plans à plusieurs étapes', () => {
     const ok = executer(b, { actions: [appel('ajouter', { nom: 'Cléo' }) as never, appel('couperSon', { coupe: true }) as never] });
     expect(ok.refus).toBeNull();
     expect(nomsDe(b)).toEqual(['Ana', 'Bob', 'Cléo']);
+  });
+
+  it('l’essai à blanc suit la rotation : après lancer, une étape verrouillée refuse tout le plan', () => {
+    const b = banc(['Ana', 'Bob']);
+    const avant = b.etat();
+    for (const suite of [appel('ajouter', { nom: 'Cléo' }), appel('lancer')]) {
+      const r = executer(b, { actions: [appel('lancer') as never, suite as never] });
+      expect(r.refus).toBe('rotation-en-cours');
+      expect(b.lances).toEqual([]);
+      expect(b.etat()).toBe(avant);
+    }
   });
 
   it('l’essai à blanc ne lance pas la roue', () => {
