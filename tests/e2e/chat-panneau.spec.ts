@@ -5,7 +5,8 @@ const ORIGINE = 'http://localhost:5200/';
 
 // Les commandes simples (« ajoute Léo »…) sont comprises par l'étage règles de la story 5.3 (PR #31),
 // pas encore dans `main`. À réactiver (retirer `fixme`) une fois #31 fusionnée.
-const MOTIF_REGLES = 'étage règles (story 5.3, PR #31) pas encore fusionné : les commandes simples ne sont pas comprises';
+const MOTIF_REGLES =
+  'étage règles (story 5.3, PR #31) pas encore fusionné : les commandes simples ne sont pas comprises';
 
 async function ouvrir(page: Page): Promise<void> {
   await page.goto(ORIGINE);
@@ -72,9 +73,23 @@ for (const [largeur, hauteur] of [
     await ouvrir(page);
     await dire(page, 'une commande assez longue pour tester le retour à la ligne dans le fil du chat '.repeat(2));
     await expect(fil(page)).toContainText('Je n’ai pas compris');
-    const debord = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    const debord = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
     expect(debord).toBeLessThanOrEqual(0);
     await expect(page.locator('.page__roue')).toBeInViewport();
+    // Roue et panneau ouverts ne se recouvrent jamais : le bas de la roue est au-dessus du haut du panneau.
+    const roue = await page.locator('.page__roue').boundingBox();
+    const panneau = await page.locator('.chat').boundingBox();
+    expect(roue).not.toBeNull();
+    expect(panneau).not.toBeNull();
+    if (roue && panneau) {
+      const separes =
+        roue.y + roue.height <= panneau.y + 1 ||
+        panneau.x + panneau.width <= roue.x ||
+        roue.x + roue.width <= panneau.x;
+      expect(separes).toBe(true);
+    }
     await expect(page.getByLabel('Commande', { exact: true })).toBeInViewport();
   });
 }

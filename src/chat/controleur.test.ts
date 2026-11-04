@@ -1,13 +1,14 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
-import { creerActions, creerMagasin } from '../actions';
+import { creerActions, creerMagasin, type Actions } from '../actions';
 import { creerCascade } from './cascade';
-import { creerControleur, modeleIndisponible, type Controleur } from './controleur';
+import { avisIndisponibilite, creerControleur, modeleIndisponible, type Controleur } from './controleur';
 import { TEXTES_CHAT } from './textes';
 import type { Decision, DecisionAction, EtatChat, Etage } from './types';
 
 interface Banc {
   c: Controleur;
+  actions: Actions;
   noms(): string[];
   historique(): number;
   rotation: { active: boolean };
@@ -56,6 +57,7 @@ function banc(script: Record<string, Decision>, noms: readonly string[] = [], ex
   });
   return {
     c,
+    actions,
     noms: () => magasin.lire().participants.map((p) => p.nom),
     historique: () => magasin.lire().historique.length,
     rotation,
@@ -363,6 +365,79 @@ describe('controleur du panneau', () => {
       };
       expect(modeleIndisponible([sansEtat, autre])).toBe(false);
       expect(modeleIndisponible([{ ...slm('indisponible'), nom: 'decision' }])).toBe(true);
+    });
+  });
+
+  describe('carte de confirmation périmée', () => {
+    const supprimeDeux = {
+      supprime: { actions: [appel('supprimer', { nom: 'Ana' }), appel('supprimer', { nom: 'Bob' })] },
+    };
+
+    it('renommage manuel après la carte : rien n’est supprimé', async () => {
+      const b = banc(supprimeDeux, ['Ana', 'Bob', 'Cy']);
+      await b.c.envoyer('supprime');
+      const id = b.actions.magasin.lire().participants[0]?.id ?? '';
+      b.actions.executer('renommer', { id, nom: 'Zoé' });
+      b.c.confirmer();
+      expect(b.noms()).toEqual(['Zoé', 'Bob', 'Cy']);
+      expect(textes(b).at(-1)).toBe(TEXTES_CHAT.confirmationPerimee);
+      expect(b.c.etat().attente).toBeNull();
+    });
+
+    it('tirage manuel après la carte d’effacement : l’historique est conservé', async () => {
+      const b = banc({ vide: appel('effacerHistorique') }, ['Ana', 'Bob']);
+      await b.c.envoyer('vide');
+      b.actions.executer('enregistrerTirage', { index: 0 });
+      expect(b.historique()).toBe(1);
+      b.c.confirmer();
+      expect(b.historique()).toBe(1);
+      expect(textes(b).at(-1)).toBe(TEXTES_CHAT.confirmationPerimee);
+    });
+
+    it('carte à jour : exécutée une fois, la double confirmation est sans effet', async () => {
+      const b = banc(supprimeDeux, ['Ana', 'Bob', 'Cy']);
+      await b.c.envoyer('supprime');
+      b.c.confirmer();
+      b.c.confirmer();
+      expect(b.noms()).toEqual(['Cy']);
+      expect(textes(b)).toEqual(['supprime', TEXTES_CHAT.confirmer, TEXTES_CHAT.fait]);
+    });
+
+    it('nouvelle commande avec une carte ouverte : carte annulée avec un message', async () => {
+      const b = banc({ ...supprimeDeux, 'ajoute Léo': appel('ajouter', { nom: 'Léo' }) }, ['Ana', 'Bob', 'Cy']);
+      await b.c.envoyer('supprime');
+      await b.c.envoyer('ajoute Léo');
+      expect(textes(b)).toEqual([
+        'supprime',
+        TEXTES_CHAT.confirmer,
+        TEXTES_CHAT.confirmationAbandonnee,
+        'ajoute Léo',
+        TEXTES_CHAT.fait,
+      ]);
+      expect(b.c.etat().attente).toBeNull();
+      expect(b.noms()).toEqual(['Ana', 'Bob', 'Cy', 'Léo']);
+    });
+  });
+
+  describe('avis d’indisponibilité selon la raison', () => {
+    const slmRaison = (raison: string): Etage => ({
+      nom: 'slm',
+      decider: () => Promise.resolve(null),
+      ...{ etat: () => 'indisponible', raisonIndisponible: () => raison },
+    });
+
+    it('modèle absent : nom du modèle et ollama pull', () => {
+      const avis = avisIndisponibilite([slmRaison('modèle qwen3:4b non installé (404)')]);
+      expect(avis).toBe(TEXTES_CHAT.avisModeleAbsent('qwen3:4b'));
+      expect(avis).toContain('ollama pull qwen3:4b');
+      expect(avis).not.toContain('OLLAMA_ORIGINS');
+    });
+
+    it('Ollama injoignable ou 403 : consigne OLLAMA_ORIGINS', () => {
+      expect(avisIndisponibilite([slmRaison('Ollama injoignable : x')])).toBe(TEXTES_CHAT.avisIndisponible);
+      expect(avisIndisponibilite([slmRaison('accès refusé (403) : vérifier OLLAMA_ORIGINS')])).toBe(
+        TEXTES_CHAT.avisIndisponible,
+      );
     });
   });
 });

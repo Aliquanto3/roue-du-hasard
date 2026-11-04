@@ -60,7 +60,8 @@ interface Echange {
 
 interface Suite {
   readonly decision: Decision;
-  readonly etapes: readonly Etape[];
+  /** Empreinte de l'état au moment de la carte : si elle change, la carte est périmée. */
+  readonly empreinte: string;
 }
 
 const CLE_ETAGE_DISPONIBILITE = ['slm', 'decision'] as const;
@@ -70,9 +71,22 @@ const aUnEtat = (e: Etage): e is EtageAvecEtat => typeof (e as { etat?: unknown 
 
 /** Vrai si un étage SLM ou décision se déclare `indisponible` (garde de type propre : les autres étages n'ont pas d'`etat`). */
 export function modeleIndisponible(etages: readonly Etage[]): boolean {
-  return etages.some(
-    (e) => (CLE_ETAGE_DISPONIBILITE as readonly string[]).includes(e.nom) && aUnEtat(e) && e.etat() === 'indisponible',
+  return etagesIndisponibles(etages).length > 0;
+}
+
+const etagesIndisponibles = (etages: readonly Etage[]): EtageAvecEtat[] =>
+  etages.filter(
+    (e): e is EtageAvecEtat =>
+      (CLE_ETAGE_DISPONIBILITE as readonly string[]).includes(e.nom) && aUnEtat(e) && e.etat() === 'indisponible',
   );
+
+/** Avis adapté à la raison de l'étage (`raisonIndisponible()` de `slm.ts`) : modèle absent, sinon Ollama injoignable ou refusé. */
+export function avisIndisponibilite(etages: readonly Etage[]): string | null {
+  const [premier] = etagesIndisponibles(etages);
+  if (premier === undefined) return null;
+  const raison = (premier as { raisonIndisponible?: () => string | null }).raisonIndisponible?.() ?? null;
+  const absent = raison === null ? null : /^modèle (.+) non installé/u.exec(raison);
+  return absent?.[1] === undefined ? TEXTES_CHAT.avisIndisponible : TEXTES_CHAT.avisModeleAbsent(absent[1]);
 }
 
 export function creerControleur(deps: DepsControleur): Controleur {
@@ -117,6 +131,17 @@ export function creerControleur(deps: DepsControleur): Controleur {
     };
   };
 
+  const empreinte = (): string => {
+    const d = deps.actions.magasin.lire();
+    return JSON.stringify([
+      deps.enRotation(),
+      d.participants.map((p) => [p.id, p.nom]),
+      d.cadeaux,
+      d.attribues,
+      d.historique.length,
+    ]);
+  };
+
   const executer = (commande: string, etapes: readonly Etape[]): void => {
     const { resultats, refus } = executerPlan(etapes, deps.actions);
     if (refus !== null) {
@@ -144,7 +169,7 @@ export function creerControleur(deps: DepsControleur): Controleur {
       attente = { genre: 'clarifier', candidats };
       repondre(commande, TEXTES_CHAT.clarifier(candidats));
     } else if (plan.confirmation) {
-      suite = { decision, etapes: plan.etapes };
+      suite = { decision, empreinte: empreinte() };
       attente = {
         genre: 'confirmer',
         recapitulatif: appels(decision).map((a) => TEXTES_CHAT.etape(a.action, a.params)),
@@ -156,9 +181,11 @@ export function creerControleur(deps: DepsControleur): Controleur {
   };
 
   const verifierAvis = (): void => {
-    if (avisDonne || !modeleIndisponible(deps.cascade.etages)) return;
+    if (avisDonne) return;
+    const texte = avisIndisponibilite(deps.cascade.etages);
+    if (texte === null) return;
     avisDonne = true;
-    avis = TEXTES_CHAT.avisIndisponible;
+    avis = texte;
   };
 
   /** Commande derrière l'attente en cours (dernier message de l'utilisateur). */
@@ -173,6 +200,7 @@ export function creerControleur(deps: DepsControleur): Controleur {
     async envoyer(texte) {
       const commande = texte.trim();
       if (commande === '') return;
+      if (attente?.genre === 'confirmer') dire('chat', TEXTES_CHAT.confirmationAbandonnee);
       courant?.abort();
       const controle = new AbortController();
       courant = controle;
@@ -211,10 +239,13 @@ export function creerControleur(deps: DepsControleur): Controleur {
     },
     confirmer() {
       if (attente?.genre !== 'confirmer' || suite === null) return;
-      const { etapes } = suite;
+      const { decision, empreinte: avant } = suite;
       const commande = derniereCommande();
       oublierAttente();
-      executer(commande, etapes);
+      // La carte date : on rejoue le plan sur l'état courant, rien n'est exécuté si l'état a changé.
+      const plan = planifier(decision, deps.actions.magasin.lire());
+      if (empreinte() !== avant || plan.genre !== 'etapes') repondre(commande, TEXTES_CHAT.confirmationPerimee);
+      else executer(commande, plan.etapes);
       notifier();
     },
     annuler() {

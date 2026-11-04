@@ -154,4 +154,11 @@
   #app[data-chat] .page {
     padding-bottom: 5rem;
   }
+  /* Tiroir ouvert : la roue rétrécit de sa hauteur, ils ne se recouvrent jamais. */
+  #app:has(.chat[data-ouvert='true']) .page {
+    --taille-roue-max: calc(100vh - 13.75rem - 45vh);
+    --taille-roue-max: calc(100dvh - 13.75rem - 45dvh);
+    padding-bottom: 45vh;
+    padding-bottom: 45dvh;
+  }
 }

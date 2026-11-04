@@ -63,6 +63,8 @@ export const TEXTES_CHAT = {
   confirmerBouton: 'Confirmer',
   annulerBouton: 'Annuler',
   confirmationTitre: 'Étapes à exécuter',
+  confirmationPerimee: 'La liste a changé depuis la demande : rien n’a été fait. Redemandez la commande.',
+  confirmationAbandonnee: 'Confirmation annulée : une nouvelle commande a été envoyée, rien n’a été fait.',
   commandeAnnulee: 'Commande annulée.',
   ambigu: 'Plusieurs personnes portent ce nom : renommez-en une, ou demandez « supprime les deux ».',
   reglagesTitre: 'Réglages du modèle',
@@ -72,6 +74,9 @@ export const TEXTES_CHAT = {
   /** Un seul avis par session, quand le modèle configuré ne répond pas. */
   avisIndisponible:
     'Le modèle local ne répond pas : seules les commandes simples sont comprises. Pour l’utiliser, lancez Ollama avec OLLAMA_ORIGINS=http://localhost:5200 (par exemple « OLLAMA_ORIGINS=http://localhost:5200 ollama serve »).',
+  /** Modèle configuré mais non installé : Ollama répond, mais ne connaît pas ce nom. */
+  avisModeleAbsent: (modele: string): string =>
+    `Le modèle « ${modele} » n’est pas installé : seules les commandes simples sont comprises. Installez-le avec « ollama pull ${modele} » ou corrigez son nom dans les réglages.`,
   /** Messages de l'interface pour un refus d'action (rotation, moins de 2 noms, cadeaux épuisés…), sinon ceux du chat. */
   refusPlan: (code: string | undefined): string =>
     code !== undefined && Object.hasOwn(TEXTS.refus, code)
