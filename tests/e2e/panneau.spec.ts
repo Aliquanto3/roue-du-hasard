@@ -235,7 +235,7 @@ test('parcours au clavier seul, du premier champ au lancement', async ({ page, b
   await ouvrir(page);
   // Safari sur macOS saute les boutons avec Tab seul : Option+Tab parcourt tous les contrôles.
   const option = browserName === 'webkit' && process.platform === 'darwin' ? 'Alt+' : '';
-  // Ordre de tabulation : roue (bouton), réglages (relief, son), puis champ d'ajout.
+  // Ordre de tabulation : roue (bouton), réglages (relief, son), mode projection (F18), puis champ d'ajout.
   await page.keyboard.press(`${option}Tab`);
   await expect(boutonLancer(page)).toBeFocused();
   await page.keyboard.press(`${option}Tab`);
@@ -243,14 +243,16 @@ test('parcours au clavier seul, du premier champ au lancement', async ({ page, b
   await page.keyboard.press(`${option}Tab`);
   await expect(page.getByRole('button', { name: /^Son :/ })).toBeFocused();
   await page.keyboard.press(`${option}Tab`);
+  await expect(page.getByRole('button', { name: 'Mode projection' })).toBeFocused();
+  await page.keyboard.press(`${option}Tab`);
   await expect(champAjout(page)).toBeFocused();
   await page.keyboard.type('Ana');
   await page.keyboard.press('Enter');
   await page.keyboard.type('Bob');
   await page.keyboard.press('Enter');
   await expect.poll(() => valeurs(page)).toEqual(['Ana', 'Bob']);
-  // Retour au bouton de lancement (par-dessus les deux réglages), qui garde un focus visible.
-  for (let i = 0; i < 3; i++) await page.keyboard.press(`${option}Shift+Tab`);
+  // Retour au bouton de lancement (par-dessus le bouton de projection et les deux réglages), focus visible.
+  for (let i = 0; i < 4; i++) await page.keyboard.press(`${option}Shift+Tab`);
   await expect(boutonLancer(page)).toBeFocused();
   const anneau = await boutonLancer(page).evaluate((el) => {
     const s = getComputedStyle(el);

@@ -266,6 +266,11 @@ test.describe('édition chat à 320 px', () => {
   test.use({ viewport: { width: 320, height: 640 } });
 
   test('tiroir du chat ouvert puis projection : la roue reprend la place du tiroir', async ({ page }) => {
+    // Cas de l'iPhone (API Fullscreen absente, repli CSS) : Firefox accorde sinon le vrai plein écran
+    // à la commande validée par Entrée, et la fenêtre prend la taille de l'écran (plus 320 px).
+    await page.addInitScript(() => {
+      Object.defineProperty(Element.prototype, 'requestFullscreen', { configurable: true, value: undefined });
+    });
     await page.goto('http://localhost:5200/');
     await expect(page.locator('#app')).toHaveAttribute('data-ready', 'true');
     await page.getByRole('button', { name: 'Ouvrir le chat' }).click();

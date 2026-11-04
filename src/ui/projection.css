@@ -1,8 +1,18 @@
 /* Mode projection (F18). Même mise en page en plein écran et dans le repli pleine fenêtre (iPhone). */
+/* Le bouton suit les réglages sur la même ligne (pas de hauteur ajoutée sous la roue). */
+.page__commandes {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+.page__commandes > .reglages {
+  margin-top: 0;
+}
 .projection {
   display: flex;
   justify-content: center;
-  margin-top: 0.5rem;
 }
 
 html.projection,

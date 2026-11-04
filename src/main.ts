@@ -137,12 +137,17 @@ export function render(root: HTMLElement): Roue {
   });
 
   const panneau = creerPanneau(zonePanneau, actions, roue);
-  creerReglages(zoneRoue, actions);
+  // Réglages et bouton de projection partagent une ligne : le bouton n'ajoute pas de hauteur sous la
+  // roue (la place libre est comptée au pixel sur téléphone en paysage, tiroir du chat ouvert).
+  const commandes = document.createElement('div');
+  commandes.className = 'page__commandes';
+  zoneRoue.append(commandes);
+  creerReglages(commandes, actions);
   // F18 : jamais mémorisé, chaque chargement repart en mode normal.
   const projection: Projection = creerProjection({
     actions,
     page,
-    conteneur: zoneRoue,
+    conteneur: commandes,
     annonceOuverte: () => annonce.ouverte(),
   });
   creerCadeaux({ panneau: zonePanneau, roue: zoneRoue, page }, actions, roue);
