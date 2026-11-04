@@ -7,7 +7,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
-import { lancerBanc, type RapportBanc, type Score } from './banc';
+import { lancerBanc, type RapportBanc, type Score, type ScoreAction } from './banc';
 import type { LigneCorpus } from './comparateur';
 import { fabriquesDuMoteur } from './moteurs';
 
@@ -55,16 +55,22 @@ const pct = (s: Score): string => (s.total === 0 ? '-' : `${((100 * s.ok) / s.to
 const ligneScore = (nom: string, s: Score): string =>
   `  ${nom.padEnd(26)} ${String(s.ok).padStart(3)}/${String(s.total).padEnd(3)} ${pct(s)}`;
 
+const precision = (s: ScoreAction): string =>
+  s.emis === 0 ? 'précision -' : `précision ${((100 * (s.emis - s.aTort)) / s.emis).toFixed(1)} %`;
+const ligneAction = (nom: string, s: ScoreAction): string =>
+  `${ligneScore(nom, s)}  émis ${String(s.emis)}, à tort ${String(s.aTort)}, ${precision(s)}`;
+
 export function formaterRapport(r: RapportBanc): string {
   return [
     `Banc ${r.moteur}, lot ${r.lot} : ${r.global.ok}/${r.global.total} = ${pct(r.global)}`,
+    `Décision brute (avant planifier) : ${r.globalBrut.ok}/${r.globalBrut.total} = ${pct(r.globalBrut)}`,
     `Plancher « refuse tout » : ${r.plancher.ok}/${r.plancher.total} = ${pct(r.plancher)}`,
     `Latence : médiane ${r.latenceMedianeMs.toFixed(1)} ms, p95 ${r.latenceP95Ms.toFixed(1)} ms`,
     '',
-    `Par action (${r.lot}) :`,
+    `Par action (${r.lot} ; rappel, puis émissions) :`,
     ...Object.keys(r.parAction)
       .sort()
-      .map((k) => ligneScore(k, r.parAction[k] as Score)),
+      .map((k) => ligneAction(k, r.parAction[k] as ScoreAction)),
     '',
     `Par catégorie (${r.lot}) :`,
     ...Object.keys(r.parCategorie)

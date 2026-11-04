@@ -3,8 +3,8 @@
  * compare à `attendu` (`comparateur.ts`). Lecture des scores : voir `docs/v1.1/README.md`.
  */
 import { decider } from '../chat/cascade';
-import { estRefus, type Decision, type FabriqueEtage, type OptionsEtages, type TraceEtage } from '../chat/types';
-import { actionsAttendues, comparer, type LigneCorpus } from './comparateur';
+import { estRefus, formeValide, type Decision, type FabriqueEtage, type OptionsEtages, type TraceEtage } from '../chat/types';
+import { actionsAttendues, comparer, decisionEffective, type LigneCorpus } from './comparateur';
 
 export interface DetailLigne {
   readonly id: string;
@@ -13,7 +13,12 @@ export interface DetailLigne {
   readonly ok: boolean;
   readonly raison: string;
   readonly attendu: Decision;
+  /** Décision brute de la cascade. */
   readonly obtenu: Decision;
+  /** Ce que l'utilisateur vivrait : la décision après `planifier`. */
+  readonly effectif: Decision;
+  /** Verdict sur la décision brute (indicateur secondaire). */
+  readonly okBrut: boolean;
   readonly etage: string | null;
   readonly dureeMs: number;
   readonly traces: readonly TraceEtage[];
@@ -24,12 +29,25 @@ export interface Score {
   readonly total: number;
 }
 
+/**
+ * Score d'une action : rappel (`ok`/`total`, lignes qui l'attendent) et précision
+ * (`emis` : lignes où le moteur l'émet ; `aTort` : parmi elles, celles qui ne l'attendent pas ;
+ * précision = (emis - aTort) / emis).
+ */
+export interface ScoreAction extends Score {
+  readonly emis: number;
+  readonly aTort: number;
+}
+
 export interface RapportBanc {
   readonly moteur: string;
   readonly lot: 'dev' | 'test';
+  /** Score sur la décision après `planifier` (ce que vit l'utilisateur). */
   readonly global: Score;
-  /** Par action attendue (une ligne à plusieurs étapes compte pour chaque action distincte). */
-  readonly parAction: Readonly<Record<string, Score>>;
+  /** Score sur la décision brute de la cascade, indicateur secondaire. */
+  readonly globalBrut: Score;
+  /** Par action (une ligne à plusieurs étapes compte pour chaque action distincte), sur la décision effective. */
+  readonly parAction: Readonly<Record<string, ScoreAction>>;
   readonly parCategorie: Readonly<Record<string, Score>>;
   /** Part de lignes attendues en `refuser` : le score d'un moteur qui refuse tout. */
   readonly plancher: Score;
@@ -55,6 +73,16 @@ function ajouter(table: Record<string, Score>, cle: string, ok: boolean): void {
   table[cle] = { ok: s.ok + (ok ? 1 : 0), total: s.total + 1 };
 }
 
+function ajouterAction(table: Record<string, ScoreAction>, cle: string, delta: Partial<ScoreAction>): void {
+  const s = table[cle] ?? { ok: 0, total: 0, emis: 0, aTort: 0 };
+  table[cle] = {
+    ok: s.ok + (delta.ok ?? 0),
+    total: s.total + (delta.total ?? 0),
+    emis: s.emis + (delta.emis ?? 0),
+    aTort: s.aTort + (delta.aTort ?? 0),
+  };
+}
+
 export interface OptionsBanc {
   readonly moteur: string;
   readonly fabriques: readonly FabriqueEtage[];
@@ -70,10 +98,11 @@ export async function lancerBanc(
 ): Promise<RapportBanc> {
   const maintenant = cfg.maintenant ?? (() => performance.now());
   const lignesLot = corpus.filter((l) => l.lot === lot);
-  const parAction: Record<string, Score> = {};
+  const parAction: Record<string, ScoreAction> = {};
   const parCategorie: Record<string, Score> = {};
   const detail: DetailLigne[] = [];
   let ok = 0;
+  let okBrutTotal = 0;
   for (const ligne of lignesLot) {
     const debut = maintenant();
     const r = await decider(ligne.commande, ligne.etat, new AbortController().signal, {
@@ -81,10 +110,20 @@ export async function lancerBanc(
       options: cfg.options ?? {},
     });
     const dureeMs = maintenant() - debut;
-    const v = comparer(ligne, r.decision);
+    const effectif = decisionEffective(r.decision, ligne.etat);
+    const v = comparer(ligne, effectif);
+    const brut = comparer(ligne, r.decision);
     if (v.ok) ok++;
+    if (brut.ok) okBrutTotal++;
     ajouter(parCategorie, ligne.categorie, v.ok);
-    for (const a of actionsAttendues(ligne.attendu)) ajouter(parAction, a, v.ok);
+    const attendues = actionsAttendues(ligne.attendu);
+    for (const a of attendues) ajouterAction(parAction, a, { ok: v.ok ? 1 : 0, total: 1 });
+    // Actions émises : celles de la décision effective (une forme invalide donne `refuser` via planifier).
+    if (formeValide(effectif)) {
+      for (const a of actionsAttendues(effectif)) {
+        ajouterAction(parAction, a, { emis: 1, aTort: attendues.includes(a) ? 0 : 1 });
+      }
+    }
     detail.push({
       id: ligne.id,
       categorie: ligne.categorie,
@@ -93,6 +132,8 @@ export async function lancerBanc(
       raison: v.raison,
       attendu: ligne.attendu,
       obtenu: r.decision,
+      effectif,
+      okBrut: brut.ok,
       etage: r.etage,
       dureeMs,
       traces: r.traces,
@@ -103,6 +144,7 @@ export async function lancerBanc(
     moteur: cfg.moteur,
     lot,
     global: { ok, total: lignesLot.length },
+    globalBrut: { ok: okBrutTotal, total: lignesLot.length },
     parAction,
     parCategorie,
     plancher: plancherDuLot(lignesLot),

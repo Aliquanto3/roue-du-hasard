@@ -8,11 +8,12 @@
  *   Un paramètre absent équivaut à `{}`, un paramètre en trop est une erreur.
  * - Plusieurs étapes : comparées dans l'ordre, même nombre d'étapes.
  * - `refuser` : le code n'est pas comparé.
- * - `clarifier` : règle des candidats du README, au moins 1 candidat (2 dans `homonymes`), tous
- *   présents dans `etat.noms` (en nombre suffisant) ; la liste exacte n'est pas exigée.
+ * - `clarifier` : règle des candidats du README : au moins 1 des candidats attendus (2 dans
+ *   `homonymes`) parmi ceux obtenus ; les candidats en trop sont tolérés.
  * - Confirmation : `confirmationRequise` appliquée à la décision obtenue, comparée à `confirmation`.
  */
-import { confirmationRequise } from '../chat/outils';
+import type { Etat } from '../domain/etat';
+import { confirmationRequise, planifier } from '../chat/outils';
 import {
   estClarifier,
   estEtapes,
@@ -79,14 +80,18 @@ function compareEtape(attendue: DecisionAction, obtenue: DecisionAction): string
 function compareClarifier(ligne: LigneCorpus, obtenue: Decision): string {
   if (!estClarifier(obtenue)) return `${estRefus(obtenue) ? 'refuser' : 'une action'} au lieu de clarifier`;
   const mini = ligne.categorie === 'homonymes' ? 2 : 1;
-  if (obtenue.candidats.length < mini) return `${obtenue.candidats.length} candidat(s), ${mini} au moins`;
-  const dispo = new Map<string, number>();
-  for (const n of ligne.etat.noms) dispo.set(n, (dispo.get(n) ?? 0) + 1);
-  for (const c of obtenue.candidats) {
-    const reste = dispo.get(c) ?? 0;
-    if (reste === 0) return `candidat « ${c} » absent de la liste`;
-    dispo.set(c, reste - 1);
+  const attendus = estClarifier(ligne.attendu) ? ligne.attendu.candidats : [];
+  // Candidats attendus retrouvés parmi ceux obtenus (doublons comptés) ; les candidats en trop sont tolérés.
+  const reste = [...obtenue.candidats];
+  let trouves = 0;
+  for (const a of attendus) {
+    const i = reste.indexOf(a);
+    if (i >= 0) {
+      reste.splice(i, 1);
+      trouves++;
+    }
   }
+  if (trouves < mini) return `${trouves} candidat(s) attendu(s) retrouvé(s), ${mini} au moins`;
   return '';
 }
 
@@ -114,4 +119,30 @@ export function comparer(ligne: LigneCorpus, obtenue: Decision): Verdict {
     return echec(`confirmation ${String(!ligne.confirmation)} au lieu de ${String(ligne.confirmation)}`);
   }
   return REUSSI;
+}
+
+/** `Etat` du domaine construit depuis l'`etat` du corpus (ids `p1`, `p2`…, ordre conservé). */
+export function etatDomaine(etat: EtatChat): Etat {
+  return {
+    participants: etat.noms.map((nom, i) => ({ id: `p${String(i + 1)}`, nom, couleur: null })),
+    cadeaux: etat.cadeaux ?? [],
+    attribues: 0,
+    historique: [],
+    retirerGagnants: false,
+    sonCoupe: false,
+    relief: true,
+    prochainId: etat.noms.length + 1,
+  };
+}
+
+/**
+ * Décision telle que la vit l'utilisateur : ce que `planifier` en fait. Refus et demande de précision
+ * remplacent la décision (un `supprimer Marie` avec deux Marie devient `clarifier`) ; un plan
+ * d'étapes garde la décision, dont les actions et paramètres sont ceux qui seront exécutés.
+ */
+export function decisionEffective(decision: Decision, etat: EtatChat): Decision {
+  const plan = planifier(decision, etatDomaine(etat));
+  if (plan.genre === 'refuser') return { action: 'refuser', code: plan.code };
+  if (plan.genre === 'clarifier') return { action: 'clarifier', candidats: plan.candidats };
+  return decision;
 }

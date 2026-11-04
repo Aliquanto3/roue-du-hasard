@@ -19,8 +19,9 @@ describe('plancher « refuse tout »', () => {
     // Indépendant du comparateur : nombre de lignes dont l'attendu est refuser.
     const refus = corpus.filter((l) => l.lot === lot && 'action' in l.attendu && l.attendu.action === 'refuser').length;
     expect(refus).toBe(ok);
-    expect(r.parAction['refuser']).toEqual({ ok, total: ok });
-    expect(r.parAction['ajouter']?.ok).toBe(0);
+    expect(r.parAction['refuser']).toEqual({ ok, total: ok, emis: total, aTort: total - ok });
+    expect(r.parAction['ajouter']).toMatchObject({ ok: 0, emis: 0, aTort: 0 });
+    expect(r.globalBrut).toEqual({ ok, total });
     expect(r.lignes).toHaveLength(total);
     expect(r.lignes[0]?.traces).toHaveLength(1);
   });
@@ -44,12 +45,54 @@ describe('lancerBanc', () => {
     let t = 0;
     const r = await lancerBanc(mini, 'dev', { moteur: 'm', fabriques: [fabrique], maintenant: () => (t += 5) });
     expect(r.global).toEqual({ ok: 1, total: 2 });
-    expect(r.parAction).toEqual({ ajouter: { ok: 0, total: 1 }, lancer: { ok: 1, total: 1 } });
+    expect(r.parAction).toEqual({
+      ajouter: { ok: 0, total: 1, emis: 0, aTort: 0 },
+      lancer: { ok: 1, total: 1, emis: 1, aTort: 0 },
+      refuser: { ok: 0, total: 0, emis: 1, aTort: 1 },
+    });
     expect(r.parCategorie).toEqual({ c1: { ok: 0, total: 1 }, c2: { ok: 1, total: 1 } });
     expect(r.lignes[0]?.raison).toBe('refuser au lieu de l\'action attendue');
     expect(r.lignes[0]?.etage).toBe('regles');
     // La cascade prend deux lectures d'horloge par étage, le banc deux par ligne.
     expect(r.latenceMedianeMs).toBeGreaterThan(0);
+  });
+
+  it('un moteur qui émet lancer partout : rappel 100 % mais précision basse', async () => {
+    const partout: FabriqueEtage = (): Etage => ({
+      nom: 'regles',
+      decider: (commande) =>
+        Promise.resolve({ decision: { action: 'lancer', params: {} }, trace: { entree: commande, sortie: null } }),
+    });
+    const l = (id: string, attendu: LigneCorpus['attendu']): LigneCorpus => ({
+      id, lot: 'dev', categorie: 'c', commande: id, etat: { noms: ['A', 'B'], rotation: false }, attendu, confirmation: false,
+    });
+    const r = await lancerBanc(
+      [l('a', { action: 'lancer', params: {} }), l('b', { action: 'refuser' }), l('c', { action: 'ajouter', params: { nom: 'Z' } })],
+      'dev',
+      { moteur: 'm', fabriques: [partout] },
+    );
+    expect(r.parAction['lancer']).toEqual({ ok: 1, total: 1, emis: 3, aTort: 2 });
+  });
+
+  it('juge la décision après planifier : supprimer un homonyme devient clarifier', async () => {
+    const supprime: FabriqueEtage = (): Etage => ({
+      nom: 'regles',
+      decider: (commande) =>
+        Promise.resolve({
+          decision: { action: 'supprimer', params: { nom: 'Marie' } },
+          trace: { entree: commande, sortie: null },
+        }),
+    });
+    const ligne: LigneCorpus = {
+      id: 'h', lot: 'dev', categorie: 'homonymes', commande: 'supprime Marie',
+      etat: { noms: ['Marie', 'Paul', 'Marie'], rotation: false },
+      attendu: { action: 'clarifier', candidats: ['Marie', 'Marie'] }, confirmation: false,
+    };
+    const r = await lancerBanc([ligne], 'dev', { moteur: 'm', fabriques: [supprime] });
+    expect(r.global).toEqual({ ok: 1, total: 1 });
+    expect(r.globalBrut).toEqual({ ok: 0, total: 1 });
+    expect(r.lignes[0]?.effectif).toEqual({ action: 'clarifier', candidats: ['Marie', 'Marie'] });
+    expect(r.lignes[0]?.okBrut).toBe(false);
   });
 
   it('quantile : rang le plus proche', () => {
@@ -148,14 +191,16 @@ describe('comparer : clarifier et refuser', () => {
     const l = ligne({ action: 'clarifier', candidats: ['Paul'] });
     expect(comparer(l, { action: 'clarifier', candidats: ['Paul'] }).ok).toBe(true);
     expect(comparer(l, { action: 'clarifier', candidats: ['Marie', 'Paul'] }).ok).toBe(true);
-    expect(comparer(l, { action: 'clarifier', candidats: [] }).raison).toBe('0 candidat(s), 1 au moins');
-    expect(comparer(l, { action: 'clarifier', candidats: ['Zoé'] }).raison).toBe('candidat « Zoé » absent de la liste');
+    expect(comparer(l, { action: 'clarifier', candidats: [] }).raison).toBe('0 candidat(s) attendu(s) retrouvé(s), 1 au moins');
+    // Un nom de la liste qui n'est pas le candidat attendu ne suffit pas (cas abs-05).
+    expect(comparer(l, { action: 'clarifier', candidats: ['Marie'] }).raison).toBe('0 candidat(s) attendu(s) retrouvé(s), 1 au moins');
   });
   it('au moins 2 candidats dans homonymes, en respectant les doublons de la liste', () => {
     const l = ligne(att, { categorie: 'homonymes' });
-    expect(comparer(l, { action: 'clarifier', candidats: ['Marie'] }).raison).toBe('1 candidat(s), 2 au moins');
+    expect(comparer(l, { action: 'clarifier', candidats: ['Marie'] }).raison).toBe('1 candidat(s) attendu(s) retrouvé(s), 2 au moins');
     expect(comparer(l, { action: 'clarifier', candidats: ['Marie', 'Marie'] }).ok).toBe(true);
-    expect(comparer(l, { action: 'clarifier', candidats: ['Paul', 'Paul'] }).raison).toBe('candidat « Paul » absent de la liste');
+    expect(comparer(l, { action: 'clarifier', candidats: ['Marie', 'Marie', 'Paul'] }).ok).toBe(true);
+    expect(comparer(l, { action: 'clarifier', candidats: ['Paul', 'Paul'] }).raison).toBe('0 candidat(s) attendu(s) retrouvé(s), 2 au moins');
   });
   it('clarifier attendu, refuser ou action obtenu : échec', () => {
     expect(comparer(ligne(att), { action: 'refuser' }).raison).toBe('refuser au lieu de clarifier');
