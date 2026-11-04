@@ -82,13 +82,11 @@ const estProba = (v: unknown): v is number => typeof v === 'number' && Number.is
 
 /** Probabilités d'une réponse `choice` : objet `{ option: p }` (constaté sur `tev1:0.8b`). */
 function lireProbas(brut: unknown): Record<string, number> | null {
-  const sortie: Record<string, number> = {};
   if (!estObjet(brut)) return null;
-  for (const [cle, p] of Object.entries(brut)) {
-    if (!estProba(p)) return null;
-    sortie[cle] = p;
-  }
-  return sortie;
+  const entrees = Object.entries(brut);
+  if (!entrees.every(([, p]) => estProba(p))) return null;
+  // `fromEntries` crée des propriétés propres : un nom « __proto__ » reste une option.
+  return Object.fromEntries(entrees) as Record<string, number>;
 }
 
 /**
