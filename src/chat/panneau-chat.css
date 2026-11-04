@@ -176,6 +176,14 @@
   .chat__reglages {
     flex: 0 0 auto;
   }
+  /* Collée en haut ou en bas du tiroir selon le défilement : la rangée de saisie ne sort jamais de la vue. */
+  .chat__formulaire {
+    position: sticky;
+    top: 0;
+    bottom: 0;
+    z-index: 1;
+    background: var(--surface);
+  }
   #app[data-chat] .page {
     padding-bottom: 5rem;
   }
