@@ -9,10 +9,18 @@
  * sont donc admis d'office. Un mot ou un radical est « attesté » si un mot d'une commande `dev` le
  * commence. Un mot non attesté en `dev` mais présent dans une commande `test` est une fuite, sauf s'il
  * figure dans `EXCEPTIONS`, avec sa justification.
+ *
+ * Lot `test2` : les mots déjà présents dans `regles.ts` à sa création ne peuvent pas venir de lui ; ils
+ * sont figés dans `fuite-base-test2.json`. Le test échoue seulement pour un mot absent de cette base,
+ * absent de `dev` et présent dans `test2`. La base se fige une seule fois, à la création du lot
+ * (`FUITE_GENERER_BASE=1`), et ne se régénère jamais pour faire passer un test.
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { lireCorpus, lireCorpusDuLot } from './cli';
+
+const CHEMIN_BASE_TEST2 = fileURLToPath(new URL('./fuite-base-test2.json', import.meta.url));
 
 /** Mots admis bien qu'absents de `dev` : une justification par mot. */
 const EXCEPTIONS: Readonly<Record<string, string>> = {
@@ -103,10 +111,16 @@ describe('séparation des lots : regles.ts', () => {
     expect(fuites).toEqual([]);
   });
 
-  it('aucun mot des règles ne vient seulement du lot test2 (lot tenu à l’écart)', () => {
-    const radicaux = [...new Set(litteraux(source).flatMap(mots))];
-    const fuites = radicaux.filter(
-      (r) => !attesteEn(dev, r) && attesteEn(test2, r) && !Object.hasOwn(EXCEPTIONS, r),
+  it('génère la base figée du lot test2 (seulement avec FUITE_GENERER_BASE=1)', () => {
+    if (process.env['FUITE_GENERER_BASE'] !== '1') return;
+    const base = [...new Set(litteraux(source).flatMap(mots))].sort();
+    writeFileSync(CHEMIN_BASE_TEST2, `${JSON.stringify(base, null, 2)}\n`, 'utf8');
+  });
+
+  it('aucun nouveau mot des règles ne vient seulement du lot test2 (lot tenu à l’écart)', () => {
+    const base = new Set(JSON.parse(readFileSync(CHEMIN_BASE_TEST2, 'utf8')) as string[]);
+    const fuites = [...new Set(litteraux(source).flatMap(mots))].filter(
+      (r) => !base.has(r) && !attesteEn(dev, r) && attesteEn(test2, r) && !Object.hasOwn(EXCEPTIONS, r),
     );
     expect(fuites).toEqual([]);
   });

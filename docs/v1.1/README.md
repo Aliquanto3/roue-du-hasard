@@ -56,7 +56,7 @@ Le lot `test` ne doit pas être passable par une règle apprise sur `dev` à un 
 - Même format, mêmes 14 catégories et mêmes règles d'attendu que ci-dessus ; répartition proche de celle de `test`, chaque action cible au moins 3 fois, `refuser` à 24 %.
 - **Personne n'écrit de règle d'après ce lot**, ni ne déplace de ligne. Anaël le relit avant l'essai 5.8.
 - `verifier_corpus.py` le vérifie aussi (même structure, ni doublon ni quasi-doublon avec `dev` ou `test`, mêmes dispenses) et affiche ses décomptes et son plancher « refuse tout ».
-- Banc : `npm run banc:chat -- --moteur <nom> --lot test2` (drapeau explicite obligatoire, comme `test`). `src/banc/fuite.test.ts` protège `test2` comme `test`.
+- Banc : `npm run banc:chat -- --moteur <nom> --lot test2` (drapeau explicite obligatoire, comme `test`). `src/banc/fuite.test.ts` protège `test2` comme `test`, avec une base figée : `src/banc/fuite-base-test2.json` liste les mots déjà présents dans `regles.ts` à la création du lot (ils ne peuvent pas venir de lui). Le test échoue seulement pour un mot absent de cette base, absent de `dev` et présent dans `test2`. La base se fige une seule fois (`FUITE_GENERER_BASE=1`) et ne se régénère jamais pour faire passer un test.
 
 ## Vérification
 
