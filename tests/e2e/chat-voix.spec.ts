@@ -29,7 +29,8 @@ interface Vue {
   url: string;
   methode: string;
   prompt: string | null;
-  tailleWav: number;
+  /** En-tête WAV de la partie `file` : RIFF/WAVE, canaux, fréquence, bits, taille des données. */
+  wav: { riff: string; canaux: number; frequence: number; bits: number; donnees: number } | null;
 }
 
 /** STT simulé : rend `texte`, et note ce que la page a envoyé. */
@@ -39,12 +40,24 @@ async function simulerStt(page: Page, texte: string, statut = 200): Promise<Vue[
     const req = route.request();
     const corps = req.postDataBuffer()?.toString('latin1') ?? '';
     const prompt = /name="prompt"\r\n\r\n([^\r]*)\r\n/u.exec(corps)?.[1] ?? null;
-    const taille = /name="file"; filename="voix\.wav"\r\nContent-Type: audio\/wav\r\n\r\n/u.exec(corps);
+    const brut = req.postDataBuffer() ?? Buffer.alloc(0);
+    const entete = /name="file"; filename="voix\.wav"\r\nContent-Type: audio\/wav\r\n\r\n/u.exec(corps);
+    const debut = entete === null ? -1 : entete.index + entete[0].length;
+    const wav =
+      debut < 0 || brut.length < debut + 44
+        ? null
+        : {
+            riff: `${brut.toString('latin1', debut, debut + 4)}/${brut.toString('latin1', debut + 8, debut + 12)}`,
+            canaux: brut.readUInt16LE(debut + 22),
+            frequence: brut.readUInt32LE(debut + 24),
+            bits: brut.readUInt16LE(debut + 34),
+            donnees: brut.readUInt32LE(debut + 40),
+          };
     vues.push({
       url: new URL(req.url()).pathname,
       methode: req.method(),
       prompt: prompt === null ? null : Buffer.from(prompt, 'latin1').toString('utf8'),
-      tailleWav: taille === null ? 0 : corps.length,
+      wav,
     });
     if (statut === 200) await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ text: texte }) });
     else await route.fulfill({ status: statut, contentType: 'text/plain', body: 'STT indisponible' });
@@ -76,7 +89,8 @@ test('appui maintenu : la transcription arrive dans le champ, puis suit le chemi
   await expect(fil(page)).not.toContainText('Ajoute Zoé');
   expect(vues).toHaveLength(1);
   expect(vues[0]).toMatchObject({ url: '/stt', methode: 'POST' });
-  expect(vues[0]?.tailleWav).toBeGreaterThan(44);
+  expect(vues[0]?.wav).toMatchObject({ riff: 'RIFF/WAVE', canaux: 1, frequence: 16000, bits: 16 });
+  expect(vues[0]?.wav?.donnees).toBeGreaterThan(0);
   // Indice : consignes puis prénoms de la liste.
   expect(vues[0]?.prompt).toMatch(/Prénoms : Léa, Anaël\.$/);
 

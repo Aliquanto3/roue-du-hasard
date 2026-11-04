@@ -138,6 +138,10 @@ describe('construireIndice', () => {
   it('un prénom seul plus long que la borne n’est pas envoyé', () => {
     expect(construireIndice(['x'.repeat(300)])).toBe('');
   });
+
+  it('un prénom trop long n’écarte pas les suivants', () => {
+    expect(construireIndice(['Léa', 'x'.repeat(300), 'Bob'])).toMatch(/Prénoms : Léa, Bob\.$/u);
+  });
 });
 
 describe('nettoyerTexte', () => {

@@ -87,6 +87,13 @@ for (const [largeur, hauteur] of [
       expect(separes).toBe(true);
     }
     await expect(page.getByLabel('Commande', { exact: true })).toBeInViewport();
+    // Bouton « Parler » (6.2), présent quand le moteur offre le micro : entier, dans le panneau.
+    const parler = page.getByRole('button', { name: 'Parler' });
+    if ((await parler.count()) > 0) {
+      await expect(parler).toBeInViewport({ ratio: 1 });
+      const boite = await parler.boundingBox();
+      if (boite && panneau) expect(boite.x + boite.width).toBeLessThanOrEqual(panneau.x + panneau.width + 1);
+    }
   });
 }
 

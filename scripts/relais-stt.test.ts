@@ -6,9 +6,10 @@ import { createServer, request, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-const SERVEUR = new URL('./serveur-chat.mjs', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
+const SERVEUR = fileURLToPath(new URL('./serveur-chat.mjs', import.meta.url));
 const FRONTIERE = 'XXboundary';
 const TYPE = `multipart/form-data; boundary=${FRONTIERE}`;
 
@@ -133,6 +134,31 @@ describe('POST /stt', () => {
     expect(vues).toEqual([]);
   });
 
+  it('refuse un corps envoyé par morceaux (sans Content-Length) au-delà de 2 Mo (413)', async () => {
+    vues.length = 0;
+    const statut = await new Promise<number | null>((ok) => {
+      const req = request(
+        {
+          host: '127.0.0.1',
+          port: portChat,
+          path: '/stt',
+          method: 'POST',
+          headers: { Host: `localhost:${String(portChat)}`, 'Content-Type': TYPE, 'Transfer-Encoding': 'chunked' },
+        },
+        (res) => {
+          res.resume();
+          ok(res.statusCode ?? 0);
+        },
+      );
+      req.on('error', () => ok(null));
+      const morceau = Buffer.alloc(256 * 1024);
+      for (let i = 0; i < 9; i += 1) req.write(morceau);
+      req.end();
+    });
+    expect(statut).toBe(413);
+    expect(vues).toEqual([]);
+  });
+
   it('relaie vers /inference seulement, avec le corps et le type d’origine, et rend la réponse', async () => {
     await demarrerFaux(200, '{"text":" Fais tourner la roue.\\n"}');
     const corps = `--${FRONTIERE}\r\nContent-Disposition: form-data; name="language"\r\n\r\nfr\r\n--${FRONTIERE}--\r\n`;
@@ -140,6 +166,15 @@ describe('POST /stt', () => {
     expect(r.statut).toBe(200);
     expect(r.corps).toBe('{"text":" Fais tourner la roue.\\n"}');
     expect(vues).toEqual([{ methode: 'POST', url: '/inference', taille: Buffer.byteLength(corps), type: TYPE }]);
+  });
+
+  it('une réponse amont de plus d’1 Mo donne 502, sans la recopier', async () => {
+    faux?.closeAllConnections();
+    await new Promise<void>((ok) => (faux ? faux.close(() => ok()) : ok()));
+    await demarrerFaux(200, 'x'.repeat(1024 * 1024 + 1));
+    const r = await appeler(portChat, '/stt', { corps: 'x' });
+    expect(r.statut).toBe(502);
+    expect(r.corps).toBe('STT indisponible\n');
   });
 
   it('les autres routes de whisper-server ne sont pas joignables', async () => {

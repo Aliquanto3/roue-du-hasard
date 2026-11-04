@@ -45,7 +45,8 @@ export function construireIndice(indices: readonly string[]): string {
       .trim();
     if (nom === '') continue;
     const ajout = `${premier ? '' : ', '}${nom}`;
-    if (indice.length + ajout.length + 1 > INDICE_MAX) break;
+    // Un prénom trop long est omis, sans écarter les suivants qui tiennent encore.
+    if (indice.length + ajout.length + 1 > INDICE_MAX) continue;
     indice += ajout;
     premier = false;
   }

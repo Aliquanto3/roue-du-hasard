@@ -5,6 +5,8 @@
 import { request } from 'node:http';
 
 export const LIMITE_CORPS = 2 * 1024 * 1024;
+/** Réponse de whisper-server : un texte JSON, bien moins d'1 Mo ; au-delà, 502 sans tout garder en mémoire. */
+export const LIMITE_REPONSE = 1024 * 1024;
 const TEXTE = { 'Content-Type': 'text/plain; charset=utf-8' };
 
 /**
@@ -65,8 +67,18 @@ export function relayerStt(req, res, { port, origine, delaiMs = 30000 }) {
       (reponse) => {
         /** @type {Buffer[]} */
         const sortie = [];
-        reponse.on('data', (/** @type {Buffer} */ m) => sortie.push(m));
+        let recue = 0;
+        reponse.on('data', (/** @type {Buffer} */ m) => {
+          recue += m.length;
+          if (recue > LIMITE_REPONSE) {
+            if (!res.headersSent) res.writeHead(502, TEXTE).end('STT indisponible\n');
+            reponse.destroy();
+            return;
+          }
+          sortie.push(m);
+        });
         reponse.on('end', () => {
+          if (res.headersSent) return;
           res
             .writeHead(reponse.statusCode ?? 502, {
               'Content-Type': reponse.headers['content-type'] ?? 'application/json',

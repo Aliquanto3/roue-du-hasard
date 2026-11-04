@@ -86,6 +86,10 @@ export function creerPanneauChat(parent: HTMLElement, options: OptionsPanneauCha
   /** Transcription dans le champ, en attente d'envoi : sa trace part avec la commande (inspection). */
   let dictee: Transcription | null = null;
   let voix: Voix | null = null;
+  // Champ vidé : la dictée est abandonnée, sa trace ne suit pas une commande tapée ensuite (une correction la garde).
+  saisie.addEventListener('input', () => {
+    if (saisie.value.trim() === '') dictee = null;
+  });
 
   const details = creer('details', 'chat__reglages', corps);
   const resume = creer('summary', 'chat__reglages-titre', details);
