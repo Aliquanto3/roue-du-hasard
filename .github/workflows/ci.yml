@@ -7,6 +7,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   verif:
     name: ${{ matrix.os }} / ${{ matrix.browser }}
@@ -14,9 +18,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # V1.0 : Windows et Chromium seulement. Les autres supports reviennent en V1.2 (docs/v1.2-supports.md).
-        os: [windows-latest]
-        browser: [chromium]
+        os: [windows-latest, macos-latest, ubuntu-latest]
+        browser: [chromium, firefox, webkit]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
