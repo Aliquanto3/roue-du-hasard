@@ -316,7 +316,7 @@ export const nomFichierInspection = (d: Date): string => {
 /** Ligne de corpus du banc (même forme que `LigneCorpus` de `src/banc/comparateur.ts`). */
 export interface LigneCorpusInspection {
   readonly id: string;
-  readonly lot: 'dev' | 'test';
+  readonly lot: 'dev' | 'test' | 'test2';
   readonly categorie: string;
   readonly commande: string;
   readonly etat: EtatChat;
@@ -331,7 +331,7 @@ export const CATEGORIE_INSPECTION = 'inspection';
  * la décision obtenue si le verdict est « juste ». Une erreur sans `attendu`, ou un message sans
  * verdict, n'a pas de réponse connue : la ligne est écartée. Lève une erreur si le document est invalide.
  */
-export function versCorpus(texte: string, lot: 'dev' | 'test'): LigneCorpusInspection[] {
+export function versCorpus(texte: string, lot: 'dev' | 'test' | 'test2'): LigneCorpusInspection[] {
   const doc: unknown = JSON.parse(texte);
   if (!estObjet(doc) || doc['format'] !== FORMAT_EXPORT || !Array.isArray(doc['lignes'])) {
     throw new Error(`export d’inspection invalide (format « ${FORMAT_EXPORT} » attendu)`);

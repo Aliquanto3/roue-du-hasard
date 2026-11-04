@@ -9,7 +9,7 @@ Commandes françaises écrites à la main (noms fictifs), pour essayer plus tard
 | Champ | Contenu |
 |---|---|
 | `id` | identifiant unique |
-| `lot` | `dev` ou `test` (voir la règle ci-dessous) |
+| `lot` | `dev` ou `test` (voir la règle ci-dessous) ; `test2` dans `corpus-test2.jsonl` |
 | `categorie` | une des 14 catégories (formes directes, familier et fautes, tournures indirectes, noms composés, homonymes, accents et casse, faux amis, plusieurs noms, nom absent, injection, truquage, hors sujet, lancement impossible, transcription orale) |
 | `commande` | texte reçu, écrit ou transcrit |
 | `etat` | `noms` (liste ordonnée, doublons possibles), `cadeaux` (facultatif), `rotation` (booléen) |
@@ -48,6 +48,15 @@ Les trois moteurs (règles, modèle de décision, SLM) reçoivent la même `comm
 Le champ `lot` est figé (environ 43 % `dev`, 57 % `test`, de 30 à 50 % de `dev` dans chaque catégorie). **Seul `dev` sert à écrire ou ajuster les règles du moteur. `test` ne sert qu'à l'essai, et aucune règle n'est écrite sur ses phrases.** Ne pas déplacer une ligne d'un lot à l'autre ; en ajouter se fait dans les deux lots à la fois, en gardant la proportion.
 
 Le lot `test` ne doit pas être passable par une règle apprise sur `dev` à un mot près : le vérificateur refuse les doublons exacts et les quasi-doublons entre lots (commandes normalisées sans accents, sans « euh », « s'il te plaît » ni noms de l'état ; similarité `difflib` de 0,85 ou plus). Seules les formes canoniques « verbe + nom » (« supprime X », « mets X en couleur », « ajoute X ») en sont dispensées, car aucune autre formulation n'existe ; les autres exceptions se déclarent une à une, avec leur motif, dans `EXCEPTIONS_QUASI_DOUBLON`.
+
+## Lot `test2` (essai 5.8)
+
+`corpus-test2.jsonl` : 83 lignes (`lot: "test2"`), écrites le 2026-11-04 **sans lire** `src/chat/regles.ts`, sa spec ni les rapports du banc. Le lot `test` a été lu pendant la mise au point de l'étage règles (story 5.3) : son score n'est plus une mesure honnête, et l'essai des moteurs (5.8) se fait donc sur un lot neuf.
+
+- Même format, mêmes 14 catégories et mêmes règles d'attendu que ci-dessus ; répartition proche de celle de `test`, chaque action cible au moins 3 fois, `refuser` à 24 %.
+- **Personne n'écrit de règle d'après ce lot**, ni ne déplace de ligne. Anaël le relit avant l'essai 5.8.
+- `verifier_corpus.py` le vérifie aussi (même structure, ni doublon ni quasi-doublon avec `dev` ou `test`, mêmes dispenses) et affiche ses décomptes et son plancher « refuse tout ».
+- Banc : `npm run banc:chat -- --moteur <nom> --lot test2` (drapeau explicite obligatoire, comme `test`). `src/banc/fuite.test.ts` protège `test2` comme `test`.
 
 ## Vérification
 

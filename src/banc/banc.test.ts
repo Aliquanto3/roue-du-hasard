@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Etage, FabriqueEtage } from '../chat/types';
 import { lancerBanc, quantile } from './banc';
-import { analyserArguments, lireCorpus } from './cli';
+import { analyserArguments, lireCorpus, lireCorpusDuLot } from './cli';
 import { comparer, type LigneCorpus } from './comparateur';
 import { MOTEURS, MOTEURS_A_VENIR, fabriquesDuMoteur } from './moteurs';
 
@@ -24,6 +24,22 @@ describe('plancher « refuse tout »', () => {
     expect(r.globalBrut).toEqual({ ok, total });
     expect(r.lignes).toHaveLength(total);
     expect(r.lignes[0]?.traces).toHaveLength(1);
+  });
+});
+
+describe('lot test2', () => {
+  it('lu dans son fichier : le moteur refuse-tout donne le plancher du vérificateur (20/83)', async () => {
+    const test2 = lireCorpusDuLot('test2');
+    expect(test2).toHaveLength(83);
+    expect(test2.every((l) => l.lot === 'test2')).toBe(true);
+    const r = await lancerBanc(test2, 'test2', { moteur: 'refuse-tout', fabriques: MOTEURS['refuse-tout'] ?? [] });
+    expect(r.lot).toBe('test2');
+    expect(r.global).toEqual({ ok: 20, total: 83 });
+    expect(r.plancher).toEqual({ ok: 20, total: 83 });
+  });
+
+  it('le corpus principal ne contient aucune ligne test2', () => {
+    expect(corpus.some((l) => l.lot === 'test2')).toBe(false);
   });
 });
 
@@ -106,7 +122,8 @@ describe('arguments et moteurs', () => {
   it('lot dev par défaut, test seulement sur demande explicite', () => {
     expect(analyserArguments(['--moteur', 'refuse-tout']).lot).toBe('dev');
     expect(analyserArguments(['--moteur', 'refuse-tout', '--lot', 'test']).lot).toBe('test');
-    expect(() => analyserArguments(['--moteur', 'x', '--lot', 'tous'])).toThrow('--lot doit valoir dev ou test');
+    expect(analyserArguments(['--moteur', 'refuse-tout', '--lot', 'test2']).lot).toBe('test2');
+    expect(() => analyserArguments(['--moteur', 'x', '--lot', 'tous'])).toThrow('--lot doit valoir dev, test ou test2');
   });
 
   it('moteur obligatoire, options transmises', () => {

@@ -12,7 +12,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { lireCorpus } from './cli';
+import { lireCorpus, lireCorpusDuLot } from './cli';
 
 /** Mots admis bien qu'absents de `dev` : une justification par mot. */
 const EXCEPTIONS: Readonly<Record<string, string>> = {
@@ -87,10 +87,11 @@ function litteraux(source: string): string[] {
 
 describe('séparation des lots : regles.ts', () => {
   const corpus = lireCorpus();
-  const vocabulaire = (lot: 'dev' | 'test'): string[] =>
-    corpus.filter((l) => l.lot === lot).flatMap((l) => mots(l.commande));
+  const vocabulaire = (lot: 'dev' | 'test' | 'test2'): string[] =>
+    lireCorpusDuLot(lot).filter((l) => l.lot === lot).flatMap((l) => mots(l.commande));
   const dev = vocabulaire('dev');
   const test = vocabulaire('test');
+  const test2 = vocabulaire('test2');
   const source = readFileSync(new URL('../chat/regles.ts', import.meta.url), 'utf8');
   const attesteEn = (lexique: readonly string[], radical: string): boolean => lexique.some((m) => m.startsWith(radical));
 
@@ -102,10 +103,20 @@ describe('séparation des lots : regles.ts', () => {
     expect(fuites).toEqual([]);
   });
 
+  it('aucun mot des règles ne vient seulement du lot test2 (lot tenu à l’écart)', () => {
+    const radicaux = [...new Set(litteraux(source).flatMap(mots))];
+    const fuites = radicaux.filter(
+      (r) => !attesteEn(dev, r) && attesteEn(test2, r) && !Object.hasOwn(EXCEPTIONS, r),
+    );
+    expect(fuites).toEqual([]);
+  });
+
   it('les tests unitaires des règles ne reprennent aucune commande exacte du lot test', () => {
     const forme = (s: string): string =>
       s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-    const exactes = new Set(corpus.filter((l) => l.lot === 'test').map((l) => forme(l.commande)));
+    const exactes = new Set(
+      [...corpus.filter((l) => l.lot === 'test'), ...lireCorpusDuLot('test2')].map((l) => forme(l.commande)),
+    );
     const tests = readFileSync(new URL('../chat/regles.test.ts', import.meta.url), 'utf8');
     const reprises = litteraux(tests)
       .flatMap((l) => l.split('\n'))
