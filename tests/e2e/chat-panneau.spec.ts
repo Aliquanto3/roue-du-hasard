@@ -61,6 +61,7 @@ test('les réglages sont mémorisés en localStorage et vides par défaut', asyn
 
 for (const [largeur, hauteur] of [
   [320, 640],
+  [568, 320], // téléphone en paysage : le tiroir cède, la roue ne descend pas sous 8 rem
   [1920, 1080],
 ] as const) {
   test(`mise en page à ${String(largeur)} px : pas de défilement horizontal, roue visible`, async ({ page }) => {

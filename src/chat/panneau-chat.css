@@ -145,7 +145,7 @@
     border-radius: 0.75rem 0.75rem 0 0;
     padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
     max-height: 35vh;
-    max-height: 35dvh;
+    max-height: var(--tiroir-max, 35dvh);
     overflow-y: auto;
   }
   .chat {

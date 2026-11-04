@@ -207,15 +207,25 @@ export function creerPanneauChat(parent: HTMLElement, options: OptionsPanneauCha
     const roue = document.querySelector('.page__roue');
     if (!etroit?.matches || racine.dataset['ouvert'] !== 'true' || !roue) {
       cible.removeProperty('--roue-libre');
+      cible.removeProperty('--tiroir-max');
       return;
     }
+    const poser = (nom: string, valeur: string): void => {
+      if (cible.getPropertyValue(nom) !== valeur) cible.setProperty(nom, valeur);
+    };
+    const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
     const haut = roue.getBoundingClientRect().top + window.scrollY;
     // La zone de la roue contient aussi autre chose que le canvas (bandeau, boutons) : on le retranche.
     const boite = roue.getBoundingClientRect().height;
     const toile = roue.querySelector('canvas')?.getBoundingClientRect().height ?? boite;
-    const libre = Math.floor(window.innerHeight - racine.getBoundingClientRect().height - haut - (boite - toile) - 8);
-    const valeur = `${String(Math.max(0, libre))}px`;
-    if (cible.getPropertyValue('--roue-libre') !== valeur) cible.setProperty('--roue-libre', valeur);
+    const hors = boite - toile;
+    // La roue ne descend pas sous 8 rem (roue.css) : si l'espace manque, c'est le tiroir qui cède,
+    // jusqu'à un minimum qui garde la saisie visible ; au-delà il défile à l'intérieur.
+    const pourTiroir = Math.floor(window.innerHeight - haut - 8 * rem - hors - 8);
+    if (pourTiroir < window.innerHeight * 0.35) poser('--tiroir-max', `${String(Math.max(5 * rem, pourTiroir))}px`);
+    else cible.removeProperty('--tiroir-max');
+    const libre = Math.floor(window.innerHeight - racine.getBoundingClientRect().height - haut - hors - 8);
+    poser('--roue-libre', `${String(Math.max(0, libre))}px`);
   };
   if (typeof ResizeObserver !== 'undefined') {
     const observateur = new ResizeObserver(ajusterRoue);
