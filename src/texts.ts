@@ -123,6 +123,13 @@ export const TEXTS = {
     statutSon: (coupe: boolean): string => (coupe ? 'Son coupé.' : 'Son rétabli.'),
   },
 
+  // --- Mode projection (F18) ---
+  projection: {
+    bouton: 'Mode projection',
+    statut: (actif: boolean): string =>
+      actif ? 'Mode projection activé. Échap pour sortir.' : 'Mode projection désactivé.',
+  },
+
   // --- Conservation et échange (F14, F15) ---
   donnees: {
     titre: 'Sauvegarde et échange',

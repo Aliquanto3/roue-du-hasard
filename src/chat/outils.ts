@@ -185,10 +185,10 @@ export const OUTILS: readonly Outil[] = [
   },
   {
     nom: 'modeProjection',
-    description: 'Active ou désactive le mode projection (pas encore disponible)',
-    parametres: schema({ actif: { type: 'boolean', description: 'Vrai pour activer le mode projection' } }),
+    description: 'Active ou désactive le mode projection : la roue et l’annonce en plein écran, sans les contrôles d’édition',
+    parametres: schema({ actif: { type: 'boolean', description: 'Vrai pour activer le mode projection, faux pour en sortir' } }),
     noms: () => [],
-    construire: null,
+    construire: (p) => etape('modeProjection', (a) => a.executer('modeProjection', { actif: p['actif'] === true })),
   },
 ];
 
