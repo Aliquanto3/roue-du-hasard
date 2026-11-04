@@ -435,6 +435,36 @@ describe('étage decision', () => {
     expect(trois.decision).toEqual({ action: 'clarifier', candidats: ['Dan', 'Chloé', 'Bob'] });
   });
 
+  it('exclusion : « retire Marie mais pas Marie-Claire » ne vise que Marie, sans clarifier', async () => {
+    const e: EtatChat = { noms: ['Marie', 'Marie-Claire', 'Paul'], rotation: false };
+    const f = serveur({ outil: { supprimer: 0.9 }, nom: { Marie: 1 } });
+    for (const cmd of ['retire Marie mais pas Marie-Claire', 'supprime Marie sauf Marie-Claire']) {
+      const r = (await decider(opts(f), cmd, e)) as ResultatEtage;
+      expect(r.decision, cmd).toEqual({ action: 'supprimer', params: { nom: 'Marie' } });
+    }
+  });
+
+  it('requête : jamais de forme qui provoque « Value looks like object » (state chaîne, questions objet)', () => {
+    const questions: QuestionDecision[] = [
+      { id: 'outil', type: 'choice', question: 'Quel outil ?', options: ['lancer', 'aucun'] },
+      { id: 'ambigu', type: 'noul', question: 'Ambigu ?' },
+    ];
+    const corps = ADAPTATEUR_SYSTEMONE.requete('m', construireMessagesDecision('lance', etat), questions) as Record<
+      string,
+      unknown
+    >;
+    // L'erreur du serveur vient d'un `state` ou de `questions` qui n'est pas du JSON d'objets attendu.
+    expect(typeof corps['state']).toBe('string');
+    expect(corps['state']).not.toBe('');
+    expect(Array.isArray(corps['questions'])).toBe(false);
+    expect(corps['questions']).toEqual({
+      outil: { type: 'choice', instructions: 'Quel outil ?', criteria: { lancer: 'lancer', aucun: 'aucun' } },
+      ambigu: { type: 'noul', instructions: 'Ambigu ?' },
+    });
+    // Le corps passe un aller-retour JSON sans perte (aucune valeur non sérialisable).
+    expect(JSON.parse(JSON.stringify(corps))).toEqual(corps);
+  });
+
   it('nom composé : « Marie-Claire » ne compte pas pour « Marie » ; un seul nom cité reste inchangé', async () => {
     const e: EtatChat = { noms: ['Marie', 'Marie-Claire', 'Paul'], rotation: false };
     expect(candidatsNoms('supprime Marie-Claire', e.noms)).toEqual(['Marie-Claire']);

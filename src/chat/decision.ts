@@ -191,6 +191,9 @@ function parametresDemandes(outil: Outil): {
   return { visePersonne, autres };
 }
 
+/** Début d'une exclusion : ce qui suit n'est pas visé par l'action. */
+const MARQUEUR_EXCLUSION = /(?<![\p{L}])(?:mais|sauf|excepté|excepte|hormis)(?![\p{L}])/iu;
+
 /** Noms de la liste cités en entier dans la commande, sans doublon de forme ; aucun si aucun n'est cité. */
 export function candidatsNoms(commande: string, noms: readonly string[]): string[] {
   const vus = new Set<string>();
@@ -419,7 +422,10 @@ export function creerEtageDecision(
         const params: Record<string, unknown> = {};
         let confiance = choixOutil.p;
         if (visePersonne) {
-          const candidats = candidatsNoms(commande, etat.noms);
+          // Exclusion (« retire Marie mais pas Marie-Claire ») : les noms après le marqueur ne sont pas visés.
+          const avantExclusion = commande.split(MARQUEUR_EXCLUSION)[0] ?? commande;
+          const vises = candidatsNoms(avantExclusion, etat.noms);
+          const candidats = vises.length > 0 ? vises : candidatsNoms(commande, etat.noms);
           if (candidats.length === 0)
             return passer('nom-non-cite', "aucun nom de la liste n'est cité dans la commande");
           // Règle déterministe : une action à un seul nom alors que la commande en cite au moins deux
