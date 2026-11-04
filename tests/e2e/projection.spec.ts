@@ -291,3 +291,65 @@ test.describe('édition chat à 320 px', () => {
     await expect(boutonLancer(page)).toBeInViewport();
   });
 });
+
+// Polices plus larges que celles du poste (Linux, réglage de l'utilisateur) : le bouton, hors flux,
+// n'ajoute jamais de hauteur sous la roue et ne recouvre aucun contrôle.
+const policesLarges =
+  '* { font-family: Verdana, "DejaVu Sans", sans-serif !important; letter-spacing: 0.12em !important; }';
+interface Boite {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+const disjointes = (a: Boite, b: Boite): boolean =>
+  a.x + a.width <= b.x || b.x + b.width <= a.x || a.y + a.height <= b.y || b.y + b.height <= a.y;
+
+for (const [largeur, hauteur] of [
+  [568, 480],
+  [320, 568],
+] as const) {
+  test(`polices larges à ${String(largeur)}×${String(hauteur)} : le bouton n'ajoute aucune hauteur`, async ({ page }) => {
+    await page.setViewportSize({ width: largeur, height: hauteur });
+    await preparer(page, 'absent');
+    await page.addStyleTag({ content: policesLarges });
+    const mesure = await page.evaluate(() => {
+      const q = (s: string): Element => document.querySelector(s) as Element;
+      return {
+        position: getComputedStyle(q('.projection')).position,
+        ligne: q('.page__commandes').getBoundingClientRect().height,
+        reglages: q('.reglages').getBoundingClientRect().height,
+      };
+    });
+    expect(mesure.position).toBe('absolute');
+    expect(mesure.ligne).toBe(mesure.reglages);
+    const bouton = await boutonProjection(page).boundingBox();
+    expect(bouton).toEqual(expect.objectContaining({ width: 44, height: 44 }));
+    await expect(boutonProjection(page)).toBeInViewport();
+    for (const autre of [
+      boutonLancer(page),
+      page.getByRole('button', { name: /^Relief :/ }),
+      page.getByRole('button', { name: /^Son :/ }),
+    ]) {
+      const b = await autre.boundingBox();
+      expect(bouton !== null && b !== null && disjointes(bouton, b)).toBe(true);
+    }
+  });
+}
+
+test('polices larges, édition chat à 568×480, tiroir ouvert : roue et tiroir ne se recouvrent pas', async ({ page }) => {
+  await page.setViewportSize({ width: 568, height: 480 });
+  await page.goto('http://localhost:5200/');
+  await expect(page.locator('#app')).toHaveAttribute('data-ready', 'true');
+  await page.addStyleTag({ content: policesLarges });
+  await page.getByRole('button', { name: 'Ouvrir le chat' }).click();
+  await expect(page.locator(".chat[data-ouvert='true']")).toHaveCount(1);
+  await expect(page.getByLabel('Commande', { exact: true })).toBeInViewport();
+  await expect
+    .poll(async () => {
+      const roue = await page.locator('.page__roue').boundingBox();
+      const tiroir = await page.locator('.chat').boundingBox();
+      return roue !== null && tiroir !== null && roue.y + roue.height <= tiroir.y + 1;
+    })
+    .toBe(true);
+});

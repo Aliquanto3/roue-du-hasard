@@ -74,6 +74,10 @@ body {
 .page__panneau {
   min-width: 0;
 }
+/* Repère du bouton de projection (hors flux, coin haut droit) ; `sticky` le reste sur écran large. */
+.page__roue {
+  position: relative;
+}
 
 /* Roue et panneau côte à côte : écran large, ou téléphone en paysage. */
 @media (min-width: 52rem), (orientation: landscape) and (min-width: 34rem) and (max-height: 32rem) {

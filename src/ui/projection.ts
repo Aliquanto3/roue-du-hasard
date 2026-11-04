@@ -66,7 +66,10 @@ export function creerProjection(options: OptionsProjection): Projection {
   const racine = creer('div', 'projection', options.conteneur);
   const bouton = creer('button', 'panneau__bouton projection__bouton', racine);
   bouton.type = 'button';
-  bouton.textContent = TEXTS.projection.bouton;
+  // Compact (icône seule) pour ne jamais ajouter de hauteur sous la roue ; nom accessible complet.
+  bouton.setAttribute('aria-label', TEXTS.projection.bouton);
+  bouton.title = TEXTS.projection.bouton;
+  creer('span', 'projection__icone', bouton).setAttribute('aria-hidden', 'true');
   bouton.setAttribute('aria-pressed', 'false');
   const statut = creer('p', 'visuellement-cache', racine);
   statut.setAttribute('role', 'status');

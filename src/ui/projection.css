@@ -1,18 +1,35 @@
 /* Mode projection (F18). Même mise en page en plein écran et dans le repli pleine fenêtre (iPhone). */
-/* Le bouton suit les réglages sur la même ligne (pas de hauteur ajoutée sous la roue). */
-.page__commandes {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
-}
+/*
+ * Le bouton est hors du flux, en haut à droite de la zone de la roue (`.page__roue`, positionnée par
+ * page.css) : compact (icône, `aria-label` complet), il n'ajoute aucune hauteur, quelles que soient
+ * les polices. La place libre sous la roue (`--taille-roue-max`, `--roue-libre`) reste juste.
+ */
 .page__commandes > .reglages {
   margin-top: 0;
 }
+.page__commandes {
+  margin-top: 0.5rem;
+}
 .projection {
-  display: flex;
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 1;
+}
+.projection__bouton {
+  display: inline-flex;
+  align-items: center;
   justify-content: center;
+  width: 44px;
+  padding: 0;
+}
+/* Icône d'écran dessinée en CSS : pas de police ni d'image. */
+.projection__icone {
+  display: block;
+  width: 1.125rem;
+  height: 0.875rem;
+  border: 2px solid currentColor;
+  border-radius: 2px;
 }
 
 html.projection,
@@ -78,11 +95,7 @@ html.projection #app .page.page--projection.page--cadeaux {
   margin: 0;
 }
 .page--projection .projection__bouton {
-  min-height: 44px;
-  padding: 0.25rem 0.75rem;
   border-color: var(--bord);
   background: transparent;
   color: var(--texte-doux);
-  font-size: 0.875rem;
-  font-weight: 500;
 }
