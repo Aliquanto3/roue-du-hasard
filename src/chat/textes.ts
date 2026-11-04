@@ -35,6 +35,7 @@ export const TEXTES_CHAT = {
     candidats.length === 0 ? 'De qui parlez-vous ?' : `De qui parlez-vous : ${candidats.join(' ou ')} ?`,
   confirmer: 'Cette action est irréversible. Confirmer ?',
   fait: 'C’est fait.',
+  slmIndisponible: 'Le modèle de langage local est indisponible : seules les commandes simples sont comprises.',
   cadeauSuivant: (libelle: LibelleCadeau | null): string =>
     libelle === null
       ? 'Il n’y a plus de cadeau à attribuer.'
