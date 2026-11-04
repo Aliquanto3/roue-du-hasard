@@ -189,3 +189,27 @@
     padding-bottom: 35dvh;
   }
 }
+
+/* Voix (6.2) : bouton à appui maintenu, état annoncé en texte. */
+.chat__parler {
+  flex: 0 0 auto;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.chat__parler[aria-pressed='true'] {
+  outline: 3px solid var(--alerte);
+  outline-offset: 2px;
+}
+.chat__parler:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+.chat__voix {
+  margin: 0;
+  font-size: 0.9375rem;
+  overflow-wrap: anywhere;
+}
+.chat__voix[hidden] {
+  display: none;
+}

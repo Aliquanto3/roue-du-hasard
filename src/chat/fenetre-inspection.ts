@@ -273,6 +273,9 @@ export function creerFenetreInspection(
       `${actionsDeDecision(e.decision).join(', ')} — ${T.execution(e.execution)}`,
     );
     creer('p', 'inspection__ligne', corps).textContent = T.latenceTotale(e.latenceMs);
+    if (e.transcription !== undefined) {
+      creer('p', 'inspection__ligne', corps).textContent = T.transcription(e.transcription.brut, e.transcription.latenceMs);
+    }
     bloc(corps, T.etatEnvoye, json(e.etat));
     rendreVerdict(corps, e);
   };

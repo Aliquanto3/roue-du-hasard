@@ -533,6 +533,8 @@ describe('robustesse du stockage et plafond en taille', () => {
       copie((e) => (e['latenceMs'] = 'vite')),
       copie((e) => (e['horodatage'] = 3)),
       copie((e) => (e['attendu'] = { action: 7 })),
+      copie((e) => (e['transcription'] = { brut: 4, latenceMs: 1 })),
+      copie((e) => (e['transcription'] = { brut: 'a', latenceMs: 'vite' })),
     ];
     s.setItem(CLE_INSPECTION, JSON.stringify([...alterees, bonne[0]]));
     const j = creerInspection({ stockage: () => s });

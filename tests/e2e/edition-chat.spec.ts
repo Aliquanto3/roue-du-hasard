@@ -71,3 +71,17 @@ test('le serveur refuse la remontée de chemin, le reste de dist/ et les autres 
   expect(await requeteBrute('GET', '/roue.html')).toBe(404);
   expect(await requeteBrute('POST', '/')).toBe(405);
 });
+
+test('la CSP du chat autorise la même origine (relais /stt) et Ollama, jamais le port du STT', async ({ page }) => {
+  await page.goto(ORIGINE);
+  const csp = await page.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute('content');
+  expect(csp).toContain("connect-src 'self' http://localhost:11434 http://127.0.0.1:11434;");
+  expect(csp).not.toContain('5201');
+});
+
+test('/stt : seul POST est accepté, les autres routes de whisper-server restent fermées', async () => {
+  expect(await requeteBrute('GET', '/stt')).toBe(405);
+  expect(await requeteBrute('GET', '/load')).toBe(404);
+  expect(await requeteBrute('POST', '/load')).toBe(405);
+  expect(await requeteBrute('GET', '/stt', 'evil.example:5200')).toBe(421);
+});

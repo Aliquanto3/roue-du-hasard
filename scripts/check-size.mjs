@@ -54,7 +54,7 @@ if (!meta) {
     .split(';')
     .map((d) => d.trim());
   const connect = directives.filter((d) => d.startsWith('connect-src'));
-  const attendu = chat ? `connect-src ${OLLAMA.join(' ')}` : "connect-src 'none'";
+  const attendu = chat ? `connect-src 'self' ${OLLAMA.join(' ')}` : "connect-src 'none'";
   if (connect.length !== 1 || connect[0] !== attendu) errors.push(`CSP de ${FILE} : '${attendu}' attendu, trouvé '${connect.join(' ; ')}'.`);
   const missing = REQUIRED_CSP.filter((d) => !directives.includes(d));
   if (missing.length) errors.push(`${FILE} : directives CSP manquantes : ${missing.join(', ')}`);

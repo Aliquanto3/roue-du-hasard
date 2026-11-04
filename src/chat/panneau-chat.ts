@@ -5,9 +5,12 @@
 import { bouton, champ, creer, idUnique } from '../ui/dom';
 import type { Controleur } from './controleur';
 import type { FenetreInspection } from './fenetre-inspection';
+import type { Micro } from './micro';
 import { ecrireReglages, type ReglagesChat } from './reglages-chat';
+import type { ClientStt } from './stt';
 import { TEXTES_CHAT } from './textes';
 import { RACCOURCI_INSPECTION, TEXTES_INSPECTION } from './textes-inspection';
+import { creerVoix, type Transcription, type Voix } from './voix';
 import './panneau-chat.css';
 
 export interface OptionsPanneauChat {
@@ -20,6 +23,12 @@ export interface OptionsPanneauChat {
   readonly ouvert?: boolean;
   /** Fenêtre d'inspection (5.7) ; sans elle, pas de bouton. */
   readonly inspection?: Pick<FenetreInspection, 'ouvrir'>;
+  /** Voix (6.2) : micro, STT et prénoms de la liste (indice). Sans elle, pas de bouton « Parler ». */
+  readonly voix?: {
+    readonly micro: Micro;
+    readonly stt: ClientStt;
+    readonly indices: () => readonly string[];
+  };
 }
 
 export function creerPanneauChat(parent: HTMLElement, options: OptionsPanneauChat): HTMLElement {
@@ -64,6 +73,19 @@ export function creerPanneauChat(parent: HTMLElement, options: OptionsPanneauCha
   saisie.placeholder = TEXTES_CHAT.saisieAide;
   const envoyer = bouton('chat__envoyer', TEXTES_CHAT.envoyer, rangee);
   envoyer.type = 'submit';
+  let parler: HTMLButtonElement | null = null;
+  let voixEtat: HTMLElement | null = null;
+  if (options.voix !== undefined) {
+    parler = bouton('chat__parler', TEXTES_CHAT.parler, rangee);
+    parler.title = TEXTES_CHAT.parlerAide;
+    parler.setAttribute('aria-pressed', 'false');
+    voixEtat = creer('p', 'chat__voix', formulaire);
+    voixEtat.setAttribute('role', 'status');
+    voixEtat.hidden = true;
+  }
+  /** Transcription dans le champ, en attente d'envoi : sa trace part avec la commande (inspection). */
+  let dictee: Transcription | null = null;
+  let voix: Voix | null = null;
 
   const details = creer('details', 'chat__reglages', corps);
   const resume = creer('summary', 'chat__reglages-titre', details);
@@ -106,6 +128,68 @@ export function creerPanneauChat(parent: HTMLElement, options: OptionsPanneauCha
     });
   }
 
+  if (options.voix !== undefined && parler !== null && voixEtat !== null) {
+    const { micro, stt, indices } = options.voix;
+    const bouteParler = parler;
+    const zoneVoix = voixEtat;
+    const dire = (texte: string): void => {
+      zoneVoix.textContent = texte;
+      zoneVoix.hidden = texte === '';
+    };
+    voix = creerVoix({
+      micro,
+      stt,
+      indices,
+      surEtat: (e) => {
+        bouteParler.setAttribute('aria-pressed', String(e === 'ecoute'));
+        if (e === 'ecoute') dire(TEXTES_CHAT.voixEcoute);
+        else if (e === 'transcription') dire(TEXTES_CHAT.voixTranscription);
+      },
+      surRefus: (message) => {
+        dire(message);
+      },
+      surTranscription: (t) => {
+        dictee = t;
+        saisie.value = t.texte;
+        dire(TEXTES_CHAT.voixPrete);
+        saisie.focus();
+      },
+    });
+    const debut = (): void => {
+      if (saisie.disabled) return;
+      void voix?.demarrer();
+    };
+    const fin = (): void => {
+      voix?.arreter();
+    };
+    bouteParler.addEventListener('pointerdown', (ev) => {
+      if (ev.button !== 0) return;
+      ev.preventDefault();
+      bouteParler.focus();
+      try {
+        bouteParler.setPointerCapture(ev.pointerId);
+      } catch {
+        // Capture indisponible : pointerleave prend le relais.
+      }
+      debut();
+    });
+    for (const nom of ['pointerup', 'pointercancel', 'pointerleave', 'lostpointercapture'] as const) bouteParler.addEventListener(nom, fin);
+    bouteParler.addEventListener('keydown', (ev) => {
+      if (ev.key !== ' ' && ev.key !== 'Enter') return;
+      ev.preventDefault();
+      if (!ev.repeat) debut();
+    });
+    bouteParler.addEventListener('keyup', (ev) => {
+      if (ev.key !== ' ' && ev.key !== 'Enter') return;
+      ev.preventDefault();
+      fin();
+    });
+    bouteParler.addEventListener('blur', fin);
+    bouteParler.addEventListener('contextmenu', (ev) => {
+      ev.preventDefault();
+    });
+  }
+
   let rendus = 0;
   let rendreFocus = false;
 
@@ -114,7 +198,10 @@ export function creerPanneauChat(parent: HTMLElement, options: OptionsPanneauCha
     racine.dataset['ouvert'] = String(ouvert);
     bascule.setAttribute('aria-expanded', String(ouvert));
     bascule.textContent = ouvert ? TEXTES_CHAT.basculerFermer : TEXTES_CHAT.basculerOuvrir;
-    if (!ouvert) controleur.fermer();
+    if (!ouvert) {
+      voix?.annuler();
+      controleur.fermer();
+    }
     ajusterRoue();
   };
 
@@ -136,6 +223,11 @@ export function creerPanneauChat(parent: HTMLElement, options: OptionsPanneauCha
     saisie.disabled = e.occupe;
     envoyer.disabled = e.occupe;
     envoyer.setAttribute('aria-disabled', String(e.occupe));
+    if (parler !== null) {
+      parler.disabled = e.occupe;
+      parler.setAttribute('aria-disabled', String(e.occupe));
+      if (e.occupe) voix?.annuler();
+    }
 
     attenteZone.replaceChildren();
     attenteZone.hidden = e.attente === null;
@@ -185,7 +277,13 @@ export function creerPanneauChat(parent: HTMLElement, options: OptionsPanneauCha
     if (texte.trim() === '' || saisie.disabled) return;
     saisie.value = '';
     rendreFocus = true;
-    void controleur.envoyer(texte);
+    const origine = dictee;
+    dictee = null;
+    if (voixEtat !== null) voixEtat.hidden = true;
+    void controleur.envoyer(
+      texte,
+      origine === null ? undefined : { transcription: { brut: origine.brut, latenceMs: origine.dureeMs } },
+    );
   });
   racine.addEventListener('keydown', (ev) => {
     if (ev.key !== 'Escape' || corps.hidden) return;
