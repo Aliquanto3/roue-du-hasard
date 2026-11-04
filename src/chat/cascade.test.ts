@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
+import { fabriqueRegles } from './regles';
 import { decider, ETAGES_ENREGISTRES, REFUS_INCOMPRIS } from './cascade';
 import type { Decision, Etage, EtatChat, NomEtage, ResultatEtage } from './types';
 
@@ -27,9 +28,11 @@ const resultat = (decision: Decision, confiance?: number): ResultatEtage => ({
 const LANCER: Decision = { action: 'lancer', params: {} };
 
 describe('cascade', () => {
-  it('aucun étage n’est enregistré par défaut (5.3, 5.6 et 5.10 les ajoutent) et le refus est « incompris »', async () => {
-    expect(ETAGES_ENREGISTRES).toEqual([]);
-    expect(await decider('lance', etat, signal)).toEqual({ decision: REFUS_INCOMPRIS, etage: null, traces: [] });
+  it('les règles sont l’étage enregistré par défaut (5.6 et 5.10 s’y ajoutent) et le refus est « incompris »', async () => {
+    expect(ETAGES_ENREGISTRES).toEqual([fabriqueRegles]);
+    const r = await decider('xyzzy plugh', etat, signal);
+    expect({ ...r, traces: r.traces.map((t) => t.etage) }).toEqual({ decision: REFUS_INCOMPRIS, etage: null, traces: ['regles'] });
+    expect((await decider('lance', etat, signal)).etage).toBe('regles');
     expect(REFUS_INCOMPRIS).toEqual({ action: 'refuser', code: 'incompris' });
   });
 
