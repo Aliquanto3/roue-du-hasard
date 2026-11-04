@@ -103,7 +103,7 @@ test.describe('parcours avec l’étage règles', () => {
     await dire(page, 'ajoute Marie');
     await dire(page, 'supprime Marie');
     await expect(fil(page)).toContainText('De qui parlez-vous : Marie ?');
-    await page.getByRole('button', { name: 'Marie' }).click();
+    await page.locator('.chat__attente').getByRole('button', { name: 'Marie' }).click();
     // Deux Marie identiques : un nom ne les distingue pas, rien n'est supprimé.
     await expect(fil(page)).toContainText('Plusieurs personnes portent ce nom');
     await expect(page.locator('.ligne__nom')).toHaveCount(2);
@@ -124,8 +124,10 @@ test.describe('parcours avec l’étage règles', () => {
     await dire(page, 'ajoute Ana');
     await dire(page, 'ajoute Bob');
     await dire(page, 'lance la roue');
+    // La roue tourne vraiment : on attend qu'elle ne soit plus lançable avant la 2e commande.
+    await expect(page.locator('.roue__canvas')).toHaveAttribute('data-lancable', 'false');
     await dire(page, 'lance la roue');
-    await expect(fil(page)).toContainText('Rotation en cours');
+    await expect(fil(page)).toContainText('Rotation en cours : la liste ne peut pas être modifiée.');
   });
 
   test('un nom hostile reste inerte', async ({ page }) => {

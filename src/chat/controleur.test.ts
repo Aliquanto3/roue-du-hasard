@@ -179,6 +179,26 @@ describe('controleur du panneau', () => {
     expect(b.rotation.active).toBe(false);
   });
 
+  it('codes de l’étage règles : verrou de rotation et lancement à moins de 2 noms', async () => {
+    const b = banc(
+      {
+        'lance la roue': { action: 'refuser', code: 'verrouille' },
+        tourne: { action: 'refuser', code: 'indisponible' },
+      },
+      ['Ana'],
+    );
+    await b.c.envoyer('lance la roue');
+    expect(textes(b).at(-1)).toBe('Rotation en cours : la liste ne peut pas être modifiée.');
+    await b.c.envoyer('tourne');
+    expect(textes(b).at(-1)).toBe('Il faut au moins deux noms pour lancer la roue.');
+  });
+
+  it('refus d’un étage sans message propre : texte dédié, jamais « incompris »', async () => {
+    const b = banc({ truque: { action: 'refuser', code: 'truquage' } });
+    await b.c.envoyer('truque');
+    expect(textes(b).at(-1)).toBe('Le tirage ne se truque pas : la roue décide seule.');
+  });
+
   it('commande non comprise : refus lisible', async () => {
     const b = banc({});
     await b.c.envoyer('blabla');

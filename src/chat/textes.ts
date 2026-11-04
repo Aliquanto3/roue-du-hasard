@@ -13,6 +13,11 @@ export const REFUS_CHAT: Readonly<Record<string, string>> = {
   'forme-invalide': 'La réponse du moteur n’a pas la forme attendue.',
   'conflit-etapes': 'Deux étapes visent la même personne : précisez une seule demande à la fois.',
   'parametres-invalides': 'La commande est incomplète ou mal formée.',
+  // Codes de l'étage règles (5.3) : le verrou de rotation a le message de l'interface.
+  verrouille: TEXTS.refus['rotation-en-cours'],
+  hostile: 'Je ne peux pas traiter cette demande.',
+  truquage: 'Le tirage ne se truque pas : la roue décide seule.',
+  'hors-sujet': 'Je ne gère que la roue : les noms, les cadeaux, les couleurs et les tirages.',
 };
 
 const REFUS_ACTION: Readonly<Record<CodeRefus, string>> = {

@@ -162,7 +162,12 @@ export function creerControleur(deps: DepsControleur): Controleur {
 
   const suivre = (commande: string, decision: Decision, plan: Plan): void => {
     if (plan.genre === 'refuser') {
-      repondre(commande, TEXTES_CHAT.refusPlan(plan.code));
+      // Les règles refusent « lancer » avec moins de 2 noms par `indisponible` : on donne le message de l'interface.
+      const moinsDeDeux =
+        plan.code === 'indisponible' &&
+        deps.actions.magasin.lire().participants.length < 2 &&
+        /\b(?:lanc|tourn)/iu.test(commande);
+      repondre(commande, TEXTES_CHAT.refusPlan(moinsDeDeux ? 'moins-de-2-noms' : plan.code));
     } else if (plan.genre === 'clarifier') {
       const candidats = [...new Set(plan.candidats)];
       aClarifier = decision;
@@ -226,9 +231,16 @@ export function creerControleur(deps: DepsControleur): Controleur {
       if (attente?.genre !== 'clarifier' || aClarifier === null) return;
       const commande = derniereCommande();
       const decision = aClarifier;
+      const attenteCandidats = attente.candidats;
       oublierAttente();
       // Clarification venue d'un étage (aucun paramètre à corriger) : la commande est reprise avec le nom choisi.
       if (estClarifier(decision)) {
+        // Un seul nom possible (homonymes identiques) : le reprendre ne lèverait pas l'ambiguïté.
+        if (attenteCandidats.length <= 1) {
+          repondre(commande, TEXTES_CHAT.ambigu);
+          notifier();
+          return;
+        }
         void controleur.envoyer(`${commande} ${candidat}`);
         return;
       }
