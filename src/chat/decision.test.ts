@@ -100,7 +100,7 @@ describe('étage decision', () => {
     expect(requetes[0]?.corps.model).toBe('m');
     const outil = requetes[0]?.corps.questions[0];
     expect(outil?.type === 'choice' && outil.options.at(-1)).toBe('aucun');
-    expect(outil?.type === 'choice' && outil.options).not.toContain('modeProjection');
+    expect(outil?.type === 'choice' && outil.options).toContain('modeProjection');
     // Nom cité dans la commande : seul candidat proposé.
     expect(requetes[1]?.corps.questions.map((q) => [q.id, q.type])).toEqual([
       ['nom', 'choice'],

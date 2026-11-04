@@ -8,8 +8,8 @@
  * l'ouverture, avec le contenu de l'annonce et le réglage de mouvement réduit.
  *
  * Échap ferme l'annonce sans arrêter la propagation ni empêcher l'action par défaut : la sortie du
- * mode projection (3.3) reçoit aussi la touche et lit `annonce.ouverte` (encore vrai à ce moment,
- * l'écouteur de la 3.3 étant enregistré avant celui-ci) pour ne fermer que l'annonce.
+ * mode projection (7.1, `ui/projection.ts`) reçoit aussi la touche et lit `annonce.ouverte` (encore vrai à ce moment,
+ * l’écouteur de la projection étant enregistré avant celui-ci) pour ne fermer que l'annonce.
  */
 import type { Actions, ControleAnnonce, InfoAnnonce } from '../actions';
 import { couleurTexte } from '../domain/palette';

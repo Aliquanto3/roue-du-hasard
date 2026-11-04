@@ -11,6 +11,7 @@ import { creerDonnees } from './ui/donnees';
 import { telechargerExport } from './ui/echange';
 import { creerHistorique } from './ui/historique';
 import { creerPanneau } from './ui/panneau';
+import { creerProjection, type Projection } from './ui/projection';
 import { creerReglages } from './ui/reglages';
 import { creerRoue, type Roue } from './ui/roue';
 import { creerSon } from './ui/son';
@@ -74,6 +75,12 @@ export function render(root: HTMLElement): Roue {
         annonce.fermer(options);
       },
     },
+    projection: {
+      active: () => projection.active(),
+      definir: (actif) => {
+        projection.definir(actif);
+      },
+    },
   });
   const roue: Roue = creerRoue(zoneRoue, {
     relief: magasin.lire().relief,
@@ -131,6 +138,13 @@ export function render(root: HTMLElement): Roue {
 
   const panneau = creerPanneau(zonePanneau, actions, roue);
   creerReglages(zoneRoue, actions);
+  // F18 : jamais mémorisé, chaque chargement repart en mode normal.
+  const projection: Projection = creerProjection({
+    actions,
+    page,
+    conteneur: zoneRoue,
+    annonceOuverte: () => annonce.ouverte(),
+  });
   creerCadeaux({ panneau: zonePanneau, roue: zoneRoue, page }, actions, roue);
   creerHistorique(zonePanneau, actions, roue);
   const donnees = creerDonnees(zonePanneau, actions, roue);

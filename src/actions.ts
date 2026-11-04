@@ -68,6 +68,13 @@ export interface ControleAnnonce {
   fermer(options?: { restaurerFocus?: boolean }): void;
 }
 
+/** Le mode projection vu par la table d'actions (implémenté par `ui/projection.ts`). */
+export interface ControleProjection {
+  active(): boolean;
+  /** Entre en mode projection (`true`) ou en sort (`false`) ; sans effet si le mode est déjà celui demandé. */
+  definir(actif: boolean): void;
+}
+
 const annonceAbsente: ControleAnnonce = { ouverte: () => false, ouvrir: () => undefined, fermer: () => undefined };
 
 /** `cadeauSuivant` n'est présent que pour `afficherCadeauSuivant` (`null` : plus de cadeau à attribuer). */
@@ -146,6 +153,8 @@ export interface ParametresActions {
   afficherCadeauSuivant: Record<string, never>;
   /** Remplace tout l'état par un état déjà lu et validé (`lireFichierImport`) ; la confirmation est demandée par l'interface. */
   importer: { readonly etat: Etat };
+  /** Entre en mode projection ou en sort (F18) ; jamais mémorisé. */
+  modeProjection: { readonly actif: boolean };
 }
 
 export type NomAction = keyof ParametresActions;
@@ -165,6 +174,8 @@ export interface Contexte {
   telecharger?: (etat: Etat) => void;
   /** Horloge des tirages ; `new Date()` par défaut. */
   maintenant?: () => Date;
+  /** Mode projection (F18) ; absent en test et dans l'essai à blanc (sans effet). */
+  projection?: ControleProjection;
 }
 
 export interface Action<N extends NomAction> {
@@ -440,6 +451,15 @@ export const ACTIONS: { readonly [N in NomAction]: Action<N> } = {
       return OK;
     },
   },
+  modeProjection: {
+    nom: 'modeProjection',
+    description: 'Active ou désactive le mode projection : la roue et l’annonce occupent tout l’écran',
+    refusPossibles: [],
+    executer(ctx, { actif }) {
+      ctx.projection?.definir(actif === true);
+      return OK;
+    },
+  },
 };
 
 const maintenant = (): Date => new Date();
@@ -466,8 +486,16 @@ function infoTirage(avant: Etat, apres: Etat, retraitPrevu: boolean): InfoAnnonc
   return { ordre: tirage.ordre, nom: tirage.nom, couleur, cadeau: tirage.cadeau, retraitPrevu };
 }
 
-/** Réglages d'affichage et de son, et lecture seule : permis pendant une rotation (couper le son à ce moment est utile). */
-const SANS_VERROU: ReadonlySet<NomAction> = new Set<NomAction>(['basculerRendu', 'couperSon', 'afficherCadeauSuivant']);
+/**
+ * Réglages d'affichage et de son, mode projection et lecture seule : permis pendant une rotation
+ * (couper le son ou passer en projection à ce moment est utile).
+ */
+const SANS_VERROU: ReadonlySet<NomAction> = new Set<NomAction>([
+  'basculerRendu',
+  'couperSon',
+  'afficherCadeauSuivant',
+  'modeProjection',
+]);
 
 export interface Actions {
   /** Exécute une action ; refus avec code, jamais d'exception pour un refus attendu. */

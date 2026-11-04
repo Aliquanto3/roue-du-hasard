@@ -1,0 +1,65 @@
+/* Mode projection (F18). Même mise en page en plein écran et dans le repli pleine fenêtre (iPhone). */
+.projection {
+  display: flex;
+  justify-content: center;
+  margin-top: 0.5rem;
+}
+
+html.projection,
+html.projection body {
+  overflow: hidden;
+}
+.page.page--projection {
+  --taille-roue-max: calc(100vh - 8rem);
+  --taille-roue-max: calc(100dvh - 8rem);
+  position: fixed;
+  inset: 0;
+  /* Sous l'annonce (10) et les confettis (11), au-dessus du tiroir du chat (5). */
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  max-width: none;
+  margin: 0;
+  overflow: auto;
+  background: var(--fond);
+}
+.page.page--projection.page--cadeaux {
+  --taille-roue-max: calc(100vh - 10.5rem);
+  --taille-roue-max: calc(100dvh - 10.5rem);
+}
+.page.page--projection .page__roue {
+  position: static;
+  width: 100%;
+}
+/* Contrôles d'édition masqués : panneau (liste, cadeaux, historique, données, chat), réglages, récapitulatif. */
+.page--projection .page__panneau,
+.page--projection .reglages,
+.page--projection .cadeaux__recap {
+  display: none;
+}
+/* Le titre reste pour les lecteurs d'écran. */
+.page--projection .page__titre {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+/* Sortie discrète, toujours atteignable au clavier : coin haut droit, sans fond. */
+.page--projection .projection {
+  position: fixed;
+  top: max(0.5rem, env(safe-area-inset-top));
+  right: max(0.5rem, env(safe-area-inset-right));
+  margin: 0;
+}
+.page--projection .projection__bouton {
+  min-height: 44px;
+  padding: 0.25rem 0.75rem;
+  border-color: var(--bord);
+  background: transparent;
+  color: var(--texte-doux);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
