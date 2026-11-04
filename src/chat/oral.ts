@@ -205,5 +205,15 @@ export function correctionsAConfirmer(r: Rapprochement, actions: readonly string
   return r.corrections.filter((c) => c.methode !== 'exact' && (!c.appliquee || destructive));
 }
 
+/**
+ * Noms visés par la décision qui ne figurent pas tels quels dans la commande corrigée : la cascade
+ * (règles ou modèle) les a rapprochés elle-même, sans score (« supprime Virgini » : « virgini »
+ * ressemble au verbe « virer », `rapprocher` le laisse, et `resoudreNom` en fait Virginie).
+ */
+export function nomsNonEntendus(texte: string, vises: readonly string[]): string[] {
+  const t = ` ${cle(texte).replace(/[^\p{L}\p{M}\p{N}-]+/gu, ' ')} `;
+  return [...new Set(vises.filter((n) => cle(n) !== '' && !t.includes(` ${cle(n)} `)))];
+}
+
 /** Vrai si le nom n'est pas dans la liste (comparaison sans accents ni casse). */
 export const estNomNouveau = (nom: string, noms: readonly string[]): boolean => !noms.some((n) => cle(n) === cle(nom));

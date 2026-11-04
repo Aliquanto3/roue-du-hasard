@@ -6,6 +6,7 @@ import { lireCorpus } from '../banc/cli';
 import {
   correctionsAConfirmer,
   estNomNouveau,
+  nomsNonEntendus,
   rapprocher,
   SCORE_EXACT,
   SCORE_PHONETIQUE,
@@ -143,6 +144,15 @@ describe('estNomNouveau', () => {
   it('compare sans accents ni casse', () => {
     expect(estNomNouveau('ZOE', noms)).toBe(false);
     expect(estNomNouveau('Camille', noms)).toBe(true);
+  });
+});
+
+describe('nomsNonEntendus', () => {
+  it('rend les noms visés absents tels quels de la commande (accents, casse, ponctuation, nom composé)', () => {
+    expect(nomsNonEntendus('supprime Virgini', ['Virginie'])).toEqual(['Virginie']);
+    expect(nomsNonEntendus('Supprime ZOE, puis Marie-Claire.', ['Zoé', 'Marie-Claire'])).toEqual([]);
+    expect(nomsNonEntendus('supprime Marie Claire', ['Marie-Claire'])).toEqual(['Marie-Claire']);
+    expect(nomsNonEntendus('supprime Mariette', ['Marie'])).toEqual(['Marie']);
   });
 });
 

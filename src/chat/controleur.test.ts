@@ -596,6 +596,20 @@ describe('enregistrement pour la fenêtre d’inspection (5.7)', () => {
     expect(actions.magasin.lire().participants.map((p) => p.nom)).toEqual(['Paul']);
   });
 
+  it('commande dictée « supprime Virgini » : nom rapproché par la cascade et non par l’oral, confirmé (6.3)', async () => {
+    // « virgini » ressemble au verbe « virer » : `rapprocher` le laisse, la cascade en fait Virginie.
+    const { c, actions } = avecInspection({ 'supprime Virgini': appel('supprimer', { nom: 'Virginie' }) }, ['Virginie', 'Paul']);
+    await c.envoyer('supprime Virgini', { transcription: { brut: 'x', latenceMs: 1 } });
+    expect(actions.magasin.lire().participants).toHaveLength(2);
+    expect(c.etat().messages.at(-1)?.texte).toBe(TEXTES_CHAT.nomRapproche(['Virginie']));
+    c.confirmer();
+    expect(actions.magasin.lire().participants.map((p) => p.nom)).toEqual(['Paul']);
+    // Tapée, la même commande s'exécute sans question.
+    const tapee = avecInspection({ 'supprime Virgini': appel('supprimer', { nom: 'Virginie' }) }, ['Virginie', 'Paul']);
+    await tapee.c.envoyer('supprime Virgini');
+    expect(tapee.actions.magasin.lire().participants).toHaveLength(1);
+  });
+
   it('commande dictée : « ajoute » d’un nom déjà dans la liste n’est pas un nom nouveau', async () => {
     const { c } = avecInspection({ 'ajoute Ana': appel('ajouter', { nom: 'Ana' }) }, ['Ana']);
     await c.envoyer('ajoute Ana', { transcription: { brut: 'ajoute Ana', latenceMs: 90 } });

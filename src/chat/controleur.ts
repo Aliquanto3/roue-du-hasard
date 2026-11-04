@@ -8,8 +8,8 @@ import type { Actions } from '../actions';
 import type { Cascade } from './cascade';
 import { SEUIL_DECISION_DEFAUT } from './decision';
 import { construireEntree, decrirePlan, type Execution, type Inspection, type TranscriptionInspectee } from './inspection';
-import { correctionsAConfirmer, estNomNouveau, rapprocher, type Rapprochement } from './oral';
-import { executerPlan, planifier, type Etape, type Plan } from './outils';
+import { ACTIONS_DESTRUCTIVES, correctionsAConfirmer, estNomNouveau, nomsNonEntendus, rapprocher, type Rapprochement } from './oral';
+import { executerPlan, OUTILS, planifier, type Etape, type Plan } from './outils';
 import { cle, extraireNoms } from './regles';
 import { TEXTES_CHAT } from './textes';
 import { estClarifier, estEtapes, type Decision, type DecisionAction, type EtatChat, type Etage,
@@ -208,9 +208,16 @@ export function creerControleur(deps: DepsControleur): Controleur {
   const questionDictee = (rapproche: Rapprochement, decision: Decision, noms: readonly string[]): string | null => {
     const nouveaux = nomsNouveaux(decision, noms, rapproche);
     if (nouveaux.length > 0) return TEXTES_CHAT.nomNouveau(nouveaux);
-    const aConfirmer = correctionsAConfirmer(rapproche, appels(decision).map((a) => a.action));
-    if (aConfirmer.length === 0) return null;
-    return TEXTES_CHAT.vousVouliezDire([...new Set(aConfirmer.map((c) => c.apres))], rapproche.texte);
+    const actions = appels(decision);
+    const aConfirmer = correctionsAConfirmer(rapproche, actions.map((a) => a.action));
+    if (aConfirmer.length > 0) return TEXTES_CHAT.vousVouliezDire([...new Set(aConfirmer.map((c) => c.apres))], rapproche.texte);
+    // Filet : sur une action destructive, un nom visé absent de la commande corrigée a été rapproché par la
+    // cascade elle-même, sans score ; il est confirmé comme une correction orale.
+    const vises = actions
+      .filter((a) => ACTIONS_DESTRUCTIVES.has(a.action))
+      .flatMap((a) => OUTILS.find((o) => o.nom === a.action)?.noms(a.params ?? {}) ?? []);
+    const nonEntendus = nomsNonEntendus(rapproche.texte, vises);
+    return nonEntendus.length === 0 ? null : TEXTES_CHAT.nomRapproche(nonEntendus);
   };
 
   const suivre = (

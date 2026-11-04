@@ -91,6 +91,8 @@ export const TEXTES_CHAT = {
   /** Correction d'un prénom entendu de travers (6.3) : confirmation obligatoire sous le seuil. */
   vousVouliezDire: (prenoms: readonly string[], commande: string): string =>
     `Vous vouliez dire ${prenoms.join(' et ')} ? La commande deviendrait : « ${commande} ». Confirmer ?`,
+  /** Nom visé rapproché par la cascade et non entendu tel quel (commande dictée, action destructive). */
+  nomRapproche: (prenoms: readonly string[]): string => `Vous vouliez dire ${prenoms.join(' et ')} ? Confirmer ?`,
   /** Correction appliquée sans question (score au-dessus du seuil), affichée. */
   commandeCorrigee: (commande: string): string => `J’ai compris : « ${commande} ».`,
   /** Nom dicté absent de la liste : jamais ajouté en silence, le STT écorche les prénoms inconnus. */
