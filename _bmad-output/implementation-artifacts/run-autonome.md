@@ -212,3 +212,13 @@ Ordre de reprise :
 - 2026-11-04 · 5.10 · dev · corrections : Object.hasOwn, seuilAmbigu distinct (0,9 provisoire, banc dev à refaire GPU libre), choice = argmax, confidence contrôlée · 6da4efe
 - 2026-11-04 · 5.10 · review · lancée (Opus, OptionsEtages touché) · 6da4efe
 - 2026-11-04 · 6.1 · dev · lancé (spec docs/specs/6.1-essai-stt.md écrite par l'orchestrateur ; GPU réservé à 6.1) ·
+- 2026-11-04 09:37 · 7.1 · fusion · PR #37 fusionnée, CI verte sur 9 jobs (bouton projection en icône 44 px hors flux, tests aux polices larges) · 508a2a6
+- 2026-11-04 · 5.10 · review · Opus : options complètes confirmées sur relevés réels, seuilAmbigu accepté ; medium sécurité « Paul ou Marie » → règle déterministe plusieurs noms = clarifier · 1167895
+- 2026-11-04 · 5.10 · dev · règle plusieurs noms (négation explicite seule exclut), 4 lignes de disjonction au lot dev (100 lignes) ; banc dev tev1 47/100, seuilAmbigu 0,9 sans clarifier à tort, seuilDecision 0,6 gardé (0,4-0,5 : 49/100, à revoir sur test) · 10bcd52
+- 2026-11-04 · 6.1 · dev · fini, PR #42 : whisper.cpp large-v3-turbo q5_0, port 5201, npm run stt ; WER 2,3 % avec indice, 165 ms ; GPU STT 919 Mo, tev1 + STT + lfm3 3 567 Mo, Bolt + tev1 + STT ne tient pas (arbitrage 5.8) · 65485cc
+- 2026-11-04 · 6.1 · second-avis · 2 medium (mention hors sujet, indice), 6 low ; corrigés en doc, relais /stt reporté à 6.2 (CORS * et /load de whisper-server) · 820cbe1
+- 2026-11-04 14:41 · 6.1 · fusion · PR #42 fusionnée, CI verte · 9e87f95
+- 2026-11-04 14:41 · 5.10 · CI · rouge : instable Firefox recette:245 et annonce:688 WebKit Windows ; jobs relancés · 72b502b
+- 2026-11-04 14:42 · 6.2 · dev · lancé (spec docs/specs/6.2-bouton-parler.md, relais /stt same-origin) ·
+- 2026-11-04 14:42 · run · dev · stabilisation des E2E instables lancée (recette:245, ambiance:51, annonce:688) ·
+- 2026-11-04 14:44 · run · décision · vérification de l'édition chat par Chromium Playwright local (le Chrome connecté n'atteint pas localhost de ce poste) : 4 tailles sans erreur ni défilement horizontal ; à 320×568 la barre du chat fermé cache Relief et Son au départ (défilement possible), à juger en 7.3 ·
