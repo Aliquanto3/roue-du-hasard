@@ -80,6 +80,7 @@ for (const [largeur, hauteur] of [
     expect(roue).not.toBeNull();
     expect(panneau).not.toBeNull();
     if (roue && panneau) {
+      console.log(`${String(largeur)}x${String(hauteur)} roue ${JSON.stringify(roue)} panneau ${JSON.stringify(panneau)}`);
       const separes =
         roue.y + roue.height <= panneau.y + 1 ||
         panneau.x + panneau.width <= roue.x ||
