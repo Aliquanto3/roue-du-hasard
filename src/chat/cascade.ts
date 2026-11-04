@@ -9,11 +9,13 @@
  * arrête tout, et une décision rendue après l'annulation est ignorée. Sans résultat : refus
  * `incompris`. La forme des décisions est vérifiée plus loin, par `planifier`.
  */
+import { creerEtageSlm } from './slm';
 import type { Decision, Etage, EtatChat, FabriqueEtage, OptionsEtages, ResultatCascade, TraceEtage } from './types';
 
 /** Fabriques des étages actifs, par ordre de priorité. Une ligne par étage. */
 export const ETAGES_ENREGISTRES: readonly FabriqueEtage[] = [
-  // 5.3 : règles ; 5.10 : décision ; 5.6 : SLM
+  // 5.3 : règles ; 5.10 : décision
+  creerEtageSlm,
 ];
 
 export const REFUS_INCOMPRIS: Decision = { action: 'refuser', code: 'incompris' };
@@ -47,6 +49,10 @@ export async function decider(
         traces.push({ etage: etage.nom, entree: commande, sortie: resultat?.trace.sortie ?? null, dureeMs });
         return { decision: REFUS_ANNULE, etage: null, traces };
       }
+      if (resultat !== null && resultat.decision === null) {
+        traces.push({ etage: etage.nom, ...resultat.trace, dureeMs, raison: resultat.raison });
+        continue;
+      }
       if (resultat === null) {
         traces.push({ etage: etage.nom, entree: commande, sortie: null, dureeMs });
         continue;
@@ -66,4 +72,19 @@ export async function decider(
     }
   }
   return { decision: REFUS_INCOMPRIS, etage: null, traces };
+}
+
+export interface Cascade {
+  readonly etages: readonly Etage[];
+  decider(commande: string, etat: EtatChat, signal: AbortSignal): Promise<ResultatCascade>;
+}
+
+/**
+ * Cascade durable : les étages sont construits une seule fois (le panneau 5.5 en garde une), si bien
+ * que l'état de chaque étage (SLM : `etat()`, `raisonIndisponible()`, `derniereTrace()`) persiste
+ * d'une commande à l'autre. `decider` seul reste sans état (tests, banc).
+ */
+export function creerCascade(options: OptionsCascade = {}): Cascade {
+  const etages = options.etages ?? (options.fabriques ?? ETAGES_ENREGISTRES).map((f) => f(options.options ?? {}));
+  return { etages, decider: (commande, etat, signal) => decider(commande, etat, signal, { ...options, etages }) };
 }

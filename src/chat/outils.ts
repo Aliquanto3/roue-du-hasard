@@ -209,13 +209,13 @@ export function validerParametres(schemaOutil: SchemaParametres, params: unknown
   if (typeof params !== 'object' || params === null || Array.isArray(params)) return 'paramètres : objet attendu';
   const valeurs = params as Record<string, unknown>;
   for (const cle of Object.keys(valeurs)) {
-    if (!(cle in schemaOutil.properties)) return `paramètre inconnu : ${cle}`;
+    if (!Object.hasOwn(schemaOutil.properties, cle)) return `paramètre inconnu : ${cle}`;
   }
   for (const cle of schemaOutil.required) {
-    if (!(cle in valeurs)) return `paramètre manquant : ${cle}`;
+    if (!Object.hasOwn(valeurs, cle)) return `paramètre manquant : ${cle}`;
   }
   for (const [cle, propriete] of Object.entries(schemaOutil.properties)) {
-    if (!(cle in valeurs)) continue;
+    if (!Object.hasOwn(valeurs, cle)) continue;
     const valeur = valeurs[cle];
     const typeOk =
       propriete.type === 'string'

@@ -70,6 +70,11 @@ export interface OptionsEtages {
   readonly urlOllama?: string;
   readonly modele?: string;
   readonly fetch?: typeof fetch;
+  /** Réglages du moteur SLM (5.6). */
+  readonly think?: boolean;
+  readonly temperature?: number;
+  /** Délai maximal d'un appel au modèle, en ms. */
+  readonly delaiMs?: number;
 }
 
 /** Fabrique d'un étage ; c'est elle que l'on enregistre dans la cascade. */
@@ -82,6 +87,10 @@ export interface EtatChat {
   readonly cadeaux?: readonly string[];
   /** Vrai pendant une rotation. */
   readonly rotation: boolean;
+  /** Prochain cadeau à attribuer, calculé par l’application (`cadeaux[attribues]`) ; absent s'il n'y en a plus. */
+  readonly prochainCadeau?: string;
+  /** Derniers échanges (du plus ancien au plus récent), fournis par le panneau ; le SLM en garde au plus `MAX_ECHANGES`. */
+  readonly historique?: readonly { readonly commande: string; readonly reponse: string }[];
 }
 
 export type NomEtage = 'regles' | 'decision' | 'slm';
@@ -98,6 +107,8 @@ export interface DonneesTrace {
 export interface TraceEtage extends DonneesTrace {
   readonly etage: NomEtage;
   readonly dureeMs: number;
+  /** Code court du passage de main (`indisponible`, `delai`, `json-invalide`, `sans-outil`, …). */
+  readonly raison?: string;
   /** Message de l'exception si l'étage a échoué (il passe alors la main). */
   readonly erreur?: string;
 }
@@ -109,10 +120,17 @@ export interface ResultatEtage {
   readonly trace: DonneesTrace;
 }
 
+/** Passage de main motivé : comme `null`, mais la raison et la trace sont conservées par la cascade. */
+export interface PasseMain {
+  readonly decision: null;
+  readonly raison: string;
+  readonly trace: DonneesTrace;
+}
+
 export interface Etage {
   readonly nom: NomEtage;
   /** `null` : cet étage ne tranche pas, l'étage suivant est essayé. */
-  decider(commande: string, etat: EtatChat, signal: AbortSignal): Promise<ResultatEtage | null>;
+  decider(commande: string, etat: EtatChat, signal: AbortSignal): Promise<ResultatEtage | PasseMain | null>;
 }
 
 /** Sortie de la cascade : la décision, l'étage qui l'a rendue (`null` si aucun) et toutes les traces. */
