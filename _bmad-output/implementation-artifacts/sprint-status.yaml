@@ -1,5 +1,5 @@
 project: roue-du-hasard
-last_updated: 2026-10-31 13:53
+last_updated: 2026-11-04 05:30
 development_status:
   1-1-socle: done
   1-2-domaine-etat-tirage: done
@@ -16,3 +16,21 @@ development_status:
   3-2-son-confettis: done
   4-1-recette-automatisee: done
   4-2a-readme-qr: done
+  4-2-distribution: backlog
+  5-1-outils-chat: backlog
+  5-2-banc-corpus: backlog
+  5-3-etage-regles: backlog
+  5-4-edition-chat: backlog
+  5-5-panneau-chat: backlog
+  5-6-client-slm: backlog
+  5-10-etage-decision: backlog
+  5-7-inspection: backlog
+  5-8-essai-moteurs: backlog
+  5-9-release-v1-1: backlog
+  6-1-essai-micro-stt: backlog
+  6-2-bouton-parler: backlog
+  6-3-prenoms-oral: backlog
+  6-4-essai-salle-release: backlog
+  7-1-mode-projection: backlog
+  7-2-ci-multi-supports: backlog
+  7-3-recette-appareils-release: backlog
