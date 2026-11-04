@@ -340,7 +340,12 @@ export function creerPanneauChat(parent: HTMLElement, options: OptionsPanneauCha
     const observateur = new ResizeObserver(ajusterRoue);
     observateur.observe(racine);
     observateur.observe(document.body);
+    // Le tiroir est plafonné : un changement de police ne change pas sa taille, mais celle de la rangée et du titre.
+    observateur.observe(rangee);
+    observateur.observe(entete);
   }
+  // Polices chargées après coup : le plancher du tiroir est remesuré.
+  void document.fonts?.ready.then(ajusterRoue);
   window.addEventListener('resize', ajusterRoue);
 
   controleur.abonner(rendre);
