@@ -87,25 +87,28 @@ const sous = (t: Texte, a: number, b: number = t.n.length): Texte =>
 /** Texte après la correspondance d'un motif ancré au début de `n`. */
 function apres(t: Texte, re: RegExp): Texte | null {
   const m = re.exec(t.n);
-  return m ? sous(t, m[0].length) : null;
+  if (!m) return null;
+  let fin = m[0].length;
+  // Verbe suivi d'un trait d'union (« ajoute-moi Inès ») : le pronom lié ne fait pas partie du nom.
+  if (t.o.charAt(fin) === '-') {
+    const pronom = /^-(?:moi|toi|lui|nous|vous|le|la|les|y|en)(?![\p{L}])/iu.exec(t.o.slice(fin));
+    fin += pronom ? pronom[0].length : 1;
+  }
+  return sous(t, fin);
 }
 
 // --- Nettoyage : euh, politesse, formules d'ouverture et de fin --------------------------------
 
 const EUH = /\b(?:euh+|heu+|hum+|hmm+|ben|bah)\b/;
 const OUVERTURE = new RegExp(
-  '^(?:bonjour|bonsoir|salut|hello|coucou|allez|alors|bon|ok|okay|dis|dites|donc|du coup|et|puis|' +
-    "s il (?:te|vous) plait|stp|svp|(?:est ce qu|est ce que) (?:tu|vous|on|je) (?:peux|pouvez|peut|pourrais|pourriez|pourrait)|" +
-    '(?:peux|pouvez|pourrais|pourriez)(?: tu| vous| moi)?|tu (?:peux|pourrais|dois|vas)|vous (?:pouvez|pourriez)|' +
-    'on (?:peut|va|doit|veut)|on|je (?:voudrais|veux|souhaite|souhaiterais|desire|dois|vais|voulais)|' +
-    'j aimerais|j aurais besoin|j ai besoin|il (?:faudrait|faut|serait bien de)|faudrait|' +
-    'ca (?:serait|sera) bien de|ce serait bien de|n hesite pas a|bien|aussi|moi|me|nous|que|de|d|pour|' +
-    'maintenant|enfin|tu|vous)\\b[ ,:;]*',
+  '^(?:allez|alors|bon|ok|dis|donc|et|puis|s il (?:te|vous) plait|stp|svp|' +
+    '(?:est ce qu|est ce que) (?:tu|vous|on|je) peux|peux tu|tu peux|on|je voudrais|j aimerais|j aurais besoin|' +
+    'il faudrait|bien|moi|me|que|de|d|pour|tu|vous)\\b[ ,:;]*',
 );
-const FIN = new RegExp(
-  '[ ,;:]*(?:s il (?:te|vous) plait|stp|svp|merci(?: beaucoup| bien| d avance)?|please|vite fait|rapidement|' +
-    'maintenant|tout de suite|si possible)[ ,;:.!?…]*$',
-);
+/** Politesse de fin (README : « s'il te plaît »). */
+const FIN_POLI = /[ ,;:]*(?:s il (?:te|vous) plait|stp|svp)[ ,;:.!?…]*$/;
+/** Précision de fin retirée hors des verbes de données seulement : un nom extrait reste littéral. */
+const FIN_TEMPS = /[ ,;:]*(?:vite fait)[ ,;:.!?…]*$/;
 const PONCTUATION_FINALE = /[ !?…]+$/;
 
 function nettoyer(brut: string): Texte {
@@ -117,7 +120,7 @@ function nettoyer(brut: string): Texte {
   }
   for (let i = 0; i < 6; i++) {
     const avant = t.n;
-    t = compacter(effacer(t, FIN));
+    t = compacter(effacer(t, FIN_POLI));
     t = compacter(effacer(t, PONCTUATION_FINALE));
     if (t.n === avant) break;
   }
@@ -127,11 +130,11 @@ function nettoyer(brut: string): Texte {
 // --- Phonétique française simple ----------------------------------------------------------------
 
 /** Clé phonétique : deux formes qui se prononcent (presque) pareil donnent la même clé. */
-export function cleFrancaise(mot: string): string {
+export function cleFrancaise(mot: string, souple = true): string {
   let s = mot.toLowerCase().replace(/ç/gu, 's').replace(/œ/gu, 'e');
   s = s.normalize('NFD').replace(/\p{M}/gu, '').replace(/[^a-z]/g, '');
+  if (souple) s = s.replace(/^h/, '');
   s = s
-    .replace(/^h/, '')
     .replace(/eau/g, 'o')
     .replace(/au/g, 'o')
     .replace(/ou/g, 'u')
@@ -141,11 +144,11 @@ export function cleFrancaise(mot: string): string {
     .replace(/ch/g, 'x')
     .replace(/gn/g, 'n')
     .replace(/th/g, 't')
-    .replace(/h/g, '')
+    .replace(/h/g, souple ? '' : 'h')
     .replace(/c(?=[eiy])/g, 's')
     .replace(/c/g, 'k')
     .replace(/g(?=[eiy])/g, 'j')
-    .replace(/y/g, 'i')
+    .replace(/y/g, souple ? 'i' : 'y')
     .replace(/z/g, 's')
     .replace(/w/g, 'v')
     .replace(/(?:ain|aim|ein)(?![aeioumn])/g, 'I')
@@ -198,14 +201,21 @@ export function resoudreNom(brut: string, noms: readonly string[]): Resolution {
   if (exacts.length > 1) return { t: 'clarifier', candidats: exacts };
   const prefixes = noms.filter((n) => cle(n).startsWith(`${c} `) || cle(n).startsWith(`${c}-`));
   if (prefixes.length > 0) return { t: 'clarifier', candidats: prefixes };
+  // Correction directe seulement si la clé stricte (h et y gardés) désigne un seul nom : « Anne » et « Hanne »,
+  // « Maya » et « Maïa » sont deux prénoms réels qui se prononcent pareil, donc `clarifier`.
+  const ks = cleFrancaise(c, false);
+  if (ks.length >= 2) {
+    const stricts = noms.filter((n) => cleFrancaise(n, false) === ks);
+    const du = unique(stricts);
+    if (du.length === 1) {
+      return stricts.length === 1 ? { t: 'ok', nom: stricts[0] as string } : { t: 'clarifier', candidats: stricts };
+    }
+    if (du.length > 1) return { t: 'clarifier', candidats: du };
+  }
   const k = cleFrancaise(c);
   if (k.length >= 2) {
-    const phon = noms.filter((n) => cleFrancaise(n) === k);
-    const distincts = unique(phon);
-    if (distincts.length === 1) {
-      return phon.length === 1 ? { t: 'ok', nom: phon[0] as string } : { t: 'clarifier', candidats: phon };
-    }
-    if (distincts.length > 1) return { t: 'clarifier', candidats: distincts };
+    const souples = unique(noms.filter((n) => cleFrancaise(n) === k));
+    if (souples.length > 0) return { t: 'clarifier', candidats: souples };
   }
   const proches = unique(
     noms.filter((n) => {
@@ -349,7 +359,7 @@ const debut = (re: RegExp, t: Texte): Texte | null => apres(t, re);
 // Données : ajouter, coller, renommer.
 const V_AJOUTER = /^(?:ajout\w*|rajout\w*|inscri\w*|incorpor\w*|integr\w*|add)\b/;
 const V_COLLER = /^(?:coll\w*|import\w*|insere\w*|charge\w*)\b/;
-const V_RENOMMER = /^(?:renomm\w*|rebaptis\w*|chang\w* (?:le )?(?:nom|prenom)(?: de| d)?)\b/;
+const V_RENOMMER = /^(?:renomm\w*|chang\w* (?:le )?(?:nom|prenom)(?: de| d)?)\b/;
 const DEBUT_DONNEES = new RegExp(`${V_AJOUTER.source}|${V_COLLER.source}|${V_RENOMMER.source}`);
 
 function ajouter(t: Texte, etat: EtatChat): Res | undefined {
@@ -365,8 +375,8 @@ function ajouter(t: Texte, etat: EtatChat): Res | undefined {
   const v = verrou('ajouter', etat);
   if (v) return v;
   let objet = reste;
-  objet = apres(objet, /^(?:une? )?(?:nouvelle? )?(?:personne|participante?|invitee?|prenom|nom)(?: nommee?| appelee?| :)? ?/) ?? objet;
-  const fin = /\s(?:a|au|aux|dans|sur) (?:la |le |les )?(?:liste|roue|tirage|participants?|jeu)(?:\s.*)?$/.exec(objet.n);
+  objet = apres(objet, /^(?:une? )?(?:personne|participante?|invitee?|prenom|nom)(?: nommee?| appelee?| :)? ?/) ?? objet;
+  const fin = /\s(?:a|au|aux|sur) (?:la |le |les )?(?:liste|roue|tirage|participants?|jeu)(?:\s.*)?$/.exec(objet.n);
   if (fin) objet = sous(objet, 0, fin.index);
   const noms = extraireNoms(objet.o);
   if (noms.length === 0) return null;
@@ -381,7 +391,7 @@ function coller(t: Texte, etat: EtatChat): Res | undefined {
   const deuxPoints = reste.n.indexOf(':');
   let texte: string;
   if (deuxPoints >= 0) texte = reste.o.slice(deuxPoints + 1).trim();
-  else if (/^(?:mes|ma|mon|la|les|cette|ces|une?) /.test(reste.n)) return null;
+  else if (/^(?:mes|ma|mon|la|les|ces|une?) /.test(reste.n)) return null;
   else texte = reste.o.trim();
   return texte === '' ? null : pas('coller', { action: 'coller', params: { texte } });
 }
@@ -396,6 +406,8 @@ function renommer(t: Texte, etat: EtatChat): Res | undefined {
   const ancien = sous(reste, 0, sep.index);
   const nouveau = nettoyerNom(reste.o.slice(sep.index + sep[0].length));
   if (nouveau === '' || ancien.n === '') return null;
+  // « renomme A en B et C en D » : un second renommage caché dans le nouveau nom, ambigu.
+  if (/(?:\set\s|[,;]|\spuis\s).*\s(?:en|par|vers)\s/.test(reste.n.slice(sep.index + sep[0].length))) return null;
   const r = resoudreNom(ancien.o, etat.noms);
   if (r.t === 'clarifier') return { t: 'clarifier', candidats: r.candidats, regle: 'renommer' };
   if (r.t === 'absent') return MOTS_RESERVES.test(ancien.n) ? null : refus('nom-absent', 'renommer');
@@ -404,26 +416,25 @@ function renommer(t: Texte, etat: EtatChat): Res | undefined {
 
 // Hostile, truquage, hors sujet.
 const HOSTILE = [
-  /\b(?:ignor|oubli|neglig|contourn|desobei)\w*\s+(?:tes|vos|les|toutes?|ces|mes|ta|toute)\s+(?:les )?(?:instructions?|consignes?|regles?|directives?|ordres?|contraintes?)/,
-  /^(?:systeme|system|assistant|admin)\s*:/,
+  /\b(?:ignor)\w*\s+(?:tes|vos|les|toutes?|ces|mes|ta|toute)\s+(?:les )?(?:instructions?|consignes?|regles?|directives?|ordres?|contraintes?)/,
+  /^(?:systeme|system)\s*:/,
   /\b(?:prompt|system prompt|jailbreak|mot de passe|api key|cle api)\b/,
   /\b(?:tes|vos) (?:instructions?|consignes?|regles?)\b/,
   /\btu es (?:maintenant|desormais)\b|\bfais comme si\b|\bjoue le role\b|\bmode (?:developpeur|admin|dan)\b/,
 ];
 const TRUQUAGE = [
   /\b(?:fai\w*|laiss\w*|fait)\s+gagn\w*/,
-  /\b(?:truqu|trich|manipul|bidonn|magouill|pipe)\w*/,
+  /\b(?:truqu|manipul)\w*/,
   /\bfauss\w*\s+(?:le |la )?(?:tirage|roue)/,
-  /\b(?:gagnant|gagnante|vainqueur)\b.*\b(?:doit|devra|devrait|sera|est|soit|serait|va etre|c est)\b/,
-  /\b(?:doit|devra|devrait|faut que|veux que|voudrais que|souhaite que|pour que|fais que)\b.*\b(?:gagne|gagnent|gagnera|gagner|remporte|tire|tombe)\b/,
+  /\b(?:gagnant)\b.*\b(?:doit|devra|devrait|est|soit|va etre|c est)\b/,
+  /\b(?:doit|devra|devrait|faut que|pour que|fais que)\b.*\b(?:gagne|gagnent|gagnera|gagner|remporte|tire)\b/,
   /\b(?:arrange|debrouille|assure|veille)\w*(?: toi)?\s+(?:a ce )?(?:pour )?que\b/,
-  /\bsans (?:tirer|tirage|lancer|passer par la roue)\b/,
-  /\b(?:double|triple|augment\w*|multipli\w*|favoris\w*|booste\w*)\s+(?:la |les |sa |ses )?(?:part|chances?|probabilite)/,
-  /\bplus de chances?\b/,
+  /\bsans (?:tirer|tirage)\b/,
+  /\b(?:double|triple|augment\w*|multipli\w*|favoris\w*|booste\w*)\s+(?:la |les |sa |ses )?part\b/,
   /\bdesign\w*\b.*\bgagn\w*/,
 ];
 const QUESTION =
-  /\b(?:quel|quelle|quels|quelles|comment|pourquoi|combien|qui est|qu est ce|c est quoi|quand|traduis|traduire|traduction|meteo|blague|raconte|poeme|chanson|recette|calcule|google|navigateur|mail|email|courriel|sms|telephone|musique|youtube|wikipedia|capitale|bonjour|bonsoir|salut|merci|coucou|hello|au revoir|bravo|lol)\b/;
+  /\b(?:quel\w*|traduis|navigateur|mail|bonjour|merci)\b/;
 
 function hostile(t: Texte): Res {
   if (DEBUT_DONNEES.test(t.n)) return null;
@@ -437,8 +448,8 @@ function annuler(t: Texte, etat: EtatChat): Res | undefined {
   const n = t.n;
   const ok =
     (/\btirage\b/.test(n) &&
-      /\b(?:annul|defai|revien|retir|supprim|suprim|efface|enlev|invalid|ote|retourn)\w*/.test(n) &&
-      /\b(?:dernier|derniere|precedent|precedente)\b/.test(n)) ||
+      /\b(?:annul|retir|supprim|suprim|efface|enlev)\w*/.test(n) &&
+      /\b(?:dernier|derniere)\b/.test(n)) ||
     /^annul\w* (?:le |ce )?tirage\b/.test(n);
   if (!ok) return undefined;
   return verrou('annulerDernierTirage', etat) ?? pas('annuler', { action: 'annulerDernierTirage', params: {} });
@@ -464,7 +475,7 @@ function reinitCouleurs(t: Texte, etat: EtatChat): Res | undefined {
   const v = verrou('reinitialiserCouleur', etat);
   if (v) return v;
   const m =
-    /^\w+ (.+?) (?:a|en|dans) (?:sa|la|son) couleur\b/d.exec(n) ??
+    /^\w+ (.+?) (?:a|en) (?:sa|la|son) couleur\b/d.exec(n) ??
     /\bcouleur (?:de|d) (.+?)(?: (?:par defaut|d origine|a l origine|d depart|initiale|originale|de base))?$/d.exec(n);
   if (!m) return null;
   const idx = m.indices?.[1]?.[0] ?? 0;
@@ -476,28 +487,29 @@ function reinitCouleurs(t: Texte, etat: EtatChat): Res | undefined {
 }
 
 function cadeauSuivant(t: Texte): Res | undefined {
-  return /\bcadeaux? suivant\b|\bprochain cadeau\b|\bcadeau d apres\b/.test(t.n)
+  return /\bcadeaux? suivant\b/.test(t.n)
     ? pas('cadeau-suivant', { action: 'afficherCadeauSuivant', params: {} })
     : undefined;
 }
 
 function gagnants(t: Texte): Res | undefined {
   const n = t.n;
-  if (!/\b(?:gagnants?|gagnantes?|vainqueurs?)\b/.test(n)) return undefined;
-  if (/\b(?:ne|pas|plus|garde|gardes|laisse|laisses|remet|remets|reintegre|conserve|decoche|desactive|arrete)\w*/.test(n)) {
-    return /\b(?:retir|sor|enlev|ote|elimin|exclu)\w*/.test(n) && !/\b(?:ne|pas|plus)\b/.test(n)
-      ? undefined
-      : pas('gagnants', { action: 'retirerGagnants', params: { actif: false } });
-  }
-  return /\b(?:retir|sor|enlev|ote|elimin|exclu|supprim)\w*/.test(n)
-    ? pas('gagnants', { action: 'retirerGagnants', params: { actif: true } })
-    : undefined;
+  if (!/\b(?:gagnants?)\b/.test(n)) return undefined;
+  // Sens sûr seulement : retirer (sans négation) = vrai ; ne plus retirer ou garder (sans négation) = faux.
+  // « ne remets plus les gagnants » (négation et garder ensemble) est ambigu : `null`.
+  const retire = /\b(?:retir|sor|enlev|ote|elimin|exclu|supprim)\w*/.test(n);
+  const garde = /\b(?:gard|laiss|conserv|reintegr|decoch|desactiv|remet)\w*/.test(n);
+  const negation = /\b(?:ne|n|pas|plus|jamais)\b/.test(n);
+  if (retire && garde) return null;
+  if (garde) return negation ? null : pas('gagnants', { action: 'retirerGagnants', params: { actif: false } });
+  if (retire) return pas('gagnants', { action: 'retirerGagnants', params: { actif: !negation } });
+  return undefined;
 }
 
 function projection(t: Texte): Res | undefined {
   const n = t.n;
   if (!/\bprojection\b/.test(n)) return undefined;
-  if (/\b(?:desactiv|quitt|sor|arret|ferm|coup|enlev|retir|stop|annul)\w*/.test(n)) {
+  if (/\b(?:desactiv|sor|ferm|coup|enlev|retir|stop|annul)\w*/.test(n)) {
     return pas('projection', { action: 'modeProjection', params: { actif: false } });
   }
   if (/\b(?:activ|lanc|met|pass|ouvr|entre|demarr|affich|bascul)\w*/.test(n)) {
@@ -509,7 +521,7 @@ function projection(t: Texte): Res | undefined {
 function son(t: Texte): Res | undefined {
   const n = t.n;
   if (!/\b(?:le|du|ce|mon|notre|sans|plus de|tout le|les) sons?\b|\bsourdine\b|\bmute\b/.test(n)) return undefined;
-  if (/\b(?:coup|mute|desactiv|eteins|eteindre|sourdine|silenc|baiss|stop|arret|enlev|retir|supprim|ferm|tais)\w*|\bsans son\b|\bplus de son\b/.test(n)) {
+  if (/\b(?:coup|mute|desactiv|sourdine|silenc|baiss|stop|enlev|retir|supprim|ferm)\w*|\bsans son\b|\bplus de son\b/.test(n)) {
     return pas('son', { action: 'couperSon', params: { coupe: true } });
   }
   if (/\b(?:remet|reactiv|activ|retabli|rallum|allum|ouvr|restaur|reprend|rend|met)\w*/.test(n)) {
@@ -521,9 +533,9 @@ function son(t: Texte): Res | undefined {
 function rendu(t: Texte): Res | undefined {
   const n = t.n;
   const trois = /\b(?:3 ?d|trois ?d|relief|volume)\b/.test(n);
-  const deux = /\b(?:2 ?d|deux ?d|plat\w*)\b/.test(n);
+  const deux = /\b(?:2 ?d|plat\w*)\b/.test(n);
   if (!trois && !deux) return undefined;
-  if (!/\b(?:pass|bascul|met|chang|rendu|affichage|mode|vue|revien|repass|utilis|activ|retour|choisi|donne|affich|prefer|veux|voudrais)\w*/.test(n)) {
+  if (!/\b(?:pass|bascul|met|rendu|affichage|mode|activ)\w*/.test(n)) {
     return undefined;
   }
   if (trois && deux) return null;
@@ -531,11 +543,11 @@ function rendu(t: Texte): Res | undefined {
 }
 
 function exporter(t: Texte): Res | undefined {
-  return /\b(?:export|telecharg|sauvegard)\w*/.test(t.n) ? pas('exporter', { action: 'exporter', params: {} }) : undefined;
+  return /\b(?:export|sauvegard)\w*/.test(t.n) ? pas('exporter', { action: 'exporter', params: {} }) : undefined;
 }
 
 // Couleur d'une personne.
-const V_COULEUR = /^(?:met\w*|pass\w*|color\w*|peins|peint\w*|chang\w*|donn\w*|defini\w*|appliqu\w*|teins|teint\w*|fais|fait|rend\w*|affect\w*|attribu\w*)\b/;
+const V_COULEUR = /^(?:met\w*|pass\w*|chang\w*|donn\w*|defini\w*|appliqu\w*|fais|fait|rend\w*)\b/;
 
 function definirCouleur(t: Texte, etat: EtatChat): Res | undefined {
   let reste = debut(V_COULEUR, t);
@@ -581,7 +593,7 @@ function definirCouleur(t: Texte, etat: EtatChat): Res | undefined {
 }
 
 // Suppression.
-const V_SUPPRIMER = /^(?:supprim\w*|suprim\w*|retir\w*|enlev\w*|vir\w*|efface\w*|elimin\w*|ote\w*|degag\w*|jett\w*|exclu\w*|balanc\w*|delete|remove)\b/;
+const V_SUPPRIMER = /^(?:supprim\w*|suprim\w*|retir\w*|enlev\w*|vir\w*|efface\w*|elimin\w*|ote\w*|degag\w*|jett\w*|exclu\w*)\b/;
 
 function supprimer(t: Texte, etat: EtatChat): Res | undefined {
   let reste = debut(V_SUPPRIMER, t);
@@ -590,7 +602,7 @@ function supprimer(t: Texte, etat: EtatChat): Res | undefined {
   if (v) return v;
   const garde = /\s+(?:et|mais)\s+(?:laisse\w*|garde\w*|conserve\w*|ne touche\w*|pas|sauf|sans toucher)\b.*$/.exec(reste.n);
   if (garde) reste = sous(reste, 0, garde.index);
-  const lieu = /\s+(?:de|dans|du|des|sur|depuis|hors de)(?: la| le| les| l)? (?:liste|roue|participants?|tirage|jeu|groupe)\b.*$/.exec(reste.n);
+  const lieu = /\s+(?:de|du|des|sur|depuis|hors de)(?: la| le| les| l)? (?:liste|roue|participants?|tirage|jeu|groupe)\b.*$/.exec(reste.n);
   if (lieu) reste = sous(reste, 0, lieu.index);
   const sauf = /^(?:tout le monde|tous les autres|tous|tout|toutes) (?:sauf|excepte|hors|a part|ormis|mis a part)\s+/.exec(reste.n);
   if (sauf) {
@@ -606,7 +618,7 @@ function supprimer(t: Texte, etat: EtatChat): Res | undefined {
     const trouves = etat.noms.filter((n) => cle(n) === c);
     return trouves.length === 2 ? pas('supprimer', ...trouves.map((nom) => ({ action: 'supprimer', params: { nom } }))) : null;
   }
-  reste = apres(reste, /^(?:le |la |les |l |un |une |mon |ma |mes |moi |ce |cette )?(?:(?:la personne|le participant|la participante|participante?|personne) )?/) ?? reste;
+  reste = apres(reste, /^(?:le |la |les |l |un |une |mon |ma |mes |moi |ce )?(?:(?:la personne|le participant|la participante|participante?|personne) )?/) ?? reste;
   reste = sansBegaiement(reste);
   if (reste.n === '') return null;
   const r = resoudreMorceaux(decouper(reste), etat, 'supprimer');
@@ -617,7 +629,7 @@ function supprimer(t: Texte, etat: EtatChat): Res | undefined {
 // Lancement.
 const V_LANCER = /^(?:lanc\w*|relanc\w*|tourn\w*|demarr\w*|go|c est parti|on y va|tire au sort|fais tourner|fait tourner|faites tourner)\b/;
 const OBJET_LANCER =
-  /^(?:(?:la |cette |une |le |ma |notre |un )?(?:roue|tirage|nouveau tirage|partie|loterie|tombola|machine)(?: de la chance)?|ca|cela|tout)?(?: (?:encore|aussi|a nouveau|de nouveau|une fois|une autre fois|vite|maintenant|tout de suite|des maintenant|immediatement))*$/;
+  /^(?:(?:la |une |le |ma |notre |un )?(?:roue|tirage|nouveau tirage|partie|loterie|tombola|machine)(?: de la chance)?|ca|cela|tout)?(?: (?:vite|maintenant))*$/;
 
 function lancer(t: Texte, etat: EtatChat): Res | undefined {
   const reste = debut(V_LANCER, t);
@@ -644,7 +656,9 @@ const ANALYSEURS: readonly ((t: Texte, etat: EtatChat) => Res | undefined)[] = [
   lancer,
 ];
 
-function traiterClause(t: Texte, etat: EtatChat): Res {
+function traiterClause(brute: Texte, etat: EtatChat): Res {
+  // Hors verbes de données, on retire la précision de fin ; un nom extrait reste littéral.
+  const t = DEBUT_DONNEES.test(brute.n) ? brute : compacter(effacer(brute, FIN_TEMPS));
   if (t.n === '') return null;
   const h = hostile(t);
   if (h) return h;
@@ -659,18 +673,24 @@ function traiterClause(t: Texte, etat: EtatChat): Res {
 // --- Découpage en étapes ---------------------------------------------------------------------------------
 
 const V_DEBUT =
-  /^(?:ajout|rajout|coll|renomm|supprim|suprim|retir|enlev|vir|efface|lanc|relanc|tourn|met|annul|coup|activ|desactiv|remet|export|affich|montr|pass|bascul|reinit|reset|vid|colore)\w*\b/;
+  /^(?:ajout|rajout|coll|renomm|supprim|suprim|retir|enlev|vir|efface|lanc|relanc|tourn|met|annul|coup|activ|desactiv|remet|export|affich|montr|pass|bascul|reinit|reset|vid)\w*\b/;
 
-function decoupeClauses(t: Texte): Texte[] {
-  const g = /\s*[,;]\s*|\s+(?:et puis|et ensuite|puis|ensuite|apres ca|apres|et)\s+/g;
+/** `null` si un « et » ou une virgule précède un mot qui est à la fois un verbe d'action et un nom de la liste. */
+function decoupeClauses(t: Texte, noms: readonly string[]): Texte[] | null {
+  const g = /\s*[,;]\s*|\s+(?:puis|et)\s+/g;
   const morceaux: Texte[] = [];
   let a = 0;
   for (const m of t.n.matchAll(g)) {
     const fin = m.index + m[0].length;
-    const mot = /puis|ensuite|apres/.test(m[0]);
+    const mot = /puis/.test(m[0]);
     const suite = t.n.slice(fin);
     const c = t.o.charAt(fin);
-    if (mot || (V_DEBUT.test(suite) && c !== '' && c === c.toLowerCase() && c !== c.toUpperCase())) {
+    const verbe = V_DEBUT.test(suite) && c !== '' && c === c.toLowerCase() && c !== c.toUpperCase();
+    if (verbe && !mot) {
+      const premier = cle(t.o.slice(fin).split(/[\s,;]/)[0] ?? '');
+      if (noms.some((n) => cle(n) === premier || cle(n).split(' ')[0] === premier)) return null;
+    }
+    if (mot || verbe) {
       morceaux.push(sous(t, a, m.index));
       a = fin;
     }
@@ -687,7 +707,8 @@ export function decideRegles(commande: string, etat: EtatChat): { decision: Deci
   }
   const h = hostile(t) ?? (DEBUT_DONNEES.test(t.n) ? null : hostile(compacter(creer(commande))));
   if (h?.t === 'refuser') return { decision: { action: 'refuser', code: h.code }, regle: h.regle };
-  const clauses = decoupeClauses(t);
+  const clauses = decoupeClauses(t, etat.noms);
+  if (clauses === null) return null;
   const resultats = clauses.map((c) => traiterClause(c, etat));
   if (clauses.length === 1) {
     const r = resultats[0] ?? null;
