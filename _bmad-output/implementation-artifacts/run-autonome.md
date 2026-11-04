@@ -67,3 +67,6 @@ Le sprint 5 avance pendant les attentes du sprint 4 (GPU, recette) ; l'ordre des
 - 2026-11-04 05:30 · run · décision · Anaël valide le plan : édition chat servie sur localhost, voix dans le run, portfolio dès maintenant ; étage 2 dans le run avec petits modèles de décision à installer ·
 - 2026-11-04 05:30 · run · décision · GPU indisponible (bancs SLM d'Anaël) jusqu'à son signal ; pas de suite locale lourde pendant les bancs ·
 - 2026-11-04 05:30 · run · décision · le run V1 notait « hors ai-portfolio » : Anaël l'y ajoute ·
+- 2026-11-04 05:34 · run · décision · portfolio : entrée ajoutée (Aliquanto3/Aliquanto3 PR #4 fusionnée), topics ai-portfolio et status-test posés ·
+- 2026-11-04 05:34 · 5.1 · dev · lancé ·
+- 2026-11-04 05:34 · 4.2 · dev · lancé (préparation, sans tag ni Pages) ·
