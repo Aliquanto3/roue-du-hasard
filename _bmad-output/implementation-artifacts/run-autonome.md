@@ -200,3 +200,47 @@ Ordre de reprise :
 - 2026-11-04 08:48 · 7.1 · décision · main fusionnée dans la branche par l'orchestrateur, sans conflit, 754 tests unitaires verts ; CI sur 9 jobs lancée · 3433fb6
 - 2026-11-04 09:00 · 7.1 · CI · rouge sur 9 jobs après intégration de 7.2 (bouton Projection : tabulation, positions, recouvrement à 568 px) ; correction confiée au PC 2 · 3433fb6
 - 2026-11-04 09:00 · run · décision · passation vers le PC 2 : état poussé, prompt de reprise donné à Anaël ; fin du travail sur le PC 1 ·
+- 2026-11-04 09:04 · run · décision · reprise sur le PC 2 : main f11aef4, npm ci, Ollama 0.40.13 (OLLAMA_ORIGINS localhost:5200), GPU 0/6144 Mo ; tev1:0.8b, lfm3:1.7b et lfm2.5:8b (étiquettes exactes) en téléchargement ; llama-server absent ; Anaël donne le feu vert au run autonome ·
+- 2026-11-04 09:04 · 7.1 · dev · lancé (Opus, correction du code après 7.2 sur la branche existante) · 3433fb6
+- 2026-11-04 09:04 · 5.10 · dev · étape B lancée (contrat réel tev1:0.8b, mesure GPU, llama-server, Julia-1 et Laya) ·
+- 2026-11-04 · 7.1 · dev · fini : rangée .page__commandes (réglages et projection), tabulation réalignée, test 320 px en repli sans Fullscreen · e6fcad6
+- 2026-11-04 · 7.1 · second-avis · 1 medium (3e ligne à 320 px, tiroir fermé), 2 low · e6fcad6
+- 2026-11-04 · 7.1 · CI · rouge 5/9 : chat-panneau.spec.ts:87 à 568 px sous Ubuntu (rangée repliée, polices Linux) ; instables Firefox recette:245 et ambiance:51 ; correction demandée (bouton sans hauteur ajoutée) · e6fcad6
+- 2026-11-04 · main · CI · rouge sur 2 instables Firefox (recette:245, ambiance:51), verte à la relance · f11aef4
+- 2026-11-04 · 5.10 · dev · étape B finie, PR #41 : contrat réel constaté (answers par id, choice, probabilities, confidence, noul), seuilDecision 0,6 (tev1 dev 42/96, plancher 26) ; mémoire mesurée tev1 1369 Mo, Julia-1 187 Mo, Laya 529 Mo ; Julia-1 et Laya au plancher, non retenus ; llama-server b12100 installé · 7086df4
+- 2026-11-04 · 5.10 · second-avis · 2 high (options partielles rejetées, seuil unique appliqué au noul : « supprime Paul » clarifié à tort), 2 low · 7086df4
+- 2026-11-04 · 5.10 · dev · corrections : Object.hasOwn, seuilAmbigu distinct (0,9 provisoire, banc dev à refaire GPU libre), choice = argmax, confidence contrôlée · 6da4efe
+- 2026-11-04 · 5.10 · review · lancée (Opus, OptionsEtages touché) · 6da4efe
+- 2026-11-04 · 6.1 · dev · lancé (spec docs/specs/6.1-essai-stt.md écrite par l'orchestrateur ; GPU réservé à 6.1) ·
+- 2026-11-04 09:37 · 7.1 · fusion · PR #37 fusionnée, CI verte sur 9 jobs (bouton projection en icône 44 px hors flux, tests aux polices larges) · 508a2a6
+- 2026-11-04 · 5.10 · review · Opus : options complètes confirmées sur relevés réels, seuilAmbigu accepté ; medium sécurité « Paul ou Marie » → règle déterministe plusieurs noms = clarifier · 1167895
+- 2026-11-04 · 5.10 · dev · règle plusieurs noms (négation explicite seule exclut), 4 lignes de disjonction au lot dev (100 lignes) ; banc dev tev1 47/100, seuilAmbigu 0,9 sans clarifier à tort, seuilDecision 0,6 gardé (0,4-0,5 : 49/100, à revoir sur test) · 10bcd52
+- 2026-11-04 · 6.1 · dev · fini, PR #42 : whisper.cpp large-v3-turbo q5_0, port 5201, npm run stt ; WER 2,3 % avec indice, 165 ms ; GPU STT 919 Mo, tev1 + STT + lfm3 3 567 Mo, Bolt + tev1 + STT ne tient pas (arbitrage 5.8) · 65485cc
+- 2026-11-04 · 6.1 · second-avis · 2 medium (mention hors sujet, indice), 6 low ; corrigés en doc, relais /stt reporté à 6.2 (CORS * et /load de whisper-server) · 820cbe1
+- 2026-11-04 14:41 · 6.1 · fusion · PR #42 fusionnée, CI verte · 9e87f95
+- 2026-11-04 14:41 · 5.10 · CI · rouge : instable Firefox recette:245 et annonce:688 WebKit Windows ; jobs relancés · 72b502b
+- 2026-11-04 14:42 · 6.2 · dev · lancé (spec docs/specs/6.2-bouton-parler.md, relais /stt same-origin) ·
+- 2026-11-04 14:42 · run · dev · stabilisation des E2E instables lancée (recette:245, ambiance:51, annonce:688) ·
+- 2026-11-04 14:44 · run · décision · vérification de l'édition chat par Chromium Playwright local (le Chrome connecté n'atteint pas localhost de ce poste) : 4 tailles sans erreur ni défilement horizontal ; à 320×568 la barre du chat fermé cache Relief et Son au départ (défilement possible), à juger en 7.3 ·
+- 2026-11-04 14:57 · run · fusion · stabilisation des E2E instables, PR #43 fusionnée, CI verte sur 9 jobs · e6e52b1
+- 2026-11-04 14:57 · 5.10 · décision · main intégrée dans la branche (E2E stabilisés) · d1d63f2
+- 2026-11-04 · 5.10 · CI · rouge : relief.spec.ts:144 macOS Chromium (42 ms pour 39,5, performance du runner) ; job relancé · d1d63f2
+- 2026-11-04 · 6.2 · dev · fini, PR #44 : bouton Parler, relais /stt (Host, Origin, POST, multipart, 2 Mo, 502), connect-src 'self' ; roue-chat.html 160 Ko · 802f8be
+- 2026-11-04 15:48 · 6.2 · second-avis · lancé ; revue Opus ensuite (relais et CSP) · 802f8be
+- 2026-11-04 · 6.2 · second-avis · 0 high, 0 medium, 8 low · 802f8be
+- 2026-11-04 · 6.2 · review · Opus : relais /stt sans constat (Host, Origin, /load fermé, 2 Mo, réponse amont bornée à 1 Mo) ; 7 low corrigés ; bouton Parler laissé actif pendant la rotation (comme la saisie, refus par la roue) : à confirmer par Anaël · 0ce37e9
+- 2026-11-04 · 6.2 · CI · rouge : chat-panneau.spec.ts:67 à 568 px (bouton Parler à moitié hors fenêtre) ; correction demandée · 0ce37e9
+- 2026-11-04 16:24 · 5.10 · CI · job macOS Chromium annulé deux fois sans runner (15 min d'attente), 8/9 verts ; troisième relance · d1d63f2
+- 2026-11-04 · 6.2 · CI · 938aeac puis 5ad11f3 : chat-panneau 568 px corrigé sous Chromium et Firefox, reste WebKit Ubuntu (tiroir remesuré après les polices) ; reproduction Linux par Docker demandée · 5ad11f3
+- 2026-11-04 · run · CI · runners macOS indisponibles depuis 14:47 UTC (jobs annulés sans runner après 15 min, toutes branches) ·
+- 2026-11-04 17:25 · 5.10 · décision · fusion sur les 6 jobs Linux et Windows verts, macOS sans runner (logique indépendante de la plateforme) ; la CI de main revérifiera macOS · 3c3e620
+- 2026-11-04 17:25 · 5.10 · fusion · PR #41 fusionnée (étape B : contrat réel, seuils, règle plusieurs noms) · 464be8b
+- 2026-11-04 · 6.2 · dev · WebKit Linux reproduit sous Docker (image Playwright 1.64.1) : rangée de saisie coupée de 12 px au défilement du tiroir ; formulaire collant · a873566
+- 2026-11-04 18:21 · 6.2 · fusion · PR #44 fusionnée, 7/9 jobs verts, 2 macOS annulés sans runner (même exception que 5.10) · e251189
+- 2026-11-04 18:21 · 6.3 · dev · lancé (spec docs/specs/6.3-prenoms-oral.md écrite par l'orchestrateur) ·
+- 2026-11-04 · 6.3 · dev · fini, PR #45 : oral.ts (rapprochement par regles.ts, seuil 0,85), banc dev règles 100/100 ; roue-chat.html 166 Ko · df3c6d7
+- 2026-11-04 · 6.3 · second-avis · 1 high (verbes manquants : nom dicté corrigé sans confirmation), 1 medium (« supprime Mari » supprime Marie), 2 low ; corrigés, ora-01 du lot dev passé à confirmation true (décision à valider par Anaël) · 21d10a6
+- 2026-11-04 · 6.3 · review · Opus : 1 Important corrigé (prénom proche d'un verbe, « supprime Virgini », corrigé en silence : nom non entendu tel quel toujours confirmé sur action destructive dictée) · 66946aa
+- 2026-11-04 · 6.3 · CI · annonce.spec.ts:691 WebKit Windows (clic bloqué sur roue.html, déjà vu en 6.2), vert à la relance ; macOS Chromium sans runner · 66946aa
+- 2026-11-04 22:20 · 6.3 · fusion · PR #45 fusionnée, 8/9 jobs verts · 564417e
+- 2026-11-04 22:20 · run · attente humaine · plus aucune story sans Anaël : relecture test2 (5.8), recette V1.0 (4.2, PR #25), recette chat (5.9), recette appareils (7.3), essai en salle (6.4) ; décisions à valider : bouton Parler actif en rotation, ora-01 confirmé, fusions sans macOS ·
