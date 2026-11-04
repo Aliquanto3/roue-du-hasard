@@ -183,6 +183,8 @@
   #app:has(.chat[data-ouvert='true']) .page {
     --taille-roue-max: calc(100vh - 15rem - 35vh);
     --taille-roue-max: calc(100dvh - 15rem - 35dvh);
+    /* Mesure faite par panneau-chat.ts (espace réellement libre) ; la réserve ci-dessus n'est qu'un repli. */
+    --taille-roue-max: var(--roue-libre, calc(100dvh - 15rem - 35dvh));
     padding-bottom: 35vh;
     padding-bottom: 35dvh;
   }

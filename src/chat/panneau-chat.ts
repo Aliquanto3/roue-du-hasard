@@ -115,6 +115,7 @@ export function creerPanneauChat(parent: HTMLElement, options: OptionsPanneauCha
     bascule.setAttribute('aria-expanded', String(ouvert));
     bascule.textContent = ouvert ? TEXTES_CHAT.basculerFermer : TEXTES_CHAT.basculerOuvrir;
     if (!ouvert) controleur.fermer();
+    ajusterRoue();
   };
 
   const rendre = (): void => {
@@ -196,8 +197,33 @@ export function creerPanneauChat(parent: HTMLElement, options: OptionsPanneauCha
     if (!corps.hidden) saisie.focus();
   });
 
+  /**
+   * Écran étroit, tiroir ouvert : hauteur libre sous le haut de la roue, mesurée et non estimée.
+   * Les polices changent la hauteur de ce qui précède la roue ; seule la mesure évite le recouvrement.
+   */
+  const etroit = globalThis.matchMedia?.('(max-width: 51.99rem)');
+  const ajusterRoue = (): void => {
+    const cible = document.documentElement.style;
+    const roue = document.querySelector('.page__roue');
+    if (!etroit?.matches || racine.dataset['ouvert'] !== 'true' || !roue) {
+      cible.removeProperty('--roue-libre');
+      return;
+    }
+    const haut = roue.getBoundingClientRect().top + window.scrollY;
+    const libre = Math.floor(window.innerHeight - racine.getBoundingClientRect().height - haut - 8);
+    const valeur = `${String(Math.max(0, libre))}px`;
+    if (cible.getPropertyValue('--roue-libre') !== valeur) cible.setProperty('--roue-libre', valeur);
+  };
+  if (typeof ResizeObserver !== 'undefined') {
+    const observateur = new ResizeObserver(ajusterRoue);
+    observateur.observe(racine);
+    observateur.observe(document.body);
+  }
+  window.addEventListener('resize', ajusterRoue);
+
   controleur.abonner(rendre);
   ouvrir(options.ouvert ?? false);
   rendre();
+  ajusterRoue();
   return racine;
 }
