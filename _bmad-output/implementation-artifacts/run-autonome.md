@@ -51,16 +51,39 @@ Le sprint 5 avance pendant les attentes du sprint 4 (GPU, recette) ; l'ordre des
 
 - Enchaînement par story : `dev-story` (Sonnet), `second-avis` (Haiku), correction des seuls constats medium et high réels par le même agent, fusion quand la CI de branche est verte. `reviewer` (Opus) seulement sur défaut sérieux. Opus pour le développement de 7.1 (plein écran, repli iPhone) et en reprise après deux échecs Sonnet.
 - Vérification Chrome de l'orchestrateur sur la page réelle pour les stories d'interface (5.5, 5.7, 7.1, 6.2).
-- **GPU indisponible (Anaël, 2026-11-04) : bancs SLM en cours.** Aucun appel d'inférence à Ollama, aucun programme sur la carte graphique, jusqu'à ce qu'Anaël écrive dans cette session que le GPU est disponible. Une étape qui en a besoin passe en `attente humaine`, avec une notification, et le run avance sur le reste. Téléchargements de petits modèles permis (pas d'inférence).
-- Pendant les bancs : pas de suite E2E ni de suite complète en local (elles faussent les mesures de vitesse) ; lint, types et tests unitaires ciblés seulement, la CI de branche sert de suite complète.
-- Modèles de décision (Anaël, 2026-11-04) : installer de petits modèles pour tester l'étage 2 ; « petit » = tient avec le SLM retenu dans les 8 Go de la RTX 3050 de ce poste, soit environ 4 Go au plus.
+- **Poste (Anaël, 2026-11-04) : le run se poursuit sur le PC 2** (RTX 3060 Laptop 6 Go, Windows 11), GPU disponible. Le PC 1 (RTX 3050 8 Go) sert aux bancs SLM d'Anaël : plus aucun développement ni inférence sur ce poste-là. Voir « Passation vers le PC 2 ».
+- Suite complète : la CI de branche (3 OS × 3 moteurs) ; en local, lint, types, tests unitaires ciblés et au plus un fichier E2E.
+- Modèles de décision (Anaël, 2026-11-04) : petits modèles, à faire tenir avec le SLM et le STT dans les 6 Go du PC 2 ; mémoire mesurée, pas supposée. llama-server autorisé (Julia-1, Laya). Modèles de voix autorisés.
+- Git : le mode auto refuse les push forcés. Jamais de rebase d'une branche poussée : intégrer `main` par `git merge origin/main`, push normal.
 - Contrat partagé fixé par 5.1, à ne pas changer sans décision : tout le code du chat dans `src/chat/` ; types `Decision` (même forme que `attendu` du corpus), `EtatChat`, `Etage` dans `src/chat/types.ts` ; cascade dans `src/chat/cascade.ts`, où chaque étage s'ajoute par une ligne d'enregistrement ; textes du chat dans `src/chat/textes.ts`. `src/main.ts` n'importe jamais `src/chat/` : seule l'édition chat (`src/main-chat.ts`, 5.4) le fait.
 - `roue.html` inchangé dans sa promesse N1 : CSP stricte, aucun code du chat (contrôlé par `check:size`). L'édition chat est servie sur `http://localhost:5200` (`npm run chat`), `OLLAMA_ORIGINS=http://localhost:5200`, jamais `null`.
 - Le modèle ne désigne jamais le gagnant ; noms = données ; confirmation calculée par l'application, pas par le modèle.
-- Corpus : règles écrites sur le lot `dev` seulement, mesures sur `test`.
+- Corpus : règles écrites sur le lot `dev` seulement. Le lot `test` a été lu pendant la 5.3 : son score est optimiste. Mesure de référence de l'essai 5.8 sur `test2` (`docs/v1.1/corpus-test2.jsonl`, 91 lignes), relu par Anaël avant l'essai ; personne n'écrit de règle d'après `test2` (garde-fou `src/banc/fuite.test.ts`, base figée `fuite-base-test2.json`, jamais régénérée).
 - Releases : `v1.0.0` après la recette d'Anaël (4.2), `v1.1.0` chat écrit (5.9), `v1.2.0` supports et projection (7.3), `v1.3.0` voix (6.4). Topic `status-*` et `portfolio.json` mis à jour à chaque release.
 - État du run hors des PR de story (PR `chore/etat-run-*`). `git worktree prune` avant chaque lancement.
 - Arrêts pour Anaël : recette V1.0 avant le tag ; GPU disponible (5.8, 5.10, 6.1) ; recette du chat (5.9) ; enregistrements audio (6.4) ; recette téléphone et projecteur (7.3) ; seuil de déploiement du chat.
+
+## Passation vers le PC 2 (2026-11-04)
+
+État de `main` : V1.0 prête (release en attente de la recette), chat écrit complet (5.1 à 5.7, 5.10 étape A, lot `test2`), CI 3 OS × 3 moteurs (7.2). `roue.html` 75 Ko, `roue-chat.html` environ 150 Ko sur 200 Ko.
+
+Ordre de reprise :
+1. **7.1 (PR #37, branche `story/7-1-mode-projection`, 3433fb6)** : CI rouge après l'intégration de 7.2, à cause du bouton « Projection » (+52 px et un arrêt de tabulation en plus) :
+   - `panneau.spec.ts:233` (parcours au clavier, 9 jobs) : l'ordre de tabulation attendu ne connaît pas le bouton ;
+   - `recette.spec.ts:121` (macOS Chromium) : positions décalées ;
+   - `chat-panneau.spec.ts:67` (568 px, Ubuntu) : recouvrement roue et tiroir, le calcul `--roue-libre` / `--tiroir-max` de 7.2 doit compter le bouton dans « ce que la zone de la roue contient hors canvas » ;
+   - `projection.spec.ts:268` (320 px, Firefox macOS et un job Windows).
+   Corriger le code d'abord ; second avis Haiku ; fusion sur CI verte (9 jobs).
+2. **GPU, 5.10 étape B** : appel réel de `/v1/systemone` sur `tev1:0.8b` (Ollama), contrat constaté, `ADAPTATEUR_SYSTEMONE` ajusté, seuil réglé, contrat documenté (`docs/specs/5.10-etage-decision.md`). Installer llama-server, essayer Julia-1 et Laya. Ne citer dans ce dépôt public aucune source interne d'un autre projet.
+3. **Relecture de `test2` par Anaël** (étape humaine), puis **5.8** : banc sur `test2` (et `test`, noté optimiste) pour règles seules, règles + décision, règles + SLM (Nemotron-3.5-Bolt-E4B, `lfm3:1.7b` avec et sans réflexion, `lfm2.5:8b` témoin) ; mémoire mesurée sur 6 Go, combinaisons comprises ; rapport `docs/v1.1/essai-moteurs.md` ; cascade par défaut et seuil de déploiement proposés à Anaël.
+4. **Vérification Chrome** de l'édition chat (5.5, 5.7, 7.1) sur la page réelle (`npm run build`, `npm run chat`, `http://localhost:5200`), reportée faute de GPU sur le PC 1.
+5. **4.2 (PR #25)** après la recette d'Anaël : `git merge origin/main` (conflit attendu dans `release.yml`, qui publie aussi `roue-chat.html`), puis les commandes de la spec `docs/specs/4.2-distribution.md` (Pages, tag `v1.0.0`, topic `status-deployed`), puis `portfolio.json` si la description change.
+6. **5.9** (recette du chat, `v1.1.0`), **voix 6.1 à 6.4** (`v1.3.0`), **7.3** (recette appareils, `v1.2.0`), selon les retours d'Anaël.
+
+À savoir :
+- Flaky d'un pixel sous Firefox Linux : `recette.spec.ts:245` (424 contre 423), repassé vert à la relance.
+- Le plus petit écran sans recouvrement roue et tiroir est 568×480 ; 568×320 est impossible avec la roue à 8 rem : à juger en recette 7.3.
+- `roue-chat.html` approche de la limite de 200 Ko : surveiller pour la voix.
 
 ## Journal
 
@@ -135,3 +158,45 @@ Le sprint 5 avance pendant les attentes du sprint 4 (GPU, recette) ; l'ordre des
 - 2026-11-04 06:38 · 5.3 · CI · verte · a300422
 - 2026-11-04 06:38 · 5.3 · fusion · PR #33 fusionnée · 24f383b
 - 2026-11-04 06:38 · 5.5 · dev · intégration de main et réactivation des E2E demandées ·
+- 2026-11-04 06:39 · 5.5 · dev · main intégrée sans conflit, 5 parcours E2E réactivés · e417ebf
+- 2026-11-04 06:47 · 5.5 · CI · rouge : 3 E2E du panneau (320 px, homonyme, refus en rotation) ; correction demandée, un seul fichier E2E permis en local · e417ebf
+- 2026-11-04 06:48 · 7.2 · dev · lancé (matrice 3 OS × 3 moteurs, fusion différée après 5.7 pour garder des CI courtes) ·
+- 2026-11-04 06:48 · run · décision · exception à la règle des bancs : un seul fichier E2E en local pour diagnostiquer la 5.5 ·
+- 2026-11-04 06:52 · 5.5 · review · 3 E2E corrigés (tiroir 35 dvh en colonne, clarification d'homonymes identiques sans boucle, code verrouille traduit) · 4230e47
+- 2026-11-04 07:00 · 5.5 · CI · verte · 4230e47
+- 2026-11-04 07:00 · 5.5 · fusion · PR #32 fusionnée · 914b195
+- 2026-11-04 07:00 · 5.7 · dev · lancé (avec code explicite de raisonIndisponible et moteur slm au banc) ·
+- 2026-11-04 07:12 · 5.7 · dev · fini, PR #36 ouverte ; roue-chat.html 145 Ko (était 75), raccourci Alt+Maj+I, export roue-inspection relu par le banc (--corpus) · c6f6ebd
+- 2026-11-04 07:12 · 5.7 · second-avis · lancé ·
+- 2026-11-04 07:16 · 5.7 · second-avis · 1 medium (décision corrigée non enregistrée après clarification), 10 low ; medium et 5 low en correction, mesure de la taille demandée · c6f6ebd
+- 2026-11-04 07:20 · 5.7 · review · medium et 5 low corrigés ; roue-chat.html 146,6 Ko (main 125,4 Ko), roue.html 75 Ko inchangé · c46d8c9
+- 2026-11-04 07:27 · 5.7 · CI · verte · c46d8c9
+- 2026-11-04 07:27 · 5.7 · fusion · PR #36 fusionnée ; chat écrit complet sans GPU · 63d50d4
+- 2026-11-04 07:27 · 7.1 · dev · lancé (Opus) ·
+- 2026-11-04 07:31 · 7.2 · dev · matrice 3 OS × 3 moteurs en place, 6 jobs sur 9 verts, job le plus long 7,2 min ; Ubuntu : roue et tiroir du chat se recouvrent à 320 px (défaut de 5.5, polices Linux), correction robuste demandée ; tolérances élargies (sonde de couleur, seuil relief hors Windows, attente des confettis) · PR #35
+- 2026-11-04 07:31 · 7.2 · CI · rouge (3 jobs Ubuntu) · PR #35
+- 2026-11-04 07:35 · 7.1 · dev · fini, PR #37 ouverte ; banc règles dev 96/96 (modeProjection 2/2) ; roue.html 78,5 Ko, roue-chat.html 150,2 Ko ; iPhone à vérifier en 7.3 · b0cc756
+- 2026-11-04 07:35 · 7.1 · second-avis · lancé ·
+- 2026-11-04 07:38 · 7.1 · second-avis · 3 medium (spécificité CSS face au tiroir du chat, Échap sans Keyboard Lock, +52 px face au correctif 7.2), 3 low ; 2 medium et 2 low en correction, le 3e vérifié à la fusion avec 7.2 · b0cc756
+- 2026-11-04 07:42 · 7.1 · review · 2 medium et 2 low corrigés (sélecteur plus fort en projection, Échap sans Keyboard Lock reste en pleine fenêtre) ; fusion après 7.2 pour passer la CI à 9 jobs · 56c1814
+- 2026-11-04 07:49 · 7.2 · review · recouvrement corrigé par mesure de l'espace libre (--roue-libre, ResizeObserver) ; chat-panneau vert sur 9 jobs · 3e37433
+- 2026-11-04 07:49 · 7.2 · CI · rouge : focus de la fenêtre d'inspection (5.7) sous Firefox et WebKit ; correction confiée à l'agent 5.7 sur la branche 7.2 · 3e37433
+- 2026-11-04 07:52 · run · décision · Anaël : lot test2 tenu à l'écart des règles (relu par Anaël avant 5.8) ; installation de llama-server et essai de Julia-1 et Laya ; téléchargement des modèles de voix autorisés ·
+- 2026-11-04 07:52 · run · décision · Anaël : suite des développements sur le PC 2 (RTX 3060 Laptop 6 Go, GPU disponible) pendant ses bancs sur ce PC ; passation après fusion de 7.2 et 7.1 ·
+- 2026-11-04 07:52 · 5.8 · dev · lot test2 lancé (agent sans accès aux règles) ·
+- 2026-11-04 07:58 · 7.2 · CI · verte sur 9 jobs, job le plus long 7,5 min ; focus de l'inspection corrigé (toggle des details sous Firefox et WebKit, déclencheur explicite sous WebKit) · d40f9b2
+- 2026-11-04 07:58 · 7.2 · second-avis · lancé ·
+- 2026-11-04 08:00 · 5.8 · dev · lot test2 écrit : 83 lignes, 14 catégories, chaque action au moins 3 fois, refuser 24 % ; fuite.test échoue sur 19 mots antérieurs au lot : base figée des mots des règles demandée · 89189ea
+- 2026-11-04 08:01 · 7.2 · second-avis · 1 medium (recouvrement possible sous 128 px d'espace libre), 7 low ; medium, filtre du favicon et timeout des jobs en correction · d40f9b2
+- 2026-11-04 08:01 · 5.8 · dev · base figée des mots des règles (226 mots, regles.ts dcfc48a) ; fuite.test vert ; PR #38 · 53725aa
+- 2026-11-04 08:01 · 5.8 · second-avis · lot test2 lancé (justesse des attendus) ·
+- 2026-11-04 08:05 · 5.8 · second-avis · test2 : aucun attendu faux ; 3 medium (base figée vue comme angle mort, rejeté ; régénération sans verrou ; verrouillage peu couvert), 6 low ; compléments demandés · 53725aa
+- 2026-11-04 08:06 · 5.8 · review · test2 complété : 91 lignes, 9 en rotation, refuser 27 %, régénération de la base verrouillée · cbf4214
+- 2026-11-04 08:14 · 5.8 · CI · verte · cbf4214
+- 2026-11-04 08:14 · 5.8 · fusion · lot test2, PR #38 fusionnée (relecture d'Anaël avant l'essai) · 278507c
+- 2026-11-04 08:48 · 7.2 · review · tiroir borné (--tiroir-max, minimum 5 rem), cas 568×480 ajouté (568×320 impossible avec la roue à 8 rem, à voir en recette 7.3) ; flaky d'un pixel sous Firefox Linux sur recette.spec.ts:245 · c465917
+- 2026-11-04 08:48 · 7.2 · CI · verte sur 9 jobs · c465917
+- 2026-11-04 08:48 · 7.2 · fusion · PR #35 fusionnée · e39589b
+- 2026-11-04 08:48 · 7.1 · décision · main fusionnée dans la branche par l'orchestrateur, sans conflit, 754 tests unitaires verts ; CI sur 9 jobs lancée · 3433fb6
+- 2026-11-04 09:00 · 7.1 · CI · rouge sur 9 jobs après intégration de 7.2 (bouton Projection : tabulation, positions, recouvrement à 568 px) ; correction confiée au PC 2 · 3433fb6
+- 2026-11-04 09:00 · run · décision · passation vers le PC 2 : état poussé, prompt de reprise donné à Anaël ; fin du travail sur le PC 1 ·
