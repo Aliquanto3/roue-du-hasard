@@ -7,7 +7,7 @@
 import type { Actions } from '../actions';
 import type { Cascade } from './cascade';
 import { SEUIL_DECISION_DEFAUT } from './decision';
-import { construireEntree, decrirePlan, type Execution, type Inspection } from './inspection';
+import { construireEntree, decrirePlan, type Execution, type Inspection, type TranscriptionInspectee } from './inspection';
 import { executerPlan, planifier, type Etape, type Plan } from './outils';
 import { TEXTES_CHAT } from './textes';
 import { estClarifier, estEtapes, type Decision, type DecisionAction, type EtatChat, type Etage,
@@ -46,11 +46,16 @@ export interface DepsControleur {
   readonly seuilDecision?: number;
 }
 
+/** Commande dictée (6.2) : transcription brute et latence du STT, pour l'inspection. */
+export interface OrigineCommande {
+  readonly transcription?: TranscriptionInspectee;
+}
+
 export interface Controleur {
   etat(): EtatPanneau;
   abonner(fn: () => void): () => void;
   /** Envoie une commande ; annule celle qui est en cours. Résolu quand la commande est traitée. */
-  envoyer(texte: string): Promise<void>;
+  envoyer(texte: string, origine?: OrigineCommande): Promise<void>;
   /** Réponse à une clarification : le candidat choisi remplace le nom ambigu de la décision. */
   choisir(candidat: string): void;
   confirmer(): void;
@@ -229,7 +234,7 @@ export function creerControleur(deps: DepsControleur): Controleur {
       abonnes.add(fn);
       return () => abonnes.delete(fn);
     },
-    async envoyer(texte) {
+    async envoyer(texte, origine) {
       const commande = texte.trim();
       if (commande === '') return;
       if (attente !== null) majInspection(entreeAttente, 'annule');
@@ -268,6 +273,7 @@ export function creerControleur(deps: DepsControleur): Controleur {
                 plan,
                 execution: 'non-execute',
                 seuilDecision: deps.seuilDecision ?? SEUIL_DECISION_DEFAUT,
+                ...(origine?.transcription === undefined ? {} : { transcription: origine.transcription }),
               }),
             );
       suivre(commande, decision, plan, id);

@@ -79,6 +79,13 @@ export interface PlanInspecte {
   readonly confirmation: boolean;
 }
 
+/** Transcription vocale à l'origine de la commande (6.2). */
+export interface TranscriptionInspectee {
+  /** Réponse brute du STT, avant nettoyage et correction éventuelle. */
+  readonly brut: string;
+  readonly latenceMs: number;
+}
+
 export interface DonneesEntree {
   readonly commande: string;
   readonly etat: EtatChat;
@@ -89,6 +96,8 @@ export interface DonneesEntree {
   readonly plan: PlanInspecte;
   readonly execution: Execution;
   readonly latenceMs: number;
+  /** Présente seulement si la commande a été dictée. */
+  readonly transcription?: TranscriptionInspectee;
 }
 
 export interface EntreeInspection extends DonneesEntree {
@@ -157,6 +166,7 @@ export interface ParametresEntree {
   readonly plan: Plan;
   readonly execution: Execution;
   readonly seuilDecision: number;
+  readonly transcription?: TranscriptionInspectee;
 }
 
 /** Construit l'entrée d'un message depuis le résultat de la cascade et les traces détaillées des étages. */
@@ -222,6 +232,7 @@ export function construireEntree(p: ParametresEntree): DonneesEntree {
     plan: decrirePlan(p.plan),
     execution: p.execution,
     latenceMs: resultat.traces.reduce((n, t) => n + t.dureeMs, 0),
+    ...(p.transcription === undefined ? {} : { transcription: p.transcription }),
   };
 }
 
@@ -408,6 +419,8 @@ const entreeValide = (v: unknown): v is EntreeInspection =>
   planValide(v['plan']) &&
   EXECUTIONS.includes(v['execution'] as string) &&
   estNombre(v['latenceMs']) &&
+  (v['transcription'] === undefined ||
+    (estObjet(v['transcription']) && estTexte(v['transcription']['brut']) && estNombre(v['transcription']['latenceMs']))) &&
   (v['verdict'] === null || verdictValide(v['verdict'])) &&
   (v['attendu'] === null || formeValide(v['attendu'])) &&
   (v['clarification'] === undefined ||

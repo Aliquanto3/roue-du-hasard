@@ -176,6 +176,14 @@
   .chat__reglages {
     flex: 0 0 auto;
   }
+  /* Collée en haut ou en bas du tiroir selon le défilement : la rangée de saisie ne sort jamais de la vue. */
+  .chat__formulaire {
+    position: sticky;
+    top: 0;
+    bottom: 0;
+    z-index: 1;
+    background: var(--surface);
+  }
   #app[data-chat] .page {
     padding-bottom: 5rem;
   }
@@ -188,4 +196,47 @@
     padding-bottom: 35vh;
     padding-bottom: 35dvh;
   }
+}
+
+/* Fenêtre basse (téléphone en paysage) : tiroir compact, le libellé « Commande » reste lu par les lecteurs d'écran. */
+@media (max-width: 51.99rem) and (max-height: 32rem) {
+  .chat {
+    gap: 0;
+    padding-block: 0.25rem;
+  }
+  .chat__corps {
+    gap: 0.25rem;
+  }
+  .chat__etiquette {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+/* Voix (6.2) : bouton à appui maintenu, état annoncé en texte. */
+.chat__parler {
+  flex: 0 0 auto;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.chat__parler[aria-pressed='true'] {
+  outline: 3px solid var(--alerte);
+  outline-offset: 2px;
+}
+.chat__parler:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+.chat__voix {
+  margin: 0;
+  font-size: 0.9375rem;
+  overflow-wrap: anywhere;
+}
+.chat__voix[hidden] {
+  display: none;
 }

@@ -507,6 +507,17 @@ describe('enregistrement pour la fenêtre d’inspection (5.7)', () => {
     expect(e?.etages[0]).toMatchObject({ etage: 'regles', regle: 'regle-x' });
   });
 
+  it('commande dictée : la transcription brute et la latence du STT sont dans l’entrée, sinon absentes (6.2)', async () => {
+    const { c, inspection, actions } = avecInspection({ 'ajoute Léo': appel('ajouter', { nom: 'Léo' }) });
+    await c.envoyer('ajoute Léo', { transcription: { brut: ' Ajoute Léo.\n', latenceMs: 165 } });
+    await c.envoyer('ajoute Léo');
+    const [dictee, tapee] = inspection.entrees();
+    expect(dictee?.transcription).toEqual({ brut: ' Ajoute Léo.\n', latenceMs: 165 });
+    expect(dictee?.execution).toBe('execute');
+    expect(tapee?.transcription).toBeUndefined();
+    expect(actions.magasin.lire().participants).toHaveLength(2);
+  });
+
   it('refus du plan : non exécutée ; commande non comprise : refus, aucun étage', async () => {
     const { c, inspection } = avecInspection({ 'supprime Zed': appel('supprimer', { nom: 'Zed' }) }, ['Ana']);
     await c.envoyer('supprime Zed');

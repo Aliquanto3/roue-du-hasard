@@ -3,10 +3,13 @@
 import { readFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { fileURLToPath } from 'node:url';
+import { relayerStt } from './relais-stt.mjs';
 
-const PORT = 5200;
+// Les variables d'environnement ne servent qu'aux tests (ports libres, page factice).
+const PORT = Number(process.env.ROUE_CHAT_PORT ?? 5200);
+const PORT_STT = Number(process.env.ROUE_STT_PORT ?? 5201);
 const HOTE = '127.0.0.1';
-const FICHIER = fileURLToPath(new URL('../dist/roue-chat.html', import.meta.url));
+const FICHIER = process.env.ROUE_CHAT_FICHIER ?? fileURLToPath(new URL('../dist/roue-chat.html', import.meta.url));
 
 try {
   await readFile(FICHIER);
@@ -33,6 +36,11 @@ const serveur = createServer(async (req, res) => {
   }
   if (hote !== `localhost:${PORT}`) {
     res.writeHead(421, TEXTE).end('Hôte refusé\n');
+    return;
+  }
+  // Seule route de transcription : POST /stt vers whisper-server (6.2). Le reste du serveur reste en lecture seule.
+  if ((req.url ?? '').split(/[?#]/, 1)[0] === '/stt') {
+    relayerStt(req, res, { port: PORT_STT, origine: `http://localhost:${PORT}` });
     return;
   }
   if (req.method !== 'GET' && req.method !== 'HEAD') {

@@ -6,8 +6,10 @@ import { creerControleur } from './chat/controleur';
 import { MARQUEUR_CHAT } from './chat/marqueur';
 import { creerFenetreInspection } from './chat/fenetre-inspection';
 import { creerInspection } from './chat/inspection';
+import { creerMicro, microDisponible } from './chat/micro';
 import { creerPanneauChat } from './chat/panneau-chat';
 import { lireReglages, type ReglagesChat } from './chat/reglages-chat';
+import { creerClientStt } from './chat/stt';
 import type { OptionsEtages } from './chat/types';
 
 type Modifiable<T> = { -readonly [K in keyof T]: T[K] };
@@ -46,6 +48,15 @@ if (racine && app) {
       surReglages: appliquer,
       stockage,
       inspection: fenetre,
+      ...(microDisponible()
+        ? {
+            voix: {
+              micro: creerMicro(),
+              stt: creerClientStt(),
+              indices: () => app.actions.magasin.lire().participants.map((p) => p.nom),
+            },
+          }
+        : {}),
       ouvert: window.matchMedia('(min-width: 52rem)').matches,
     });
     zone.prepend(section);
