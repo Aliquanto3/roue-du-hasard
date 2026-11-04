@@ -227,3 +227,7 @@ Ordre de reprise :
 - 2026-11-04 · 5.10 · CI · rouge : relief.spec.ts:144 macOS Chromium (42 ms pour 39,5, performance du runner) ; job relancé · d1d63f2
 - 2026-11-04 · 6.2 · dev · fini, PR #44 : bouton Parler, relais /stt (Host, Origin, POST, multipart, 2 Mo, 502), connect-src 'self' ; roue-chat.html 160 Ko · 802f8be
 - 2026-11-04 15:48 · 6.2 · second-avis · lancé ; revue Opus ensuite (relais et CSP) · 802f8be
+- 2026-11-04 · 6.2 · second-avis · 0 high, 0 medium, 8 low · 802f8be
+- 2026-11-04 · 6.2 · review · Opus : relais /stt sans constat (Host, Origin, /load fermé, 2 Mo, réponse amont bornée à 1 Mo) ; 7 low corrigés ; bouton Parler laissé actif pendant la rotation (comme la saisie, refus par la roue) : à confirmer par Anaël · 0ce37e9
+- 2026-11-04 · 6.2 · CI · rouge : chat-panneau.spec.ts:67 à 568 px (bouton Parler à moitié hors fenêtre) ; correction demandée · 0ce37e9
+- 2026-11-04 16:24 · 5.10 · CI · job macOS Chromium annulé deux fois sans runner (15 min d'attente), 8/9 verts ; troisième relance · d1d63f2
