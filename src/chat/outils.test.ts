@@ -89,8 +89,6 @@ describe('corpus', () => {
         expect(plan).toEqual({ genre: 'refuser', code: 'incompris' });
       } else if (estClarifier(a)) {
         expect(plan).toEqual({ genre: 'clarifier', candidats: a.candidats });
-      } else if (!estEtapes(a) && a.action === 'modeProjection') {
-        expect(plan).toEqual({ genre: 'refuser', code: 'indisponible' });
       } else {
         expect(plan.genre).toBe('etapes');
         expect(confirmationRequise(a)).toBe(ligne.confirmation);
@@ -279,9 +277,20 @@ describe('exécution par actions.ts', () => {
     expect(TEXTES_CHAT.cadeauSuivant({ numero: 1, total: 2, nom: 'bougie' })).toBe('Cadeau n° 1 sur 2 : bougie');
   });
 
-  it('modeProjection est refusé avec le code indisponible', () => {
+  it('modeProjection passe par actions.ts, sans confirmation, et reste permis pendant une rotation', () => {
     const b = banc(['Ana', 'Bob']);
-    expect(planifier(appel('modeProjection', { actif: true }), b.etat())).toEqual({ genre: 'refuser', code: 'indisponible' });
+    const plan = planifier(appel('modeProjection', { actif: true }), b.etat());
+    expect(plan.genre === 'etapes' && plan.etapes.map((e) => e.nom)).toEqual(['modeProjection']);
+    expect(plan.genre === 'etapes' && plan.confirmation).toBe(false);
+    b.rotation.active = true;
+    const avant = b.etat();
+    expect(executer(b, appel('modeProjection', { actif: true })).resultats).toEqual([{ ok: true }]);
+    expect(executer(b, appel('modeProjection', { actif: false })).resultats).toEqual([{ ok: true }]);
+    expect(b.etat()).toBe(avant);
+    expect(planifier(appel('modeProjection', { actif: 'oui' }), b.etat())).toEqual({
+      genre: 'refuser',
+      code: 'parametres-invalides',
+    });
   });
 
   it('le verrou de rotation et les refus viennent d’actions.ts, et le plan s’arrête au premier refus', () => {
