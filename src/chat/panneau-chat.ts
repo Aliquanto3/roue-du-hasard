@@ -4,8 +4,10 @@
  */
 import { bouton, champ, creer, idUnique } from '../ui/dom';
 import type { Controleur } from './controleur';
+import type { FenetreInspection } from './fenetre-inspection';
 import { ecrireReglages, type ReglagesChat } from './reglages-chat';
 import { TEXTES_CHAT } from './textes';
+import { RACCOURCI_INSPECTION, TEXTES_INSPECTION } from './textes-inspection';
 import './panneau-chat.css';
 
 export interface OptionsPanneauChat {
@@ -16,6 +18,8 @@ export interface OptionsPanneauChat {
   readonly stockage: () => Pick<Storage, 'getItem' | 'setItem'>;
   /** Ouvert au départ (écran large). */
   readonly ouvert?: boolean;
+  /** Fenêtre d'inspection (5.7) ; sans elle, pas de bouton. */
+  readonly inspection?: Pick<FenetreInspection, 'ouvrir'>;
 }
 
 export function creerPanneauChat(parent: HTMLElement, options: OptionsPanneauChat): HTMLElement {
@@ -90,6 +94,17 @@ export function creerPanneauChat(parent: HTMLElement, options: OptionsPanneauCha
   }));
   const aide = creer('p', 'panneau__aide', details);
   aide.textContent = TEXTES_CHAT.reglagesAide;
+
+  if (options.inspection !== undefined) {
+    const fenetre = options.inspection;
+    const inspecter = bouton('chat__inspecter', TEXTES_INSPECTION.bouton, corps);
+    inspecter.title = TEXTES_INSPECTION.boutonAide;
+    inspecter.setAttribute('aria-haspopup', 'dialog');
+    inspecter.setAttribute('aria-keyshortcuts', RACCOURCI_INSPECTION);
+    inspecter.addEventListener('click', () => {
+      fenetre.ouvrir();
+    });
+  }
 
   let rendus = 0;
   let rendreFocus = false;

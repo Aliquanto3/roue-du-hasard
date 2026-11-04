@@ -17,6 +17,7 @@ import {
   type Etage,
   type EtatChat,
   type OptionsEtages,
+  type RaisonIndisponible,
   type ResultatEtage,
 } from './types';
 
@@ -69,8 +70,8 @@ export interface EtageSlm extends Etage {
   readonly nom: 'slm';
   /** `indisponible` après connexion refusée, 403 ou modèle absent ; `disponible` après une réponse. */
   etat(): EtatSlm;
-  /** Raison lisible de l'indisponibilité, `null` sinon. */
-  raisonIndisponible(): string | null;
+  /** Raison de l'indisponibilité (code explicite et détail), `null` sinon. */
+  raisonIndisponible(): RaisonIndisponible | null;
   derniereTrace(): TraceSlm | null;
 }
 
@@ -163,7 +164,7 @@ function convertir(appels: readonly Appel[]): { decision: Decision } | { rejet: 
 /** Fabrique de l'étage ; inactif (rend toujours `null`, sans appel) tant qu'aucun `modele` n'est fourni. Réglages (`think`, `temperature`, `delaiMs`) lus dans `OptionsEtages`. */
 export function creerEtageSlm(options: OptionsEtages): EtageSlm {
   let etatSlm: EtatSlm = 'inconnu';
-  let raison: string | null = null;
+  let raison: RaisonIndisponible | null = null;
   let trace: TraceSlm | null = null;
   const delaiMs = options.delaiMs ?? DELAI_DEFAUT_MS;
 
@@ -231,18 +232,20 @@ export function creerEtageSlm(options: OptionsEtages): EtageSlm {
           signal: controleur.signal,
         });
         if (!reponse.ok) {
-          const absent = reponse.status === 403 || reponse.status === 404;
-          const raisonHttp =
-            reponse.status === 403
-              ? 'accès refusé (403) : vérifier OLLAMA_ORIGINS'
-              : reponse.status === 404
-                ? `modèle ${modele} non installé (404)`
-                : `erreur HTTP ${String(reponse.status)}`;
-          if (absent) {
+          const refuse = reponse.status === 403;
+          const manquant = reponse.status === 404;
+          const raisonHttp = refuse
+            ? 'accès refusé (403) : vérifier OLLAMA_ORIGINS'
+            : manquant
+              ? `modèle ${modele} non installé (404)`
+              : `erreur HTTP ${String(reponse.status)}`;
+          if (refuse || manquant) {
             etatSlm = 'indisponible';
-            raison = raisonHttp;
+            raison = refuse
+              ? { code: 'origine-refusee', detail: raisonHttp }
+              : { code: 'modele-absent', detail: raisonHttp, modele };
           }
-          return passer(absent ? 'indisponible' : 'erreur-http', raisonHttp);
+          return passer(refuse || manquant ? 'indisponible' : 'erreur-http', raisonHttp);
         }
         const texteBrut = await reponse.text();
         let json: unknown;
@@ -287,8 +290,8 @@ export function creerEtageSlm(options: OptionsEtages): EtageSlm {
           return passer('delai', `délai dépassé (${String(delaiMs)} ms)`);
         const message = erreur instanceof Error ? erreur.message : String(erreur);
         etatSlm = 'indisponible';
-        raison = `Ollama injoignable : ${message}`;
-        return passer('indisponible', raison);
+        raison = { code: 'ollama-absent', detail: `Ollama injoignable : ${message}` };
+        return passer('indisponible', raison.detail);
       } finally {
         clearTimeout(minuteur);
         if (surAnnulation) signal.removeEventListener('abort', surAnnulation);

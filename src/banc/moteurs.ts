@@ -6,11 +6,12 @@
  * Ajouter un moteur : une entrée dans `MOTEURS` quand sa story livre l'étage, et le retirer de
  * `MOTEURS_A_VENIR`.
  * - `regles` (5.3) : `[fabriqueRegles]`
- * - `slm` (5.6) : `[fabriqueSlm]` (lit `urlOllama` et `modele`)
+ * - `slm` (5.6, branché en 5.7) : `[creerEtageSlm]` (lit `urlOllama` et `modele`) ; inactif sans `--modele`, donc aucun appel réseau par défaut
  * - `decision` (5.10) : `[fabriqueDecision]`
  */
 import { fabriqueRegles } from '../chat/regles';
 import { creerEtageDecision } from '../chat/decision';
+import { creerEtageSlm } from '../chat/slm';
 import type { Etage, FabriqueEtage } from '../chat/types';
 
 /** Moteur factice : refuse toujours. Son score est le plancher de référence du corpus. */
@@ -31,13 +32,12 @@ export const fabriqueDecisionBanc: FabriqueEtage = (options) =>
 export const MOTEURS: Readonly<Record<string, readonly FabriqueEtage[]>> = {
   'refuse-tout': [fabriqueRefuseTout],
   regles: [fabriqueRegles],
+  slm: [creerEtageSlm],
   decision: [fabriqueDecisionBanc],
 };
 
 /** Moteurs prévus, pas encore livrés, avec la story qui les apporte. */
-export const MOTEURS_A_VENIR: Readonly<Record<string, string>> = {
-  slm: '5.6',
-};
+export const MOTEURS_A_VENIR: Readonly<Record<string, string>> = {};
 
 export function moteursDisponibles(): string[] {
   return Object.keys(MOTEURS);
