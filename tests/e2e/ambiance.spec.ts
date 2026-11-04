@@ -72,17 +72,38 @@ test('son et confettis sous la CSP du dépôt : aucune erreur, violation ni requ
   await page.click('#couper');
   await page.click('#fanfare');
 
+  // Observateur posé avant le déclenchement : sonder le canvas après coup rate une apparition
+  // ou un retrait rapide (Firefox sous Windows, images d'animation espacées).
+  type Trace = { ajoutes: string[]; retires: number };
+  await page.evaluate(() => {
+    const w = window as unknown as { traceCanvas: Trace };
+    w.traceCanvas = { ajoutes: [], retires: 0 };
+    const zone = document.querySelector('#zone');
+    if (!zone) throw new Error('#zone absente');
+    new MutationObserver((lots) => {
+      for (const lot of lots) {
+        lot.addedNodes.forEach((n) => {
+          if (n instanceof HTMLCanvasElement)
+            w.traceCanvas.ajoutes.push(`${n.getAttribute('aria-hidden') ?? ''}|${getComputedStyle(n).pointerEvents}`);
+        });
+        lot.removedNodes.forEach((n) => {
+          if (n instanceof HTMLCanvasElement) w.traceCanvas.retires++;
+        });
+      }
+    }).observe(zone, { childList: true });
+  });
+  const trace = () => page.evaluate(() => (window as unknown as { traceCanvas: Trace }).traceCanvas);
+
   await page.click('#confettis');
-  const canvas = page.locator('#zone canvas');
-  await expect(canvas).toHaveCount(1);
-  await expect(canvas).toHaveAttribute('aria-hidden', 'true');
-  await expect(canvas).toHaveCSS('pointer-events', 'none');
+  await expect.poll(async () => (await trace()).ajoutes.length).toBeGreaterThanOrEqual(1);
+  expect((await trace()).ajoutes[0]).toBe('true|none');
   await expect.poll(() => canvasPeint(page)).toBe(true);
   await page.click('#confettis');
-  await expect(canvas).toHaveCount(1);
-  // Durée prévue 3,5 s ; Firefox sous Windows a dépassé 6 s en CI (images d'animation espacées).
+  // Durée prévue 3,5 s ; Firefox sous Windows a dépassé 6 s en CI.
   const t0 = Date.now();
-  await expect(canvas).toHaveCount(0, { timeout: 12_000 });
+  await expect(page.locator('#zone canvas')).toHaveCount(0, { timeout: 12_000 });
+  const final = await trace();
+  expect(final.retires).toBe(final.ajoutes.length);
   console.log(`confettis retirés après ${String(Date.now() - t0)} ms`);
 
   expect(await page.evaluate(() => (window as unknown as { violations: string[] }).violations)).toEqual([]);

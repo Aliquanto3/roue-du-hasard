@@ -69,6 +69,9 @@ async function nomSousPointeur(page: Page): Promise<string | null> {
 }
 
 async function sansDefilementHorizontal(page: Page): Promise<void> {
+  // Fin des animations et transitions avant la mesure : juste après un changement de fenêtre
+  // ou l'ouverture de l'annonce, la mise en page peut être transitoire.
+  await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished.catch(() => undefined))));
   const [defilable, vue] = await page.evaluate(() => [
     document.documentElement.scrollWidth,
     document.documentElement.clientWidth,
