@@ -163,10 +163,10 @@ export function cleFrancaise(mot: string, souple = true): string {
 
 // --- Résolution des noms de la liste --------------------------------------------------------------
 
-/** Forme de comparaison d'un nom : sans accents, casse, apostrophes ni points. */
-const cle = (nom: string): string => formeComparable(nom.replace(/['’‘`´.]/gu, '')).replace(/\s+/gu, ' ');
+/** Forme de comparaison d’un nom : sans accents, casse, apostrophes ni points (réutilisée par `oral.ts`). */
+export const cle = (nom: string): string => formeComparable(nom.replace(/['’‘`´.]/gu, '')).replace(/\s+/gu, ' ');
 
-function distance(a: string, b: string): number {
+export function distance(a: string, b: string): number {
   let ligne = Array.from({ length: b.length + 1 }, (_, j) => j);
   for (let i = 1; i <= a.length; i++) {
     const suivante = [i];

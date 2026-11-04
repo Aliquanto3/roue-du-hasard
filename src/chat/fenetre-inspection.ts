@@ -275,6 +275,10 @@ export function creerFenetreInspection(
     creer('p', 'inspection__ligne', corps).textContent = T.latenceTotale(e.latenceMs);
     if (e.transcription !== undefined) {
       creer('p', 'inspection__ligne', corps).textContent = T.transcription(e.transcription.brut, e.transcription.latenceMs);
+      for (const c of e.transcription.corrections ?? []) creer('p', 'inspection__ligne', corps).textContent = T.correction(c);
+      if (e.transcription.corrigee !== undefined) {
+        creer('p', 'inspection__ligne', corps).textContent = T.commandeCorrigee(e.transcription.corrigee);
+      }
     }
     bloc(corps, T.etatEnvoye, json(e.etat));
     rendreVerdict(corps, e);

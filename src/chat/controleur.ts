@@ -8,7 +8,9 @@ import type { Actions } from '../actions';
 import type { Cascade } from './cascade';
 import { SEUIL_DECISION_DEFAUT } from './decision';
 import { construireEntree, decrirePlan, type Execution, type Inspection, type TranscriptionInspectee } from './inspection';
+import { estNomNouveau, rapprocher, type Rapprochement } from './oral';
 import { executerPlan, planifier, type Etape, type Plan } from './outils';
+import { extraireNoms } from './regles';
 import { TEXTES_CHAT } from './textes';
 import { estClarifier, estEtapes, type Decision, type DecisionAction, type EtatChat, type Etage,
   type RaisonIndisponible,
@@ -183,7 +185,35 @@ export function creerControleur(deps: DepsControleur): Controleur {
   const appels = (decision: Decision): readonly DecisionAction[] =>
     estEtapes(decision) ? decision.actions : [decision as DecisionAction];
 
-  const suivre = (commande: string, decision: Decision, plan: Plan, id: string | null): Execution => {
+  /** Noms à ajouter ou à donner qui ne sont pas dans la liste (commande dictée : le STT écorche les prénoms inconnus). */
+  const nomsNouveaux = (decision: Decision, noms: readonly string[]): string[] => {
+    const nouveaux: string[] = [];
+    for (const a of appels(decision)) {
+      const p = a.params ?? {};
+      if (a.action === 'ajouter' && typeof p['nom'] === 'string') nouveaux.push(p['nom']);
+      else if (a.action === 'renommer' && typeof p['nouveau'] === 'string') nouveaux.push(p['nouveau']);
+      else if (a.action === 'coller' && typeof p['texte'] === 'string') nouveaux.push(...extraireNoms(p['texte']));
+    }
+    return nouveaux.filter((n) => n.trim() !== '' && estNomNouveau(n, noms));
+  };
+
+  /** Question à poser avant d'exécuter une commande dictée, ou `null` : correction sous le seuil, puis nom nouveau. */
+  const questionDictee = (rapproche: Rapprochement, decision: Decision, noms: readonly string[]): string | null => {
+    if (rapproche.aConfirmer) {
+      const prenoms = [...new Set(rapproche.corrections.filter((c) => !c.appliquee).map((c) => c.apres))];
+      return TEXTES_CHAT.vousVouliezDire(prenoms, rapproche.texte);
+    }
+    const nouveaux = nomsNouveaux(decision, noms);
+    return nouveaux.length > 0 ? TEXTES_CHAT.nomNouveau(nouveaux) : null;
+  };
+
+  const suivre = (
+    commande: string,
+    decision: Decision,
+    plan: Plan,
+    id: string | null,
+    question: string | null = null,
+  ): Execution => {
     if (plan.genre === 'refuser') {
       // Les règles refusent « lancer » avec moins de 2 noms par `indisponible` : on donne le message de l'interface.
       const moinsDeDeux =
@@ -201,13 +231,13 @@ export function creerControleur(deps: DepsControleur): Controleur {
       entreeAttente = id;
       majInspection(id, 'attente-precision');
       return 'attente-precision';
-    } else if (plan.confirmation) {
+    } else if (plan.confirmation || question !== null) {
       suite = { decision, empreinte: empreinte() };
       attente = {
         genre: 'confirmer',
         recapitulatif: appels(decision).map((a) => TEXTES_CHAT.etape(a.action, a.params)),
       };
-      repondre(commande, TEXTES_CHAT.confirmer);
+      repondre(commande, question ?? TEXTES_CHAT.confirmer);
       entreeAttente = id;
       majInspection(id, 'attente-confirmation');
       return 'attente-confirmation';
@@ -249,8 +279,11 @@ export function creerControleur(deps: DepsControleur): Controleur {
       let decision: Decision;
       let resultat: ResultatCascade | null = null;
       const etatEnvoye = etatChat();
+      // Commande dictée : prénoms rapprochés de la liste avant la cascade (6.3).
+      const rapproche = origine?.transcription === undefined ? null : rapprocher(commande, etatEnvoye.noms);
+      const aDecider = rapproche?.texte ?? commande;
       try {
-        resultat = await deps.cascade.decider(commande, etatEnvoye, controle.signal);
+        resultat = await deps.cascade.decider(aDecider, etatEnvoye, controle.signal);
         decision = resultat.decision;
       } catch {
         decision = { action: 'refuser', code: 'incompris' };
@@ -273,10 +306,28 @@ export function creerControleur(deps: DepsControleur): Controleur {
                 plan,
                 execution: 'non-execute',
                 seuilDecision: deps.seuilDecision ?? SEUIL_DECISION_DEFAUT,
-                ...(origine?.transcription === undefined ? {} : { transcription: origine.transcription }),
+                ...(origine?.transcription === undefined
+                  ? {}
+                  : {
+                      transcription: {
+                        ...origine.transcription,
+                        ...(rapproche === null || rapproche.corrections.length === 0
+                          ? {}
+                          : { corrections: rapproche.corrections, corrigee: rapproche.texte }),
+                      },
+                    }),
               }),
             );
-      suivre(commande, decision, plan, id);
+      const question = rapproche === null ? null : questionDictee(rapproche, decision, etatEnvoye.noms);
+      if (
+        question === null &&
+        rapproche !== null &&
+        plan.genre !== 'refuser' &&
+        rapproche.corrections.some((c) => c.methode !== 'exact')
+      ) {
+        repondre(commande, TEXTES_CHAT.commandeCorrigee(rapproche.texte));
+      }
+      suivre(commande, decision, plan, id, question);
       notifier();
     },
     choisir(candidat) {
