@@ -124,6 +124,21 @@ describe('arguments et moteurs', () => {
     expect(() => fabriquesDuMoteur('toString')).toThrow('inconnu');
     expect(fabriquesDuMoteur('refuse-tout')).toHaveLength(1);
   });
+
+  it('moteur decision : --modele devient le modèle de décision ; inactif sans modèle', async () => {
+    const [fabrique] = fabriquesDuMoteur('decision');
+    const signal = new AbortController().signal;
+    const etat = { noms: ['Ana'], rotation: false };
+    expect(await fabrique?.({}).decider('lance', etat, signal)).toBeNull();
+    let corps = '';
+    const f = ((_u: string, init: RequestInit) => {
+      corps = init.body as string;
+      return Promise.resolve(new Response('{}'));
+    }) as unknown as typeof fetch;
+    const r = await fabrique?.({ modele: 'm1', fetch: f }).decider('lance', etat, signal);
+    expect((JSON.parse(corps) as { model: string }).model).toBe('m1');
+    expect(r).toMatchObject({ decision: null, raison: 'reponse-invalide' });
+  });
 });
 
 const ligne = (attendu: LigneCorpus['attendu'], extra: Partial<LigneCorpus> = {}): LigneCorpus => ({

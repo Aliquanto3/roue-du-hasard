@@ -77,6 +77,12 @@ export interface OptionsEtages {
   readonly temperature?: number;
   /** Délai maximal d'un appel au modèle, en ms. */
   readonly delaiMs?: number;
+  /** Modèle de décision (5.10) ; l'étage `decision` est inactif sans lui. */
+  readonly modeleDecision?: string;
+  /** Serveur du modèle de décision ; à défaut `urlOllama`. */
+  readonly urlDecision?: string;
+  /** Probabilité minimale pour agir (0,5 par défaut) ; en dessous, l'étage passe la main (`incertain`). */
+  readonly seuilDecision?: number;
 }
 
 /** Fabrique d'un étage ; c'est elle que l'on enregistre dans la cascade. */
