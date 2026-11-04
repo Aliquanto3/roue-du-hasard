@@ -11,9 +11,13 @@ const boutonLancer = (page: Page) => page.getByRole('button', { name: 'Lancer la
 const pageApp = (page: Page) => page.locator('.page');
 const dialogue = (page: Page) => page.getByRole('dialog');
 
-type Fullscreen = 'simule' | 'absent' | 'refuse';
+type Fullscreen = 'simule' | 'sans-verrou' | 'tenu-sans-plein' | 'absent' | 'refuse';
 
-/** API Fullscreen simulée (sortie du navigateur par `sortieNavigateur()`), absente (iPhone) ou refusée. */
+/**
+ * API Fullscreen simulée (sortie du navigateur par `sortieNavigateur()`), simulée sans Keyboard Lock
+ * (Firefox, Safari : `navigator.keyboard` absent), promesse tenue sans plein écran effectif, absente
+ * (iPhone) ou refusée.
+ */
 async function preparer(page: Page, fullscreen: Fullscreen): Promise<string[]> {
   const erreurs: string[] = [];
   page.on('pageerror', (e) => erreurs.push(e.message));
@@ -34,6 +38,14 @@ async function preparer(page: Page, fullscreen: Fullscreen): Promise<string[]> {
       };
       return;
     }
+    if (mode === 'tenu-sans-plein') {
+      Element.prototype.requestFullscreen = function () {
+        w.demandes++;
+        return Promise.resolve();
+      };
+      return;
+    }
+    if (mode === 'sans-verrou') Object.defineProperty(Navigator.prototype, 'keyboard', { configurable: true, get: () => undefined });
     let plein: Element | null = null;
     const signaler = (): void => {
       document.dispatchEvent(new Event('fullscreenchange'));
@@ -74,6 +86,7 @@ async function graves(page: Page): Promise<string[]> {
     .map((v) => `${v.id} : ${v.nodes.map((n) => n.target.join(' ')).join(' | ')}`);
 }
 
+// Chemin Keyboard Lock (Chromium) : Échap arrive à la page même en plein écran.
 test('entrée par le bouton, contrôles masqués, Espace lance, Échap ferme l’annonce puis sort', async ({ page }) => {
   const erreurs = await preparer(page, 'simule');
   await ajouterNoms(page, 'Ana\nBob\nCléo');
@@ -209,4 +222,67 @@ test('édition chat : « active le mode projection » passe par les règles', as
   await expect(pageApp(page)).not.toHaveClass(/page--projection/);
   await expect(commande).toBeVisible();
   await expect(commande).toBeFocused();
+});
+
+test('sans Keyboard Lock : le navigateur garde Échap et sort du plein écran, l’annonce se ferme et la projection reste en pleine fenêtre', async ({
+  page,
+}) => {
+  // Chemin Firefox / Safari : `navigator.keyboard` absent, Échap n'arrive pas à la page ; la sortie du
+  // plein écran par le navigateur est simulée par `fullscreenchange` (pas par une touche).
+  const erreurs = await preparer(page, 'sans-verrou');
+  expect(await page.evaluate(() => (navigator as Navigator & { keyboard?: unknown }).keyboard)).toBeUndefined();
+  await ajouterNoms(page, 'Ana\nBob');
+  await boutonProjection(page).click();
+  await expect(pageApp(page)).toHaveAttribute('data-projection', 'plein-ecran');
+  await boutonLancer(page).focus();
+  await page.keyboard.press('Space');
+  await expect(dialogue(page)).toBeVisible();
+
+  await page.evaluate(() => {
+    (window as unknown as { sortieNavigateur: () => void }).sortieNavigateur();
+  });
+  await expect(dialogue(page)).toHaveCount(0);
+  await expect(pageApp(page)).toHaveAttribute('data-projection', 'fenetre');
+  await expect(boutonProjection(page)).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.page__panneau')).toBeHidden();
+
+  // Hors plein écran, Échap arrive à la page : il fait sortir du mode.
+  await page.keyboard.press('Escape');
+  await expect(pageApp(page)).not.toHaveAttribute('data-projection');
+  await expect(page.locator('.page__panneau')).toBeVisible();
+  expect(erreurs).toEqual([]);
+});
+
+test('promesse tenue sans plein écran effectif : le repli pleine fenêtre reste', async ({ page }) => {
+  await preparer(page, 'tenu-sans-plein');
+  await boutonProjection(page).click();
+  await expect.poll(() => page.evaluate(() => (window as unknown as { demandes: number }).demandes)).toBe(1);
+  // Laisse la promesse se résoudre : le mode ne passe pas à « plein-ecran ».
+  await page.evaluate(() => new Promise((r) => setTimeout(r, 50)));
+  await expect(pageApp(page)).toHaveAttribute('data-projection', 'fenetre');
+});
+
+test.describe('édition chat à 320 px', () => {
+  test.use({ viewport: { width: 320, height: 640 } });
+
+  test('tiroir du chat ouvert puis projection : la roue reprend la place du tiroir', async ({ page }) => {
+    await page.goto('http://localhost:5200/');
+    await expect(page.locator('#app')).toHaveAttribute('data-ready', 'true');
+    await page.getByRole('button', { name: 'Ouvrir le chat' }).click();
+    await expect(page.locator(".chat[data-ouvert='true']")).toHaveCount(1);
+    const commande = page.getByLabel('Commande', { exact: true });
+    await commande.fill('active le mode projection');
+    await commande.press('Enter');
+    await expect(pageApp(page)).toHaveClass(/page--projection/);
+    // Le tiroir reste « ouvert » dans le DOM, mais sa réserve ne s'applique plus.
+    await expect(page.locator(".chat[data-ouvert='true']")).toHaveCount(1);
+    await expect(commande).toBeHidden();
+    expect(await pageApp(page).boundingBox()).toEqual({ x: 0, y: 0, width: 320, height: 640 });
+    const padding = await pageApp(page).evaluate((p) => parseFloat(getComputedStyle(p).paddingBottom));
+    expect(padding).toBeLessThanOrEqual(16);
+    // Sans le correctif, la roue tombe à ~176 px (35 vh retirés) ; ici elle prend la largeur.
+    const scene = await page.locator('.roue__scene').boundingBox();
+    expect(scene?.width ?? 0).toBeGreaterThan(280);
+    await expect(boutonLancer(page)).toBeInViewport();
+  });
 });

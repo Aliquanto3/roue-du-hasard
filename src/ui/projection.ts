@@ -11,7 +11,8 @@
  * navigateur sort seul du plein écran. Échap ferme d'abord l'annonce : cet écouteur est enregistré
  * au démarrage, avant celui de l'annonce (posé à son ouverture), et lit `annonceOuverte()` encore
  * vrai ; il laisse alors l'annonce se fermer. Un second Échap sort du mode. Quand le navigateur
- * garde Échap pour lui (sans Keyboard Lock), c'est `fullscreenchange` qui fait sortir.
+ * garde Échap pour lui (sans Keyboard Lock), `fullscreenchange` ferme l'annonce si elle est ouverte
+ * (la projection continue en pleine fenêtre), sinon fait sortir du mode.
  *
  * Le mode n'est pas mémorisé : chaque chargement repart en mode normal.
  */
@@ -43,6 +44,19 @@ interface ClavierVerrouillable {
 }
 const clavier = (): ClavierVerrouillable | undefined =>
   (navigator as Navigator & { keyboard?: ClavierVerrouillable }).keyboard;
+
+const poses = new WeakSet<EventTarget>();
+
+/**
+ * Pose les écouteurs une seule fois par cible (le document) : une seconde projection sur la même
+ * page ne double pas les sorties par Échap. Rend `false` si la cible avait déjà ses écouteurs.
+ */
+export function poserUneFois(cible: EventTarget, ecouteurs: Readonly<Record<string, (e: Event) => void>>): boolean {
+  if (poses.has(cible)) return false;
+  poses.add(cible);
+  for (const [type, ecouteur] of Object.entries(ecouteurs)) cible.addEventListener(type, ecouteur);
+  return true;
+}
 
 const visible = (el: Element | null): el is HTMLElement =>
   el instanceof HTMLElement && el.isConnected && el.getClientRects().length > 0;
@@ -86,6 +100,8 @@ export function creerProjection(options: OptionsProjection): Projection {
           quitterPleinEcran();
           return;
         }
+        // Promesse tenue sans plein écran effectif (navigateur, extension) : le repli reste.
+        if (document.fullscreenElement !== document.documentElement) return;
         mode = 'plein-ecran';
         appliquer();
         clavier()
@@ -134,18 +150,28 @@ export function creerProjection(options: OptionsProjection): Projection {
     void actions.executer('modeProjection', { actif: mode === 'normal' });
   });
 
-  document.addEventListener('keydown', (e) => {
-    if (e.key !== 'Escape' || mode === 'normal') return;
-    // L'annonce reçoit la même touche après cet écouteur et se ferme : on ne sort pas encore.
-    if (options.annonceOuverte()) return;
-    e.preventDefault();
-    void actions.executer('modeProjection', { actif: false });
-  });
-
-  document.addEventListener('fullscreenchange', () => {
-    if (mode === 'plein-ecran' && !document.fullscreenElement) {
+  poserUneFois(document, {
+    keydown: (e) => {
+      if (!(e instanceof KeyboardEvent) || e.key !== 'Escape' || mode === 'normal') return;
+      // L'annonce reçoit la même touche après cet écouteur et se ferme : on ne sort pas encore.
+      if (options.annonceOuverte()) return;
+      e.preventDefault();
       void actions.executer('modeProjection', { actif: false });
-    }
+    },
+    fullscreenchange: () => {
+      if (mode !== 'plein-ecran' || document.fullscreenElement) return;
+      // Sans Keyboard Lock (Firefox, Safari), Échap est gardé par le navigateur, qui sort seul du
+      // plein écran. Annonce ouverte : on la ferme et on reste en projection, en pleine fenêtre ;
+      // un second Échap ou le bouton fait sortir du mode. Sinon, on sort du mode.
+      if (options.annonceOuverte()) {
+        clavier()?.unlock?.();
+        void actions.executer('fermerAnnonce', {});
+        mode = 'fenetre';
+        appliquer();
+        return;
+      }
+      void actions.executer('modeProjection', { actif: false });
+    },
   });
 
   return {
