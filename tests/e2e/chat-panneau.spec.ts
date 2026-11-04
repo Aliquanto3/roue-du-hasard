@@ -3,11 +3,6 @@ import { expect, test, type Page } from '@playwright/test';
 // Story 5.5 : panneau de chat de l'édition chat, servie en localhost (webServer de la 5.4), règles seules.
 const ORIGINE = 'http://localhost:5200/';
 
-// Les commandes simples (« ajoute Léo »…) sont comprises par l'étage règles de la story 5.3 (PR #31),
-// pas encore dans `main`. À réactiver (retirer `fixme`) une fois #31 fusionnée.
-const MOTIF_REGLES =
-  'étage règles (story 5.3, PR #31) pas encore fusionné : les commandes simples ne sont pas comprises';
-
 async function ouvrir(page: Page): Promise<void> {
   await page.goto(ORIGINE);
   await expect(page.locator('#app')).toHaveAttribute('data-ready', 'true');
@@ -95,8 +90,6 @@ for (const [largeur, hauteur] of [
 }
 
 test.describe('parcours avec l’étage règles', () => {
-  test.fixme(true, MOTIF_REGLES);
-
   test('ajout', async ({ page }) => {
     await ouvrir(page);
     await dire(page, 'ajoute Léo');
@@ -107,12 +100,13 @@ test.describe('parcours avec l’étage règles', () => {
   test('homonyme clarifié par un bouton', async ({ page }) => {
     await ouvrir(page);
     await dire(page, 'ajoute Marie');
-    await dire(page, 'ajoute Marion');
-    await dire(page, 'supprime Mari');
-    await expect(fil(page)).toContainText('De qui parlez-vous : Marie ou Marion ?');
-    await page.getByRole('button', { name: 'Marion' }).click();
-    await expect(fil(page)).toContainText('C’est fait.');
-    await expect(page.locator('.ligne__nom')).toHaveCount(1);
+    await dire(page, 'ajoute Marie');
+    await dire(page, 'supprime Marie');
+    await expect(fil(page)).toContainText('De qui parlez-vous : Marie ?');
+    await page.getByRole('button', { name: 'Marie' }).click();
+    // Deux Marie identiques : un nom ne les distingue pas, rien n'est supprimé.
+    await expect(fil(page)).toContainText('Plusieurs personnes portent ce nom');
+    await expect(page.locator('.ligne__nom')).toHaveCount(2);
   });
 
   test('suppression confirmée', async ({ page }) => {

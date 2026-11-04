@@ -69,8 +69,6 @@ export function formeValide(d: unknown): d is Decision {
 export interface OptionsEtages {
   readonly urlOllama?: string;
   readonly modele?: string;
-  /** Modèle de l'étage décision (5.10) ; vide, l'étage reste inactif. */
-  readonly modeleDecision?: string;
   readonly fetch?: typeof fetch;
   /** Réglages du moteur SLM (5.6). */
   readonly think?: boolean;
