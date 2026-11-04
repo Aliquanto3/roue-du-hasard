@@ -79,7 +79,7 @@ export interface OptionsEtages {
   readonly modeleDecision?: string;
   /** Serveur du modèle de décision ; à défaut `urlOllama`. */
   readonly urlDecision?: string;
-  /** Probabilité minimale pour agir (0,5 par défaut) ; en dessous, l'étage passe la main (`incertain`). */
+  /** Probabilité minimale pour agir (0,6 par défaut, réglé sur le banc dev de `tev1:0.8b`) ; en dessous, l'étage passe la main (`incertain`). */
   readonly seuilDecision?: number;
 }
 

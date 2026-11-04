@@ -10,14 +10,35 @@ const etat: EtatChat = { noms: ['Ana', 'Bob', 'Chloé'], rotation: false };
 const signal = new AbortController().signal;
 const optionsDe = (q: QuestionDecision | undefined): readonly string[] => (q?.type === 'choice' ? q.options : []);
 
+/** Requête décodée : le corps réel est `{ model, state, questions: { id: { type, instructions, criteria? } } }`. */
 interface Requete {
   url: string;
   corps: {
     model: string;
-    messages: { role: string; content: string }[];
+    state: string;
     questions: QuestionDecision[];
+    brut: unknown;
   };
 }
+
+interface QuestionBrute {
+  type: 'choice' | 'noul';
+  instructions: string;
+  criteria?: Record<string, string>;
+}
+
+function decoder(body: string): Requete['corps'] {
+  const brut = JSON.parse(body) as { model: string; state: string; questions: Record<string, QuestionBrute> };
+  const questions = Object.entries(brut.questions).map(([id, q]): QuestionDecision =>
+    q.type === 'choice'
+      ? { id, type: 'choice', question: q.instructions, options: Object.keys(q.criteria ?? {}) }
+      : { id, type: 'noul', question: q.instructions },
+  );
+  return { model: brut.model, state: brut.state, questions, brut };
+}
+
+/** Partie « état » du `state` envoyé : sans les consignes, qui citent les délimiteurs. */
+const partieEtat = (state: string): string => (state.split('\nÉtat (')[1] ?? '').split('\nCommande : ')[0] ?? '';
 
 type Probas = Record<string, number>;
 interface Scenario {
@@ -38,18 +59,21 @@ function repartir(options: readonly string[], source: Probas): Probas {
 /** Serveur simulé : répond d'après le scénario. */
 function serveur(sc: Scenario, requetes: Requete[] = []): typeof fetch {
   return ((url: string, init: RequestInit) => {
-    const corps = JSON.parse(init.body as string) as Requete['corps'];
+    const corps = decoder(init.body as string);
     requetes.push({ url, corps });
-    const answers = corps.questions.map((q) => {
-      if (q.type === 'noul') return { id: q.id, type: 'noul', probability: sc.ambigu ?? 0 };
-      const source = (q.id === 'outil' ? sc.outil : sc.nom) ?? {};
-      return {
-        id: q.id,
-        type: 'choice',
-        probabilities: repartir(q.options, source),
-      };
-    });
-    return Promise.resolve(new Response(JSON.stringify({ answers, usage: { total_tokens: 1 } })));
+    // Forme constatée sur tev1:0.8b : answers est un objet indexé par id.
+    const answers = Object.fromEntries(
+      corps.questions.map((q) => {
+        if (q.type === 'noul') return [q.id, { type: 'noul', noul: sc.ambigu ?? 0 }];
+        const source = (q.id === 'outil' ? sc.outil : sc.nom) ?? {};
+        const probabilities = repartir(q.options, source);
+        const [choice = ''] = Object.entries(probabilities).sort((a, b) => b[1] - a[1])[0] ?? [];
+        return [q.id, { type: 'choice', choice, probabilities, confidence: 0.5 }];
+      }),
+    );
+    return Promise.resolve(
+      new Response(JSON.stringify({ model: 'm', answers, usage: { input_tokens: 1, output_tokens: 0 } })),
+    );
   }) as unknown as typeof fetch;
 }
 
@@ -132,13 +156,13 @@ describe('étage decision', () => {
     expect(JSON.stringify(requetes[0]?.corps.questions)).not.toMatch(/gagnant/);
   });
 
-  it('seuil : outil sous le seuil par défaut (0,5) passe la main, incertain', async () => {
-    const r = (await decider(opts(serveur({ outil: { supprimer: 0.49, exporter: 0.48, aucun: 0.03 } })))) as PasseMain;
+  it('seuil : outil sous le seuil par défaut (0,6) passe la main, incertain', async () => {
+    const r = (await decider(opts(serveur({ outil: { supprimer: 0.59, exporter: 0.38, aucun: 0.03 } })))) as PasseMain;
     expect(r.decision).toBeNull();
     expect(r.raison).toBe('incertain');
-    // À 0,5 pile, on agit.
+    // À 0,6 pile, on agit.
     const ok = (await decider(
-      opts(serveur({ outil: { supprimer: 0.5, exporter: 0.25, aucun: 0.25 }, nom: { Bob: 1 } })),
+      opts(serveur({ outil: { supprimer: 0.6, exporter: 0.2, aucun: 0.2 }, nom: { Bob: 1 } })),
     )) as ResultatEtage;
     expect(ok.decision).toEqual({
       action: 'supprimer',
@@ -251,7 +275,7 @@ describe('étage decision', () => {
       const tout = Object.fromEntries(
         [...OUTILS.filter((o) => o.construire !== null).map((o) => o.nom), 'aucun'].map((o) => [o, 0]),
       );
-      return { answers: [{ id: 'outil', type: 'choice', probabilities: { ...tout, ...p } }] };
+      return { answers: { outil: { type: 'choice', probabilities: { ...tout, ...p } } } };
     };
     const cas: [unknown, string][] = [
       [complet({ lancer: 0.9, aucun: 0.9 }), 'forme-invalide'],
@@ -324,21 +348,13 @@ describe('étage decision', () => {
     const cas: [unknown, string][] = [
       ['pas du json', 'json-invalide'],
       [{}, 'reponse-invalide'],
-      [{ answers: [] }, 'reponse-invalide'],
-      [{ answers: [{ id: 'outil', type: 'noul', probability: 1 }] }, 'reponse-invalide'],
-      [
-        {
-          answers: [{ id: 'outil', type: 'choice', probabilities: { supprimer: 1.5 } }],
-        },
-        'reponse-invalide',
-      ],
-      [
-        {
-          answers: [{ id: 'outil', type: 'choice', probabilities: { supprimer: 1 } }],
-        },
-        'reponse-invalide',
-      ],
-      [{ answers: [{ id: 'outil', type: 'choice' }] }, 'reponse-invalide'],
+      [{ answers: {} }, 'reponse-invalide'],
+      // Ancienne forme supposée (liste), jamais servie : rejetée.
+      [{ answers: [{ id: 'outil', type: 'choice', probabilities: { supprimer: 1 } }] }, 'reponse-invalide'],
+      [{ answers: { outil: { type: 'noul', noul: 1 } } }, 'reponse-invalide'],
+      [{ answers: { outil: { type: 'choice', probabilities: { supprimer: 1.5 } } } }, 'reponse-invalide'],
+      [{ answers: { outil: { type: 'choice', probabilities: { supprimer: 1 } } } }, 'reponse-invalide'],
+      [{ answers: { outil: { type: 'choice' } } }, 'reponse-invalide'],
     ];
     for (const [corps, code] of cas) {
       const r = (await decider(opts(reponse(corps)))) as PasseMain;
@@ -347,29 +363,91 @@ describe('étage decision', () => {
     }
   });
 
-  it('accepte aussi des probabilités en liste [{ option, probability }]', async () => {
-    const f = ((_u: string, init: RequestInit) => {
-      const q = {
-        options: optionsDe((JSON.parse(init.body as string) as Requete['corps']).questions[0]),
-      };
-      return Promise.resolve(
-        new Response(
-          JSON.stringify({
-            answers: [
-              {
-                id: 'outil',
-                type: 'choice',
-                probabilities: q.options.map((o) => ({
-                  option: o,
-                  probability: o === 'exporter' ? 1 : 0,
-                })),
-              },
-            ],
-          }),
-        ),
-      );
-    }) as unknown as typeof fetch;
-    expect(((await decider(opts(f), 'exporte')) as ResultatEtage).decision).toEqual({ action: 'exporter', params: {} });
+  it('corps de requête constaté : state en chaîne, questions indexées par id, criteria pour choice', async () => {
+    const requetes: Requete[] = [];
+    await decider(opts(serveur({ outil: { supprimer: 0.9 }, nom: { Bob: 1 } }, requetes)), 'supprime Bob');
+    const [premier, second] = requetes.map((r) => r.corps.brut as Record<string, unknown>);
+    expect(Object.keys(premier ?? {}).sort()).toEqual(['model', 'questions', 'state']);
+    expect(typeof premier?.['state']).toBe('string');
+    expect(Object.keys(premier?.['questions'] as object)).toEqual(['outil']);
+    const outil = (premier?.['questions'] as Record<string, QuestionBrute>)['outil'];
+    expect(outil?.type).toBe('choice');
+    expect(outil?.instructions).toBe('Quel outil la commande demande-t-elle ?');
+    expect(Object.keys(outil?.criteria ?? {}).at(-1)).toBe('aucun');
+    expect(second?.['questions']).toEqual({
+      nom: {
+        type: 'choice',
+        instructions: 'Quelle personne de la liste est visée ?',
+        criteria: { Bob: 'Bob' },
+      },
+      ambigu: {
+        type: 'noul',
+        instructions: 'Plusieurs personnes de la liste pourraient-elles être visées ?',
+      },
+    });
+  });
+
+  it('réponses réelles de tev1:0.8b (relevées le 2026-11-04) : « annule » donne aucun-outil', async () => {
+    const reel = {
+      model: 'tev1:0.8b',
+      answers: {
+        outil: {
+          type: 'choice',
+          choice: 'aucun',
+          probabilities: {
+            ajouter: 0.037321567359738114,
+            supprimer: 0.1807320322546993,
+            renommer: 0.02531162563702895,
+            lancer: 0.013418617857988667,
+            definirCouleur: 0.0016486169835586786,
+            aucun: 0.7415675399069862,
+          },
+          confidence: 0.6898810478883834,
+        },
+      },
+      usage: { input_tokens: 203, output_tokens: 0 },
+    };
+    // Le relevé ne portait que 6 options : les autres outils exécutables sont ajoutés à 0 (la somme reste 1).
+    const tout = Object.fromEntries(OUTILS.filter((o) => o.construire !== null).map((o) => [o.nom, 0]));
+    const complet = {
+      ...reel,
+      answers: { outil: { ...reel.answers.outil, probabilities: { ...tout, ...reel.answers.outil.probabilities } } },
+    };
+    const r = (await decider(opts(reponse(complet)), 'annule le dernier tirage')) as PasseMain;
+    expect(r.raison).toBe('aucun-outil');
+    // Une option demandée mais absente de la réponse reste rejetée.
+    expect(((await decider(opts(reponse(reel)), 'annule')) as PasseMain).raison).toBe('reponse-invalide');
+  });
+
+  it('réponses réelles de tev1:0.8b : nom et ambigu lus, `noul` au-dessus du seuil donne clarifier', async () => {
+    // Relevé réel pour « supprime Paul ou Marie » ; l'étage 1 (outil) est servi par le simulateur.
+    const reelNom = {
+      model: 'tev1:0.8b',
+      answers: {
+        nom: {
+          type: 'choice',
+          choice: 'Paul',
+          probabilities: { Paul: 0.543331371385393, Marie: 0.456668628614607 },
+          confidence: 0.086662742770786,
+        },
+        ambigu: { type: 'noul', noul: 0.6605770613094323 },
+      },
+      usage: { input_tokens: 219, output_tokens: 0 },
+    };
+    const sim = serveur({ outil: { supprimer: 0.9 } });
+    const f = ((url: string, init: RequestInit) =>
+      decoder(init.body as string).questions[0]?.id === 'nom'
+        ? Promise.resolve(new Response(JSON.stringify(reelNom)))
+        : sim(url, init)) as unknown as typeof fetch;
+    const e: EtatChat = { noms: ['Paul', 'Marie'], rotation: false };
+    const etage = creerEtageDecision(opts(f));
+    const r = (await etage.decider('supprime Paul ou Marie', e, signal)) as ResultatEtage;
+    expect(r.decision).toEqual({ action: 'clarifier', candidats: ['Paul', 'Marie'] });
+    expect(r.confiance).toBe(0.6605770613094323);
+    expect(etage.derniereTrace()?.probabilites['ambigu']).toBe(0.6605770613094323);
+    // Sous le seuil (0,7 > 0,66) : on lit le nom, 0,54 < 0,7 donc incertain.
+    const sous = (await decider(opts(f, { seuilDecision: 0.7 }), 'supprime Paul ou Marie', e)) as PasseMain;
+    expect(sous.raison).toBe('incertain');
   });
 
   it('nom hostile : donnée échappée, jamais une instruction, jamais deux fins de bloc', async () => {
@@ -399,9 +477,7 @@ describe('étage decision', () => {
       action: 'supprimer',
       params: { nom: hostile },
     });
-    expect((requetes[0]?.corps.messages[1]?.content.split('\nCommande : ')[0] ?? '').split(FIN_DONNEES)).toHaveLength(
-      2,
-    );
+    expect(partieEtat(requetes[0]?.corps.state ?? '').split(FIN_DONNEES)).toHaveLength(2);
   });
 
   it('candidatsNoms : noms entiers aux frontières de mot, sans doublon, sans troncature', () => {
