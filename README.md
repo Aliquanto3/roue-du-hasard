@@ -80,7 +80,7 @@ Une édition expérimentale prépare le pilotage de la roue par des phrases, ave
    - PowerShell : `$env:OLLAMA_ORIGINS = "http://localhost:5200"; ollama serve`
    - bash : `OLLAMA_ORIGINS=http://localhost:5200 ollama serve`
 2. Dans le dépôt : `npm run build`, puis `npm run chat`.
-3. Ouvrir `http://localhost:5200`.
+3. Ouvrir `http://localhost:5200` (et non `127.0.0.1:5200` : Ollama n'accepte que l'origine `localhost`). Le serveur redirige `127.0.0.1` vers `localhost` et refuse tout autre nom d'hôte.
 
 Le serveur n'écoute que sur cette machine (`127.0.0.1`) et ne sert que `dist/roue-chat.html`. La page ne peut joindre qu'Ollama en local (`localhost:11434`).
 

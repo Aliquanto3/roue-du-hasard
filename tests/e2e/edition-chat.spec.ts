@@ -4,9 +4,9 @@ import { expect, test } from '@playwright/test';
 // Story 5.4 : l'édition chat est servie en local (npm run chat, port 5200), jamais en file://.
 const ORIGINE = 'http://localhost:5200/';
 
-function requeteBrute(method: string, path: string): Promise<number> {
+function requeteBrute(method: string, path: string, hote = 'localhost:5200'): Promise<number> {
   return new Promise((resolve, reject) => {
-    const q = http.request({ host: '127.0.0.1', port: 5200, method, path }, (r) => {
+    const q = http.request({ host: '127.0.0.1', port: 5200, method, path, headers: { Host: hote } }, (r) => {
       r.resume();
       r.on('end', () => resolve(r.statusCode ?? 0));
     });
@@ -40,6 +40,24 @@ test('l’édition chat se charge sans violation de CSP et la roue fonctionne', 
 
   expect(await page.evaluate(() => (window as unknown as { violationsCsp: string[] }).violationsCsp)).toEqual([]);
   expect(erreurs).toEqual([]);
+});
+
+test('le serveur ne sert que le Host localhost:5200', async () => {
+  expect(await requeteBrute('GET', '/', '127.0.0.1:5200')).toBe(302);
+  expect(await requeteBrute('GET', '/', 'evil.example:5200')).toBe(421);
+  expect(await requeteBrute('GET', '/', 'localhost:80')).toBe(421);
+});
+
+test('la redirection de 127.0.0.1 garde le chemin', async () => {
+  const location = await new Promise<string>((resolve, reject) => {
+    const q = http.request({ host: '127.0.0.1', port: 5200, path: '/x?a=1' }, (r) => {
+      r.resume();
+      resolve(String(r.headers.location));
+    });
+    q.on('error', reject);
+    q.end();
+  });
+  expect(location).toBe('http://localhost:5200/x?a=1');
 });
 
 test('le serveur refuse la remontée de chemin, le reste de dist/ et les autres méthodes', async () => {
