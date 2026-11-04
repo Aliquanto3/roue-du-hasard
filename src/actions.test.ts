@@ -154,10 +154,11 @@ describe('verrou F8 : toute action est refusée pendant une rotation', () => {
     basculerRendu: { mode: '2d' },
     couperSon: { coupe: true },
     exporter: {},
+    afficherCadeauSuivant: {},
     importer: { etat: etatInitial() },
   };
   // Réglages d'affichage et de son : permis pendant une rotation (testés plus bas).
-  const REGLAGES: readonly NomAction[] = ['basculerRendu', 'couperSon'];
+  const REGLAGES: readonly NomAction[] = ['basculerRendu', 'couperSon', 'afficherCadeauSuivant'];
 
   for (const nom of (Object.keys(params) as NomAction[]).filter((n) => !REGLAGES.includes(n))) {
     it(`${nom} renvoie rotation-en-cours et ne change rien`, () => {
@@ -241,5 +242,44 @@ describe('rendu, son, export et import', () => {
     const importe: Etat = { ...etatInitial(), cadeaux: ['Livre'], relief: false, sonCoupe: true };
     expect(b.actions.executer('importer', { etat: importe })).toEqual({ ok: true });
     expect(b.actions.magasin.lire()).toBe(importe);
+  });
+});
+
+describe('afficherCadeauSuivant', () => {
+  it('rend le prochain cadeau sans modifier l’état, même pendant une rotation', () => {
+    const b = banc();
+    b.actions.executer('coller', { texte: 'Ana,Bob' });
+    b.actions.executer('collerCadeaux', { texte: 'bougie,plaid' });
+    const avant = b.actions.magasin.lire();
+    expect(b.actions.executer('afficherCadeauSuivant', {})).toEqual({
+      ok: true,
+      cadeauSuivant: { numero: 1, total: 2, nom: 'bougie' },
+    });
+    b.rotation.active = true;
+    expect(b.actions.executer('afficherCadeauSuivant', {})).toMatchObject({ ok: true });
+    expect(b.actions.magasin.lire()).toBe(avant);
+  });
+
+  it('rend null sans cadeau', () => {
+    expect(banc().actions.executer('afficherCadeauSuivant', {})).toEqual({ ok: true, cadeauSuivant: null });
+  });
+});
+
+describe('essayer', () => {
+  it('applique les actions sur une copie : mêmes refus, état et roue intacts', () => {
+    const b = banc();
+    b.actions.executer('coller', { texte: 'Ana,Bob' });
+    const avant = b.actions.magasin.lire();
+    const essai = b.actions.essayer();
+    expect(essai.executer('ajouter', { nom: 'Cléo' })).toEqual({ ok: true });
+    expect(essai.executer('annulerDernierTirage', {})).toEqual({ ok: false, code: 'historique-vide' });
+    expect(essai.executer('lancer', {})).toEqual({ ok: true });
+    // Comme la vraie roue, la copie tourne après « lancer » : la suite du plan est refusée.
+    expect(essai.executer('ajouter', { nom: 'Dan' })).toEqual({ ok: false, code: 'rotation-en-cours' });
+    expect(essai.magasin.lire().participants).toHaveLength(3);
+    expect(b.actions.magasin.lire()).toBe(avant);
+    expect(b.lances).toEqual([]);
+    b.rotation.active = true;
+    expect(b.actions.essayer().executer('ajouter', { nom: 'X' })).toEqual({ ok: false, code: 'rotation-en-cours' });
   });
 });
