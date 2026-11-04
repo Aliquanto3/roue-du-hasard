@@ -210,7 +210,10 @@ export function creerPanneauChat(parent: HTMLElement, options: OptionsPanneauCha
       return;
     }
     const haut = roue.getBoundingClientRect().top + window.scrollY;
-    const libre = Math.floor(window.innerHeight - racine.getBoundingClientRect().height - haut - 8);
+    // La zone de la roue contient aussi autre chose que le canvas (bandeau, boutons) : on le retranche.
+    const boite = roue.getBoundingClientRect().height;
+    const toile = roue.querySelector('canvas')?.getBoundingClientRect().height ?? boite;
+    const libre = Math.floor(window.innerHeight - racine.getBoundingClientRect().height - haut - (boite - toile) - 8);
     const valeur = `${String(Math.max(0, libre))}px`;
     if (cible.getPropertyValue('--roue-libre') !== valeur) cible.setProperty('--roue-libre', valeur);
   };
