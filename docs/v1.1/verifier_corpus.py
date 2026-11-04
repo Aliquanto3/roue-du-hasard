@@ -1,6 +1,7 @@
 """Vérifie la structure du corpus d'essai du chat V1.1 (sans dépendance).
 
-Usage : uv run --no-project python docs/v1.1/verifier_corpus.py [corpus.jsonl]
+Usage : uv run --no-project python docs/v1.1/verifier_corpus.py [corpus.jsonl [corpus-test2.jsonl]]
+Vérifie aussi le lot d'essai `test2` (corpus-test2.jsonl), tenu à l'écart des règles.
 Code de retour 1 si une erreur est relevée. Ne mesure aucune qualité de moteur.
 """
 
@@ -15,6 +16,7 @@ from difflib import SequenceMatcher
 from pathlib import Path
 
 CORPUS = Path(__file__).with_name("corpus-commandes.jsonl")
+CORPUS_TEST2 = Path(__file__).with_name("corpus-test2.jsonl")
 
 CATEGORIES = {
     "formes_directes", "familier_fautes", "tournures_indirectes",
@@ -54,6 +56,10 @@ VERROUILLEES = {"ajouter", "coller", "renommer", "supprimer", "definirCouleur",
                 "effacerHistorique", "annulerDernierTirage"}
 DESTRUCTIVES = {"effacerHistorique", "reinitialiserCouleurs"}
 LOTS = {"dev", "test"}
+LOT_TEST2 = "test2"
+# Lot test2 : un seul lot par fichier, avec ses propres planchers (il est plus petit que test).
+MIN_PAR_CATEGORIE_TEST2 = 4
+MIN_ACTION_TEST2 = 3
 # Couverture minimale par action cible (étapes attendues), dans chaque lot.
 MIN_ACTION_DEV = 2
 MIN_ACTION_TEST = 3
@@ -76,7 +82,7 @@ def etapes(attendu: dict) -> list[dict]:
     return [attendu]
 
 
-def verifier_ligne(n: int, d: dict, erreurs: list[str]) -> list[str]:
+def verifier_ligne(n: int, d: dict, erreurs: list[str], lots: set[str] = LOTS) -> list[str]:
     """Retourne la liste des actions de la ligne (pour le décompte)."""
     def err(msg: str) -> None:
         erreurs.append(f"ligne {n} ({d.get('id', '?')}) : {msg}")
@@ -85,7 +91,7 @@ def verifier_ligne(n: int, d: dict, erreurs: list[str]) -> list[str]:
         if champ not in d:
             err(f"champ manquant « {champ} »")
             return []
-    if d["lot"] not in LOTS:
+    if d["lot"] not in lots:
         err(f"lot inconnu « {d['lot']} »")
     if d["categorie"] not in CATEGORIES:
         err(f"catégorie inconnue « {d['categorie']} »")
@@ -209,33 +215,87 @@ def normaliser_commande(commande: str, noms: list[str]) -> str:
     return " ".join(texte.split())
 
 
-def quasi_doublons(lignes: list[dict]) -> list[str]:
-    """Paires test/dev trop proches une fois les noms de l'état et le bruit retirés."""
+def quasi_doublons(lignes: list[dict], cible: str = "test", ref: str = "dev") -> list[str]:
+    """Paires cible/ref trop proches une fois les noms de l'état et le bruit retirés."""
     erreurs: list[str] = []
-    dev = [(d["id"], normaliser_commande(d["commande"], d["etat"]["noms"])) for d in lignes if d["lot"] == "dev"]
-    brutes_dev = {d["commande"].strip().lower(): d["id"] for d in lignes if d["lot"] == "dev"}
+    refs = [(d["id"], normaliser_commande(d["commande"], d["etat"]["noms"])) for d in lignes if d["lot"] == ref]
+    brutes = {d["commande"].strip().lower(): d["id"] for d in lignes if d["lot"] == ref}
     for d in lignes:
-        if d["lot"] != "test":
+        if d["lot"] != cible:
             continue
-        doublon = brutes_dev.get(d["commande"].strip().lower())
+        doublon = brutes.get(d["commande"].strip().lower())
         if doublon:
-            erreurs.append(f"commande « {d['commande']} » présente dans dev ({doublon}) et test ({d['id']})")
+            erreurs.append(f"commande « {d['commande']} » présente dans {ref} ({doublon}) et {cible} ({d['id']})")
         a = normaliser_commande(d["commande"], d["etat"]["noms"])
-        for id_dev, b in dev:
-            if (d["id"], id_dev) in EXCEPTIONS_QUASI_DOUBLON:
+        for id_ref, b in refs:
+            if (d["id"], id_ref) in EXCEPTIONS_QUASI_DOUBLON:
                 continue
             if GABARITS_CANONIQUES.match(a) or GABARITS_CANONIQUES.match(b):
                 continue
             ratio = SequenceMatcher(None, a, b).ratio()
             if ratio >= SEUIL_QUASI_DOUBLON:
                 erreurs.append(
-                    f"quasi-doublon test/dev : {d['id']} « {d['commande']} » ~ {id_dev} "
+                    f"quasi-doublon {cible}/{ref} : {d['id']} « {d['commande']} » ~ {id_ref} "
                     f"(similarité {ratio:.2f} sur « {a} » / « {b} »)"
                 )
     return erreurs
 
 
-def main(chemin: Path) -> int:
+def verifier_test2(chemin: Path, ids: set[str], dev_test: list[dict], erreurs: list[str]) -> None:
+    """Lot test2 : même structure, ni doublon ni quasi-doublon avec dev ni avec test."""
+    valides: list[dict] = []
+    par_cat: Counter[str] = Counter()
+    par_action: Counter[str] = Counter()
+    refuser = 0
+    total = 0
+    for n, brut in enumerate((x for x in chemin.read_text(encoding="utf-8").splitlines() if x.strip()), 1):
+        try:
+            d = json.loads(brut)
+        except json.JSONDecodeError as exc:
+            erreurs.append(f"{chemin.name} ligne {n} : JSON invalide ({exc})")
+            continue
+        if not isinstance(d, dict):
+            erreurs.append(f"{chemin.name} ligne {n} : objet JSON attendu")
+            continue
+        total += 1
+        id_ligne = str(d.get("id"))
+        if id_ligne in ids:
+            erreurs.append(f"{chemin.name} ligne {n} : id en double « {id_ligne} »")
+        ids.add(id_ligne)
+        avant = len(erreurs)
+        actions = verifier_ligne(n, d, erreurs, {LOT_TEST2})
+        par_cat[str(d.get("categorie"))] += 1
+        par_action.update(actions)
+        if actions == ["refuser"]:
+            refuser += 1
+        etat = d.get("etat")
+        if (
+            len(erreurs) == avant
+            and isinstance(d.get("commande"), str)
+            and isinstance(etat, dict)
+            and isinstance(etat.get("noms"), list)
+        ):
+            valides.append(d)
+    for ref in sorted(LOTS):
+        erreurs.extend(quasi_doublons(valides + dev_test, LOT_TEST2, ref))
+    for cat in sorted(CATEGORIES):
+        if par_cat[cat] < MIN_PAR_CATEGORIE_TEST2:
+            erreurs.append(f"test2 : catégorie {cat} : {par_cat[cat]} lignes (minimum {MIN_PAR_CATEGORIE_TEST2})")
+    for a in sorted(set(ACTIONS) | {"refuser", "clarifier"}):
+        if par_action[a] < MIN_ACTION_TEST2:
+            erreurs.append(f"test2 : action {a} : {par_action[a]} (minimum {MIN_ACTION_TEST2})")
+    print(f"\n--- Lot test2 ({chemin.name}) : {total} lignes ---")
+    print("Par catégorie :")
+    for cat in sorted(par_cat):
+        print(f"  {cat:26} {par_cat[cat]:3}")
+    print("Par action (étapes attendues) :")
+    for a in sorted(par_action):
+        print(f"  {a:26} {par_action[a]:3}")
+    if total:
+        print(f"Référence « moteur qui refuse tout » : test2 {refuser}/{total} = {refuser / total:.0%}")
+
+
+def main(chemin: Path, chemin_test2: Path | None = None, explicite: bool = False) -> int:
     erreurs: list[str] = []
     lignes = [ligne for ligne in chemin.read_text(encoding="utf-8").splitlines() if ligne.strip()]
     ids: set[str] = set()
@@ -284,6 +344,12 @@ def main(chemin: Path) -> int:
     # Une même commande ne doit pas être répartie entre dev et test (doublon exact)
     # et aucune paire dev/test ne doit être quasi identique.
     erreurs.extend(quasi_doublons(valides))
+    if chemin_test2 is not None and chemin_test2.exists():
+        verifier_test2(chemin_test2, ids, valides, erreurs)
+    elif chemin_test2 is not None and explicite:
+        erreurs.append(f"fichier absent : {chemin_test2}")
+    elif chemin_test2 is not None:
+        print(f"AVERTISSEMENT : {chemin_test2.name} absent, lot test2 non vérifié.", file=sys.stderr)
 
     for cat in sorted(CATEGORIES):
         if par_cat[cat] == 0:
@@ -327,4 +393,8 @@ def main(chemin: Path) -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main(Path(sys.argv[1]) if len(sys.argv) > 1 else CORPUS))
+    sys.exit(main(
+        Path(sys.argv[1]) if len(sys.argv) > 1 else CORPUS,
+        Path(sys.argv[2]) if len(sys.argv) > 2 else CORPUS_TEST2,
+        explicite=len(sys.argv) > 2,
+    ))

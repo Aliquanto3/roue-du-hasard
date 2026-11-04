@@ -4,7 +4,7 @@
  */
 import { decider } from '../chat/cascade';
 import { estRefus, formeValide, type Decision, type FabriqueEtage, type OptionsEtages, type TraceEtage } from '../chat/types';
-import { actionsAttendues, comparer, decisionEffective, type LigneCorpus } from './comparateur';
+import { actionsAttendues, comparer, decisionEffective, type LigneCorpus, type LotCorpus } from './comparateur';
 
 export interface DetailLigne {
   readonly id: string;
@@ -41,7 +41,7 @@ export interface ScoreAction extends Score {
 
 export interface RapportBanc {
   readonly moteur: string;
-  readonly lot: 'dev' | 'test';
+  readonly lot: LotCorpus;
   /** Score sur la décision après `planifier` (ce que vit l'utilisateur). */
   readonly global: Score;
   /** Score sur la décision brute de la cascade, indicateur secondaire. */
@@ -93,7 +93,7 @@ export interface OptionsBanc {
 
 export async function lancerBanc(
   corpus: readonly LigneCorpus[],
-  lot: 'dev' | 'test',
+  lot: LotCorpus,
   cfg: OptionsBanc,
 ): Promise<RapportBanc> {
   const maintenant = cfg.maintenant ?? (() => performance.now());

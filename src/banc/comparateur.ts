@@ -24,9 +24,12 @@ import {
   type EtatChat,
 } from '../chat/types';
 
+/** Lots du corpus : `dev` règle les moteurs ; `test` et `test2` ne servent qu'à l'essai (README, « Règle de séparation »). */
+export type LotCorpus = 'dev' | 'test' | 'test2';
+
 export interface LigneCorpus {
   readonly id: string;
-  readonly lot: 'dev' | 'test';
+  readonly lot: LotCorpus;
   readonly categorie: string;
   readonly commande: string;
   readonly etat: EtatChat;

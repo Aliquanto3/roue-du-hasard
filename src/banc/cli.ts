@@ -1,7 +1,8 @@
 /**
- * Ligne de commande du banc : `npm run banc:chat -- --moteur <nom> [--lot dev|test] [--modele m] [--url u] [--corpus f]`.
+ * Ligne de commande du banc : `npm run banc:chat -- --moteur <nom> [--lot dev|test|test2] [--modele m] [--url u] [--corpus f]`.
  * `--corpus <fichier>` remplace le corpus du dépôt par un export de la fenêtre d'inspection (5.7) ou un fichier JSONL.
- * Le lot `test` exige `--lot test` explicite (il ne sert pas au réglage des règles). Détail ligne par
+ * Les lots `test` et `test2` exigent `--lot test` ou `--lot test2` explicite (ils ne servent pas au réglage
+ * des règles) ; `test2` est lu dans `docs/v1.1/corpus-test2.jsonl`. Détail ligne par
  * ligne dans `.banc/<moteur>-<lot>.json`.
  */
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -10,11 +11,18 @@ import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { lancerBanc, type RapportBanc, type Score, type ScoreAction } from './banc';
 import { versCorpus } from '../chat/inspection';
-import type { LigneCorpus } from './comparateur';
+import type { LigneCorpus, LotCorpus } from './comparateur';
 import { fabriquesDuMoteur } from './moteurs';
 
 const RACINE = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const CHEMIN_CORPUS = resolve(RACINE, 'docs', 'v1.1', 'corpus-commandes.jsonl');
+
+export const CHEMIN_CORPUS_TEST2 = resolve(RACINE, 'docs', 'v1.1', 'corpus-test2.jsonl');
+
+/** Corpus du dépôt qui porte le lot demandé : `test2` vit dans son propre fichier. */
+export function lireCorpusDuLot(lot: LotCorpus): LigneCorpus[] {
+  return lireCorpus(lot === 'test2' ? CHEMIN_CORPUS_TEST2 : CHEMIN_CORPUS);
+}
 
 export function lireCorpus(chemin: string = CHEMIN_CORPUS): LigneCorpus[] {
   return readFileSync(chemin, 'utf-8')
@@ -27,7 +35,7 @@ export function lireCorpus(chemin: string = CHEMIN_CORPUS): LigneCorpus[] {
  * Corpus d'un fichier choisi : un export de la fenêtre d'inspection (document JSON, toutes ses lignes
  * versées au lot demandé) ou un fichier JSONL au format du corpus du dépôt.
  */
-export function lireCorpusFichier(chemin: string, lot: 'dev' | 'test'): LigneCorpus[] {
+export function lireCorpusFichier(chemin: string, lot: LotCorpus): LigneCorpus[] {
   const texte = readFileSync(chemin, 'utf-8');
   let document: unknown;
   try {
@@ -41,7 +49,7 @@ export function lireCorpusFichier(chemin: string, lot: 'dev' | 'test'): LigneCor
 
 export interface Arguments {
   readonly moteur: string;
-  readonly lot: 'dev' | 'test';
+  readonly lot: LotCorpus;
   readonly modele?: string;
   readonly url?: string;
   /** Fichier de corpus à la place de celui du dépôt. */
@@ -63,7 +71,7 @@ export function analyserArguments(argv: readonly string[]): Arguments {
   });
   if (!values.moteur) throw new Error('--moteur <nom> est obligatoire');
   const lot = values.lot ?? 'dev';
-  if (lot !== 'dev' && lot !== 'test') throw new Error(`--lot doit valoir dev ou test (reçu « ${lot} »)`);
+  if (lot !== 'dev' && lot !== 'test' && lot !== 'test2') throw new Error(`--lot doit valoir dev, test ou test2 (reçu « ${lot} »)`);
   return {
     moteur: values.moteur,
     lot,
@@ -108,7 +116,7 @@ export async function main(argv: readonly string[]): Promise<number> {
     args = analyserArguments(argv);
   } catch (e) {
     console.error(`banc:chat : ${message(e)}`);
-    console.error('Usage : npm run banc:chat -- --moteur <nom> [--lot dev|test] [--modele <m>] [--url <u>] [--corpus <fichier>]');
+    console.error('Usage : npm run banc:chat -- --moteur <nom> [--lot dev|test|test2] [--modele <m>] [--url <u>] [--corpus <fichier>]');
     return 2;
   }
   let fabriques;
@@ -124,7 +132,7 @@ export async function main(argv: readonly string[]): Promise<number> {
   };
   let corpus: LigneCorpus[];
   try {
-    corpus = args.corpus === undefined ? lireCorpus() : lireCorpusFichier(args.corpus, args.lot);
+    corpus = args.corpus === undefined ? lireCorpusDuLot(args.lot) : lireCorpusFichier(args.corpus, args.lot);
   } catch (e) {
     console.error(`banc:chat : corpus illisible : ${message(e)}`);
     return 2;
