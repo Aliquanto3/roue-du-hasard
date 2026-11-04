@@ -8,9 +8,9 @@ import { MOTEURS, MOTEURS_A_VENIR, fabriquesDuMoteur } from './moteurs';
 const corpus = lireCorpus();
 
 describe('plancher « refuse tout »', () => {
-  // Valeurs affichées par `docs/v1.1/verifier_corpus.py` (dev 26/96, test 32/126).
+  // Valeurs affichées par `docs/v1.1/verifier_corpus.py` (dev 26/100, test 32/126).
   it.each([
-    ['dev', 26, 96],
+    ['dev', 26, 100],
     ['test', 32, 126],
   ] as const)('le moteur refuse-tout donne exactement le plancher du lot %s', async (lot, ok, total) => {
     const r = await lancerBanc(corpus, lot, { moteur: 'refuse-tout', fabriques: MOTEURS['refuse-tout'] ?? [] });

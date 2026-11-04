@@ -201,13 +201,18 @@ export function candidatsNoms(commande: string, noms: readonly string[]): string
     vus.add(f);
     uniques.push(n);
   }
-  // Noms entiers, aux frontières de mot, sur la forme normalisée (sans accents, casse ni ponctuation).
+  // Noms entiers, aux frontières de mot (le trait d'union lie : « Marie-Claire » n'est pas « Marie »), sur la forme normalisée (sans accents ni casse).
   const mots = (t: string): string =>
     ` ${formeComparable(t)
-      .replace(/[^\p{L}\p{N}]+/gu, ' ')
+      .replace(/[^\p{L}\p{N}-]+/gu, ' ')
       .trim()} `;
   const cible = mots(commande);
-  return uniques.filter((n) => cible.includes(mots(n)));
+  // Dans l'ordre où la commande les cite.
+  return uniques
+    .map((n) => ({ n, pos: cible.indexOf(mots(n)) }))
+    .filter((x) => x.pos >= 0)
+    .sort((a, b) => a.pos - b.pos)
+    .map((x) => x.n);
 }
 
 /** Messages : consignes, puis état (noms en données JSON, `<` et `>` échappés) et commande. */
@@ -417,6 +422,11 @@ export function creerEtageDecision(
           const candidats = candidatsNoms(commande, etat.noms);
           if (candidats.length === 0)
             return passer('nom-non-cite', "aucun nom de la liste n'est cité dans la commande");
+          // Règle déterministe : une action à un seul nom alors que la commande en cite au moins deux
+          // (« supprime Paul ou Marie ») : clarifier, sans interroger le modèle ni dépendre d'un seuil.
+          if (candidats.length >= 2) {
+            return rendre({ action: 'clarifier', candidats: candidats.slice(0, 3) }, choixOutil.p);
+          }
           // Options neutralisées comme les messages ; on revient au nom d'origine à la lecture.
           const origine = new Map(candidats.map((n) => [neutraliser(n), n]));
           const r = await poser([

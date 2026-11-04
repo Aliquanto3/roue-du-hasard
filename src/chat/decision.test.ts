@@ -173,13 +173,13 @@ describe('étage decision', () => {
   it('seuil : nom sous le seuil configurable passe la main, incertain', async () => {
     const f = serveur({
       outil: { supprimer: 0.95, aucun: 0.05 },
-      nom: { Bob: 0.7, Ana: 0.3 },
+      nom: { Bob: 0.97 },
     });
-    const cmd = 'supprime Bob ou Ana';
-    const r = (await decider(opts(f, { seuilDecision: 0.8 }), cmd)) as PasseMain;
+    const cmd = 'supprime Bob';
+    const r = (await decider(opts(f, { seuilDecision: 0.98 }), cmd)) as PasseMain;
     expect(r.raison).toBe('incertain');
     expect(r.trace.sortie).toContain('answers');
-    expect(((await decider(opts(f, { seuilDecision: 0.7 }), cmd)) as ResultatEtage).decision).toEqual({
+    expect(((await decider(opts(f, { seuilDecision: 0.9 }), cmd)) as ResultatEtage).decision).toEqual({
       action: 'supprimer',
       params: { nom: 'Bob' },
     });
@@ -229,21 +229,18 @@ describe('étage decision', () => {
     expect(plan).toEqual({ genre: 'clarifier', candidats: ['Marie', 'Marie'] });
   });
 
-  it('ambiguïté (noul au-dessus du seuil) : clarifier avec les candidats les plus probables', async () => {
+  it('ambiguïté (noul au-dessus du seuil) : clarifier', async () => {
     const r = (await decider(
       opts(
         serveur({
           outil: { supprimer: 0.9 },
-          nom: { Ana: 0.3, Bob: 0.5, Chloé: 0.2 },
+          nom: { Bob: 1 },
           ambigu: 0.95,
         }),
       ),
-      'supprime Ana, Bob ou Chloé',
+      'supprime Bob',
     )) as ResultatEtage;
-    expect(r.decision).toEqual({
-      action: 'clarifier',
-      candidats: ['Bob', 'Ana', 'Chloé'],
-    });
+    expect(r.decision).toEqual({ action: 'clarifier', candidats: ['Bob'] });
     expect(r.confiance).toBe(0.95);
   });
 
@@ -420,38 +417,38 @@ describe('étage decision', () => {
     expect(((await decider(opts(reponse(reel)), 'annule')) as PasseMain).raison).toBe('reponse-invalide');
   });
 
-  it('réponses réelles de tev1:0.8b : nom et ambigu lus, `noul` au-dessus de seuilAmbigu donne clarifier', async () => {
-    // Relevé réel pour « supprime Paul ou Marie » ; l'étage 1 (outil) est servi par le simulateur.
-    const reelNom = {
-      model: 'tev1:0.8b',
-      answers: {
-        nom: {
-          type: 'choice',
-          choice: 'Paul',
-          probabilities: { Paul: 0.543331371385393, Marie: 0.456668628614607 },
-          confidence: 0.086662742770786,
-        },
-        ambigu: { type: 'noul', noul: 0.6605770613094323 },
-      },
-      usage: { input_tokens: 219, output_tokens: 0 },
-    };
-    const sim = serveur({ outil: { supprimer: 0.9 } });
-    const f = ((url: string, init: RequestInit) =>
-      decoder(init.body as string).questions[0]?.id === 'nom'
-        ? Promise.resolve(new Response(JSON.stringify(reelNom)))
-        : sim(url, init)) as unknown as typeof fetch;
-    const e: EtatChat = { noms: ['Paul', 'Marie'], rotation: false };
-    const etage = creerEtageDecision(opts(f, { seuilAmbigu: 0.6 }));
-    const r = (await etage.decider('supprime Paul ou Marie', e, signal)) as ResultatEtage;
+  it('plusieurs noms cités avec une action à un seul nom : clarifier sans seuil ni second appel', async () => {
+    const requetes: Requete[] = [];
+    const e: EtatChat = { noms: ['Marie', 'Paul', 'Zoé'], rotation: false };
+    // Même un modèle très affirmatif ne supprime pas : le nom n'est pas interrogé.
+    const f = serveur({ outil: { supprimer: 0.99 }, nom: { Paul: 1 } }, requetes);
+    const r = (await decider(opts(f), 'supprime Paul ou Marie', e)) as ResultatEtage;
     expect(r.decision).toEqual({ action: 'clarifier', candidats: ['Paul', 'Marie'] });
-    expect(r.confiance).toBe(0.6605770613094323);
-    expect(etage.derniereTrace()?.probabilites['ambigu']).toBe(0.6605770613094323);
-    // Seuil par défaut (0,9) : pas de clarification, le nom (0,54) est sous le seuil de décision (0,6).
-    const defaut = (await decider(opts(f), 'supprime Paul ou Marie', e)) as PasseMain;
-    expect(defaut.raison).toBe('incertain');
+    expect(r.confiance).toBe(0.99);
+    expect(requetes).toHaveLength(1);
+    // Même avec un seuil de décision très bas, la règle l'emporte.
+    const bas = (await decider(opts(f, { seuilDecision: 0.1 }), 'supprime Paul ou Marie', e)) as ResultatEtage;
+    expect(bas.decision).toEqual({ action: 'clarifier', candidats: ['Paul', 'Marie'] });
+    // Quatre noms : au plus trois candidats, dans l'ordre de la commande.
+    const e4: EtatChat = { noms: ['Ana', 'Bob', 'Chloé', 'Dan'], rotation: false };
+    const trois = (await decider(opts(f), 'renomme Dan, Chloé, Bob ou Ana', e4)) as ResultatEtage;
+    expect(trois.decision).toEqual({ action: 'clarifier', candidats: ['Dan', 'Chloé', 'Bob'] });
   });
 
-  it('« supprime Paul » : noul réel à 0,77, sans ambiguïté, n’est pas clarifié (seuilAmbigu 0,9)', async () => {
+  it('nom composé : « Marie-Claire » ne compte pas pour « Marie » ; un seul nom cité reste inchangé', async () => {
+    const e: EtatChat = { noms: ['Marie', 'Marie-Claire', 'Paul'], rotation: false };
+    expect(candidatsNoms('supprime Marie-Claire', e.noms)).toEqual(['Marie-Claire']);
+    expect(candidatsNoms('supprime Marie ou Marie-Claire', e.noms)).toEqual(['Marie', 'Marie-Claire']);
+    const requetes: Requete[] = [];
+    const f = serveur({ outil: { supprimer: 0.9 }, nom: { 'Marie-Claire': 1 } }, requetes);
+    const r = (await decider(opts(f), 'supprime Marie-Claire', e)) as ResultatEtage;
+    expect(r.decision).toEqual({ action: 'supprimer', params: { nom: 'Marie-Claire' } });
+    expect(requetes).toHaveLength(2);
+    const seul = (await decider(opts(serveur({ outil: { supprimer: 0.9 }, nom: { Paul: 1 } })), 'supprime Paul', e)) as ResultatEtage;
+    expect(seul.decision).toEqual({ action: 'supprimer', params: { nom: 'Paul' } });
+  });
+
+  it('réponse réelle de tev1:0.8b pour « supprime Paul » : noul 0,77 sous seuilAmbigu, sans effet', async () => {
     const reel = {
       model: 'tev1:0.8b',
       answers: {
@@ -466,8 +463,10 @@ describe('étage decision', () => {
         ? Promise.resolve(new Response(JSON.stringify(reel)))
         : sim(url, init)) as unknown as typeof fetch;
     const e: EtatChat = { noms: ['Paul', 'Marie'], rotation: false };
-    const r = (await decider(opts(f), 'supprime Paul', e)) as ResultatEtage;
+    const etage = creerEtageDecision(opts(f));
+    const r = (await etage.decider('supprime Paul', e, signal)) as ResultatEtage;
     expect(r.decision).toEqual({ action: 'supprimer', params: { nom: 'Paul' } });
+    expect(etage.derniereTrace()?.probabilites['ambigu']).toBe(0.7741634886809781);
     // En abaissant seuilAmbigu sous 0,77, la clarification revient.
     const bas = (await decider(opts(f, { seuilAmbigu: 0.7 }), 'supprime Paul', e)) as ResultatEtage;
     expect(bas.decision).toEqual({ action: 'clarifier', candidats: ['Paul'] });
