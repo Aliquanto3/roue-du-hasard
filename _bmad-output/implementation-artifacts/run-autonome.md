@@ -203,3 +203,12 @@ Ordre de reprise :
 - 2026-11-04 09:04 · run · décision · reprise sur le PC 2 : main f11aef4, npm ci, Ollama 0.40.13 (OLLAMA_ORIGINS localhost:5200), GPU 0/6144 Mo ; tev1:0.8b, lfm3:1.7b et lfm2.5:8b (étiquettes exactes) en téléchargement ; llama-server absent ; Anaël donne le feu vert au run autonome ·
 - 2026-11-04 09:04 · 7.1 · dev · lancé (Opus, correction du code après 7.2 sur la branche existante) · 3433fb6
 - 2026-11-04 09:04 · 5.10 · dev · étape B lancée (contrat réel tev1:0.8b, mesure GPU, llama-server, Julia-1 et Laya) ·
+- 2026-11-04 · 7.1 · dev · fini : rangée .page__commandes (réglages et projection), tabulation réalignée, test 320 px en repli sans Fullscreen · e6fcad6
+- 2026-11-04 · 7.1 · second-avis · 1 medium (3e ligne à 320 px, tiroir fermé), 2 low · e6fcad6
+- 2026-11-04 · 7.1 · CI · rouge 5/9 : chat-panneau.spec.ts:87 à 568 px sous Ubuntu (rangée repliée, polices Linux) ; instables Firefox recette:245 et ambiance:51 ; correction demandée (bouton sans hauteur ajoutée) · e6fcad6
+- 2026-11-04 · main · CI · rouge sur 2 instables Firefox (recette:245, ambiance:51), verte à la relance · f11aef4
+- 2026-11-04 · 5.10 · dev · étape B finie, PR #41 : contrat réel constaté (answers par id, choice, probabilities, confidence, noul), seuilDecision 0,6 (tev1 dev 42/96, plancher 26) ; mémoire mesurée tev1 1369 Mo, Julia-1 187 Mo, Laya 529 Mo ; Julia-1 et Laya au plancher, non retenus ; llama-server b12100 installé · 7086df4
+- 2026-11-04 · 5.10 · second-avis · 2 high (options partielles rejetées, seuil unique appliqué au noul : « supprime Paul » clarifié à tort), 2 low · 7086df4
+- 2026-11-04 · 5.10 · dev · corrections : Object.hasOwn, seuilAmbigu distinct (0,9 provisoire, banc dev à refaire GPU libre), choice = argmax, confidence contrôlée · 6da4efe
+- 2026-11-04 · 5.10 · review · lancée (Opus, OptionsEtages touché) · 6da4efe
+- 2026-11-04 · 6.1 · dev · lancé (spec docs/specs/6.1-essai-stt.md écrite par l'orchestrateur ; GPU réservé à 6.1) ·
