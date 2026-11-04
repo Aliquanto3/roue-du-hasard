@@ -3,7 +3,7 @@ import type { Etage, FabriqueEtage } from '../chat/types';
 import { lancerBanc, quantile } from './banc';
 import { analyserArguments, lireCorpus } from './cli';
 import { comparer, type LigneCorpus } from './comparateur';
-import { MOTEURS, fabriquesDuMoteur } from './moteurs';
+import { MOTEURS, MOTEURS_A_VENIR, fabriquesDuMoteur } from './moteurs';
 
 const corpus = lireCorpus();
 
@@ -119,10 +119,29 @@ describe('arguments et moteurs', () => {
     });
   });
 
-  it('moteur inconnu ou à venir : message clair', () => {
-    expect(() => fabriquesDuMoteur('slm')).toThrow('pas encore disponible (story 5.6)');
+  it('moteur inconnu : message clair, avec les moteurs disponibles', () => {
     expect(() => fabriquesDuMoteur('toString')).toThrow('inconnu');
+    expect(() => fabriquesDuMoteur('absent')).toThrow('moteurs disponibles : refuse-tout, regles, slm, decision');
+    expect(MOTEURS_A_VENIR).toEqual({});
     expect(fabriquesDuMoteur('refuse-tout')).toHaveLength(1);
+  });
+
+  it('moteur slm : inactif sans --modele (aucun appel réseau), --modele et --url transmis au client', async () => {
+    const [fabrique] = fabriquesDuMoteur('slm');
+    expect(fabriquesDuMoteur('slm')).toHaveLength(1);
+    const signal = new AbortController().signal;
+    const etat = { noms: ['Ana'], rotation: false };
+    const appels: string[] = [];
+    const f = ((u: string, init: RequestInit) => {
+      appels.push(u);
+      void init;
+      return Promise.resolve(new Response(JSON.stringify({ message: { content: '' } })));
+    }) as unknown as typeof fetch;
+    expect(await fabrique?.({ fetch: f }).decider('lance', etat, signal)).toBeNull();
+    expect(appels).toEqual([]);
+    const r = await fabrique?.({ modele: 'm1', urlOllama: 'http://h:1', fetch: f }).decider('lance', etat, signal);
+    expect(appels).toEqual(['http://h:1/api/chat']);
+    expect(r).toMatchObject({ decision: null, raison: 'sans-outil' });
   });
 
   it('moteur decision : --modele devient le modèle de décision ; inactif sans modèle', async () => {

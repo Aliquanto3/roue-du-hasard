@@ -218,17 +218,22 @@ describe('étage SLM', () => {
     expect((await e.decider('x', etat, signal))?.decision).toBeNull();
     expect(appels).toHaveLength(1);
     expect(e.etat()).toBe('indisponible');
-    expect(e.raisonIndisponible()).toBe('Ollama injoignable : fetch failed');
+    expect(e.raisonIndisponible()).toEqual({ code: 'ollama-absent', detail: 'Ollama injoignable : fetch failed' });
   });
 
   it('403 (OLLAMA_ORIGINS) et 404 (modèle absent) : null, indisponible avec raison lisible', async () => {
     const e = etage(serveur(() => new Response('', { status: 403 })));
     expect((await e.decider('x', etat, signal))?.decision).toBeNull();
     expect(e.etat()).toBe('indisponible');
-    expect(e.raisonIndisponible()).toContain('OLLAMA_ORIGINS');
+    expect(e.raisonIndisponible()?.code).toBe('origine-refusee');
+    expect(e.raisonIndisponible()?.detail).toContain('OLLAMA_ORIGINS');
     const e2 = etage(serveur(() => new Response('', { status: 404 })));
     expect((await e2.decider('x', etat, signal))?.decision).toBeNull();
-    expect(e2.raisonIndisponible()).toBe('modèle m non installé (404)');
+    expect(e2.raisonIndisponible()).toEqual({
+      code: 'modele-absent',
+      detail: 'modèle m non installé (404)',
+      modele: 'm',
+    });
   });
 
   it('une erreur 500 passe la main sans marquer l’étage indisponible ; JSON invalide aussi', async () => {
@@ -342,7 +347,7 @@ describe('étage SLM', () => {
     expect(slm.etat()).toBe('indisponible');
     await c.decider('y', etat, signal);
     expect(c.etages[0]).toBe(slm);
-    expect(slm.raisonIndisponible()).toBe('Ollama injoignable : refusé');
+    expect(slm.raisonIndisponible()).toEqual({ code: 'ollama-absent', detail: 'Ollama injoignable : refusé' });
   });
 });
 

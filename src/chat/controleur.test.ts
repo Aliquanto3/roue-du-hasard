@@ -2,9 +2,10 @@
 import { describe, expect, it } from 'vitest';
 import { creerActions, creerMagasin, type Actions } from '../actions';
 import { creerCascade } from './cascade';
+import { creerInspection } from './inspection';
 import { avisIndisponibilite, creerControleur, modeleIndisponible, type Controleur } from './controleur';
 import { TEXTES_CHAT } from './textes';
-import type { Decision, DecisionAction, EtatChat, Etage } from './types';
+import type { Decision, DecisionAction, EtatChat, Etage, RaisonIndisponible } from './types';
 
 interface Banc {
   c: Controleur;
@@ -440,24 +441,144 @@ describe('controleur du panneau', () => {
   });
 
   describe('avis d’indisponibilité selon la raison', () => {
-    const slmRaison = (raison: string): Etage => ({
+    const slmRaison = (raison: RaisonIndisponible): Etage => ({
       nom: 'slm',
       decider: () => Promise.resolve(null),
       ...{ etat: () => 'indisponible', raisonIndisponible: () => raison },
     });
 
     it('modèle absent : nom du modèle et ollama pull', () => {
-      const avis = avisIndisponibilite([slmRaison('modèle qwen3:4b non installé (404)')]);
+      const avis = avisIndisponibilite([slmRaison({ code: 'modele-absent', detail: 'modèle qwen3:4b non installé (404)', modele: 'qwen3:4b' })]);
       expect(avis).toBe(TEXTES_CHAT.avisModeleAbsent('qwen3:4b'));
       expect(avis).toContain('ollama pull qwen3:4b');
       expect(avis).not.toContain('OLLAMA_ORIGINS');
     });
 
     it('Ollama injoignable ou 403 : consigne OLLAMA_ORIGINS', () => {
-      expect(avisIndisponibilite([slmRaison('Ollama injoignable : x')])).toBe(TEXTES_CHAT.avisIndisponible);
-      expect(avisIndisponibilite([slmRaison('accès refusé (403) : vérifier OLLAMA_ORIGINS')])).toBe(
+      expect(avisIndisponibilite([slmRaison({ code: 'ollama-absent', detail: 'Ollama injoignable : x' })])).toBe(TEXTES_CHAT.avisIndisponible);
+      expect(avisIndisponibilite([slmRaison({ code: 'origine-refusee', detail: 'accès refusé (403)' })])).toBe(
         TEXTES_CHAT.avisIndisponible,
       );
     });
+  });
+});
+
+describe('enregistrement pour la fenêtre d’inspection (5.7)', () => {
+  function avecInspection(script: Record<string, Decision>, noms: readonly string[] = []) {
+    const magasin = creerMagasin();
+    const actions = creerActions({ magasin, enRotation: () => false, lancer: () => undefined, tirer: () => 0 });
+    for (const nom of noms) actions.executer('ajouter', { nom });
+    const memoire = new Map<string, string>();
+    const stockage = {
+      getItem: (k: string) => memoire.get(k) ?? null,
+      setItem: (k: string, v: string) => void memoire.set(k, v),
+      removeItem: (k: string) => void memoire.delete(k),
+    };
+    const inspection = creerInspection({ stockage: () => stockage });
+    const etage: Etage = {
+      nom: 'regles',
+      decider: (commande) => {
+        const decision = script[commande];
+        return Promise.resolve(decision ? { decision, trace: { entree: commande, sortie: 'regle-x' } } : null);
+      },
+    };
+    const c = creerControleur({
+      cascade: creerCascade({ etages: [etage] }),
+      actions,
+      enRotation: () => false,
+      inspection,
+    });
+    return { c, inspection, actions };
+  }
+
+  it('commande exécutée : une entrée avec étage, règle, plan, exécution et état envoyé', async () => {
+    const { c, inspection } = avecInspection({ 'ajoute Léo': appel('ajouter', { nom: 'Léo' }) }, ['Ana']);
+    await c.envoyer('ajoute Léo');
+    const [e] = inspection.entrees();
+    expect(inspection.entrees()).toHaveLength(1);
+    expect(e).toMatchObject({
+      commande: 'ajoute Léo',
+      etage: 'regles',
+      decision: { action: 'ajouter', params: { nom: 'Léo' } },
+      execution: 'execute',
+      plan: { genre: 'etapes', confirmation: false },
+    });
+    expect(e?.etat.noms).toEqual(['Ana']);
+    expect(e?.etages[0]).toMatchObject({ etage: 'regles', regle: 'regle-x' });
+  });
+
+  it('refus du plan : non exécutée ; commande non comprise : refus, aucun étage', async () => {
+    const { c, inspection } = avecInspection({ 'supprime Zed': appel('supprimer', { nom: 'Zed' }) }, ['Ana']);
+    await c.envoyer('supprime Zed');
+    await c.envoyer('blabla');
+    const [a, b] = inspection.entrees();
+    expect(a).toMatchObject({ execution: 'non-execute', plan: { genre: 'refuser', detail: 'refus : nom-absent' } });
+    expect(b).toMatchObject({ etage: null, execution: 'non-execute', decision: { action: 'refuser', code: 'incompris' } });
+  });
+
+  it('confirmation : en attente, puis exécutée ou annulée sur la même entrée', async () => {
+    const script = { 'vide tout': appel('effacerHistorique'), rien: appel('effacerHistorique') };
+    const { c, inspection } = avecInspection(script, ['Ana']);
+    await c.envoyer('vide tout');
+    expect(inspection.entrees()[0]?.execution).toBe('attente-confirmation');
+    expect(inspection.entrees()[0]?.plan.confirmation).toBe(true);
+    c.confirmer();
+    expect(inspection.entrees()[0]?.execution).toBe('execute');
+    await c.envoyer('rien');
+    expect(inspection.entrees()[1]?.execution).toBe('attente-confirmation');
+    c.annuler();
+    expect(inspection.entrees()[1]?.execution).toBe('annule');
+    expect(inspection.entrees()).toHaveLength(2);
+  });
+
+  it('nouvelle commande pendant une confirmation : l’ancienne entrée est annulée', async () => {
+    const { c, inspection } = avecInspection({
+      'vide tout': appel('effacerHistorique'),
+      'ajoute Léo': appel('ajouter', { nom: 'Léo' }),
+    });
+    await c.envoyer('vide tout');
+    await c.envoyer('ajoute Léo');
+    expect(inspection.entrees().map((e) => e.execution)).toEqual(['annule', 'execute']);
+  });
+
+  it('confirmation périmée : non exécutée', async () => {
+    const { c, inspection, actions } = avecInspection({ 'vide tout': appel('effacerHistorique') }, ['Ana']);
+    await c.envoyer('vide tout');
+    actions.executer('ajouter', { nom: 'Bob' });
+    c.confirmer();
+    expect(inspection.entrees()[0]?.execution).toBe('perime');
+  });
+
+  it('clarification : l’entrée porte la décision et le plan réellement exécutés, la clarification est gardée', async () => {
+    const { c, inspection } = avecInspection({ 'supprime Mari': appel('supprimer', { nom: 'Mari' }) }, ['Marie', 'Marion']);
+    await c.envoyer('supprime Mari');
+    expect(inspection.entrees()[0]).toMatchObject({ execution: 'attente-precision', plan: { genre: 'clarifier' } });
+    c.choisir('Marion');
+    const e = inspection.entrees()[0];
+    expect(inspection.entrees()).toHaveLength(1);
+    expect(e).toMatchObject({
+      decision: { action: 'supprimer', params: { nom: 'Marion' } },
+      plan: { genre: 'etapes', detail: '1 étape(s)', confirmation: false },
+      execution: 'execute',
+      clarification: { decision: { action: 'supprimer', params: { nom: 'Mari' } }, plan: { genre: 'clarifier' } },
+    });
+    expect(e?.clarification?.plan.detail).toBe('clarifier : Marie, Marion');
+  });
+
+  it('nouvelle commande pendant une précision attendue : l’entrée est annulée', async () => {
+    const { c, inspection } = avecInspection(
+      { 'supprime Mari': appel('supprimer', { nom: 'Mari' }), 'ajoute Léo': appel('ajouter', { nom: 'Léo' }) },
+      ['Marie', 'Marion'],
+    );
+    await c.envoyer('supprime Mari');
+    await c.envoyer('ajoute Léo');
+    expect(inspection.entrees().map((e) => e.execution)).toEqual(['annule', 'execute']);
+  });
+
+  it('panneau fermé pendant une confirmation : entrée annulée', async () => {
+    const { c, inspection } = avecInspection({ 'vide tout': appel('effacerHistorique') }, ['Ana']);
+    await c.envoyer('vide tout');
+    c.fermer();
+    expect(inspection.entrees()[0]?.execution).toBe('annule');
   });
 });

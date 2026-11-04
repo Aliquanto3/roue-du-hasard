@@ -4,6 +4,8 @@ import { application } from './main';
 import { creerCascade, ETAGES_ENREGISTRES } from './chat/cascade';
 import { creerControleur } from './chat/controleur';
 import { MARQUEUR_CHAT } from './chat/marqueur';
+import { creerFenetreInspection } from './chat/fenetre-inspection';
+import { creerInspection } from './chat/inspection';
 import { creerPanneauChat } from './chat/panneau-chat';
 import { lireReglages, type ReglagesChat } from './chat/reglages-chat';
 import type { OptionsEtages } from './chat/types';
@@ -28,7 +30,10 @@ const racine = document.getElementById('app');
 const app = application;
 if (racine && app) {
   racine.dataset['chat'] = `${MARQUEUR_CHAT}:${String(cascade.etages.length)}`;
+  const inspection = creerInspection({ stockage });
+  const fenetre = creerFenetreInspection(document.body, inspection);
   const controleur = creerControleur({
+    inspection,
     cascade,
     actions: app.actions,
     enRotation: () => app.roue.enRotation,
@@ -40,6 +45,7 @@ if (racine && app) {
       reglages,
       surReglages: appliquer,
       stockage,
+      inspection: fenetre,
       ouvert: window.matchMedia('(min-width: 52rem)').matches,
     });
     zone.prepend(section);

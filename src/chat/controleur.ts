@@ -6,9 +6,14 @@
  */
 import type { Actions } from '../actions';
 import type { Cascade } from './cascade';
+import { SEUIL_DECISION_DEFAUT } from './decision';
+import { construireEntree, decrirePlan, type Execution, type Inspection } from './inspection';
 import { executerPlan, planifier, type Etape, type Plan } from './outils';
 import { TEXTES_CHAT } from './textes';
-import { estClarifier, estEtapes, type Decision, type DecisionAction, type EtatChat, type Etage } from './types';
+import { estClarifier, estEtapes, type Decision, type DecisionAction, type EtatChat, type Etage,
+  type RaisonIndisponible,
+  type ResultatCascade,
+} from './types';
 
 export type Auteur = 'moi' | 'chat';
 
@@ -35,6 +40,10 @@ export interface DepsControleur {
   readonly cascade: Pick<Cascade, 'etages' | 'decider'>;
   readonly actions: Actions;
   readonly enRotation: () => boolean;
+  /** Fenêtre d'inspection (5.7) : une entrée par commande décidée. Absente, rien n'est enregistré. */
+  readonly inspection?: Pick<Inspection, 'ajouter' | 'mettreAJour' | 'corriger'>;
+  /** Seuil de l'étage décision, rapporté dans la validation de l'inspection. */
+  readonly seuilDecision?: number;
 }
 
 export interface Controleur {
@@ -84,9 +93,10 @@ const etagesIndisponibles = (etages: readonly Etage[]): EtageAvecEtat[] =>
 export function avisIndisponibilite(etages: readonly Etage[]): string | null {
   const [premier] = etagesIndisponibles(etages);
   if (premier === undefined) return null;
-  const raison = (premier as { raisonIndisponible?: () => string | null }).raisonIndisponible?.() ?? null;
-  const absent = raison === null ? null : /^modèle (.+) non installé/u.exec(raison);
-  return absent?.[1] === undefined ? TEXTES_CHAT.avisIndisponible : TEXTES_CHAT.avisModeleAbsent(absent[1]);
+  const raison = (premier as { raisonIndisponible?: () => RaisonIndisponible | null }).raisonIndisponible?.() ?? null;
+  return raison?.code === 'modele-absent' && raison.modele !== undefined
+    ? TEXTES_CHAT.avisModeleAbsent(raison.modele)
+    : TEXTES_CHAT.avisIndisponible;
 }
 
 export function creerControleur(deps: DepsControleur): Controleur {
@@ -100,6 +110,8 @@ export function creerControleur(deps: DepsControleur): Controleur {
   let suite: Suite | null = null;
   /** Décision à corriger quand une clarification est en attente. */
   let aClarifier: Decision | null = null;
+  /** Entrée d'inspection de la commande qui attend une réponse (précision ou confirmation). */
+  let entreeAttente: string | null = null;
   const echanges: Echange[] = [];
   const abonnes = new Set<() => void>();
 
@@ -113,7 +125,11 @@ export function creerControleur(deps: DepsControleur): Controleur {
     dire('chat', texte);
     echanges.push({ commande, reponse: texte });
   };
+  const majInspection = (id: string | null, execution: Execution): void => {
+    if (id !== null) deps.inspection?.mettreAJour(id, execution);
+  };
   const oublierAttente = (): void => {
+    entreeAttente = null;
     attente = null;
     suite = null;
     aClarifier = null;
@@ -142,11 +158,12 @@ export function creerControleur(deps: DepsControleur): Controleur {
     ]);
   };
 
-  const executer = (commande: string, etapes: readonly Etape[]): void => {
+  /** Rend `true` si les étapes ont été exécutées. */
+  const executer = (commande: string, etapes: readonly Etape[]): boolean => {
     const { resultats, refus } = executerPlan(etapes, deps.actions);
     if (refus !== null) {
       repondre(commande, TEXTES_CHAT.refusPlan(refus));
-      return;
+      return false;
     }
     const lecture = [...resultats].reverse().find((r) => r.ok && r.cadeauSuivant !== undefined);
     repondre(
@@ -155,12 +172,13 @@ export function creerControleur(deps: DepsControleur): Controleur {
         ? TEXTES_CHAT.cadeauSuivant(lecture.cadeauSuivant)
         : TEXTES_CHAT.fait,
     );
+    return true;
   };
 
   const appels = (decision: Decision): readonly DecisionAction[] =>
     estEtapes(decision) ? decision.actions : [decision as DecisionAction];
 
-  const suivre = (commande: string, decision: Decision, plan: Plan): void => {
+  const suivre = (commande: string, decision: Decision, plan: Plan, id: string | null): Execution => {
     if (plan.genre === 'refuser') {
       // Les règles refusent « lancer » avec moins de 2 noms par `indisponible` : on donne le message de l'interface.
       const moinsDeDeux =
@@ -168,11 +186,16 @@ export function creerControleur(deps: DepsControleur): Controleur {
         deps.actions.magasin.lire().participants.length < 2 &&
         /\b(?:lanc|tourn)/iu.test(commande);
       repondre(commande, TEXTES_CHAT.refusPlan(moinsDeDeux ? 'moins-de-2-noms' : plan.code));
+      majInspection(id, 'non-execute');
+      return 'non-execute';
     } else if (plan.genre === 'clarifier') {
       const candidats = [...new Set(plan.candidats)];
       aClarifier = decision;
       attente = { genre: 'clarifier', candidats };
       repondre(commande, TEXTES_CHAT.clarifier(candidats));
+      entreeAttente = id;
+      majInspection(id, 'attente-precision');
+      return 'attente-precision';
     } else if (plan.confirmation) {
       suite = { decision, empreinte: empreinte() };
       attente = {
@@ -180,9 +203,13 @@ export function creerControleur(deps: DepsControleur): Controleur {
         recapitulatif: appels(decision).map((a) => TEXTES_CHAT.etape(a.action, a.params)),
       };
       repondre(commande, TEXTES_CHAT.confirmer);
-    } else {
-      executer(commande, plan.etapes);
+      entreeAttente = id;
+      majInspection(id, 'attente-confirmation');
+      return 'attente-confirmation';
     }
+    const execution: Execution = executer(commande, plan.etapes) ? 'execute' : 'non-execute';
+    majInspection(id, execution);
+    return execution;
   };
 
   const verifierAvis = (): void => {
@@ -205,6 +232,7 @@ export function creerControleur(deps: DepsControleur): Controleur {
     async envoyer(texte) {
       const commande = texte.trim();
       if (commande === '') return;
+      if (attente !== null) majInspection(entreeAttente, 'annule');
       if (attente?.genre === 'confirmer') dire('chat', TEXTES_CHAT.confirmationAbandonnee);
       courant?.abort();
       const controle = new AbortController();
@@ -214,8 +242,11 @@ export function creerControleur(deps: DepsControleur): Controleur {
       occupe = true;
       notifier();
       let decision: Decision;
+      let resultat: ResultatCascade | null = null;
+      const etatEnvoye = etatChat();
       try {
-        decision = (await deps.cascade.decider(commande, etatChat(), controle.signal)).decision;
+        resultat = await deps.cascade.decider(commande, etatEnvoye, controle.signal);
+        decision = resultat.decision;
       } catch {
         decision = { action: 'refuser', code: 'incompris' };
       }
@@ -224,7 +255,22 @@ export function creerControleur(deps: DepsControleur): Controleur {
       courant = null;
       occupe = false;
       verifierAvis();
-      suivre(commande, decision, planifier(decision, deps.actions.magasin.lire()));
+      const plan = planifier(decision, deps.actions.magasin.lire());
+      const id =
+        resultat === null || deps.inspection === undefined
+          ? null
+          : deps.inspection.ajouter(
+              construireEntree({
+                commande,
+                etat: etatEnvoye,
+                resultat,
+                etages: deps.cascade.etages,
+                plan,
+                execution: 'non-execute',
+                seuilDecision: deps.seuilDecision ?? SEUIL_DECISION_DEFAUT,
+              }),
+            );
+      suivre(commande, decision, plan, id);
       notifier();
     },
     choisir(candidat) {
@@ -232,42 +278,56 @@ export function creerControleur(deps: DepsControleur): Controleur {
       const commande = derniereCommande();
       const decision = aClarifier;
       const attenteCandidats = attente.candidats;
+      const id = entreeAttente;
       oublierAttente();
       // Clarification venue d'un étage (aucun paramètre à corriger) : la commande est reprise avec le nom choisi.
       if (estClarifier(decision)) {
         // Un seul nom possible (homonymes identiques) : le reprendre ne lèverait pas l'ambiguïté.
         if (attenteCandidats.length <= 1) {
           repondre(commande, TEXTES_CHAT.ambigu);
+          majInspection(id, 'non-execute');
           notifier();
           return;
         }
+        majInspection(id, 'non-execute');
         void controleur.envoyer(`${commande} ${candidat}`);
         return;
       }
       const corrigee = substituer(decision, candidat, deps.actions);
-      if (corrigee === null) repondre(commande, TEXTES_CHAT.ambigu);
-      else suivre(commande, corrigee.decision, corrigee.plan);
+      if (corrigee === null) {
+        repondre(commande, TEXTES_CHAT.ambigu);
+        majInspection(id, 'non-execute');
+      } else {
+        // L'entrée porte la décision réellement exécutée ; la clarification initiale est gardée à part.
+        if (id !== null) deps.inspection?.corriger(id, corrigee.decision, decrirePlan(corrigee.plan));
+        suivre(commande, corrigee.decision, corrigee.plan, id);
+      }
       notifier();
     },
     confirmer() {
       if (attente?.genre !== 'confirmer' || suite === null) return;
       const { decision, empreinte: avant } = suite;
       const commande = derniereCommande();
+      const id = entreeAttente;
       oublierAttente();
       // La carte date : on rejoue le plan sur l'état courant, rien n'est exécuté si l'état a changé.
       const plan = planifier(decision, deps.actions.magasin.lire());
-      if (empreinte() !== avant || plan.genre !== 'etapes') repondre(commande, TEXTES_CHAT.confirmationPerimee);
-      else executer(commande, plan.etapes);
+      if (empreinte() !== avant || plan.genre !== 'etapes') {
+        repondre(commande, TEXTES_CHAT.confirmationPerimee);
+        majInspection(id, 'perime');
+      } else majInspection(id, executer(commande, plan.etapes) ? 'execute' : 'non-execute');
       notifier();
     },
     annuler() {
       if (attente?.genre !== 'confirmer') return;
       const commande = derniereCommande();
+      majInspection(entreeAttente, 'annule');
       oublierAttente();
       repondre(commande, TEXTES_CHAT.commandeAnnulee);
       notifier();
     },
     fermer() {
+      if (attente !== null) majInspection(entreeAttente, 'annule');
       courant?.abort();
       courant = null;
       occupe = false;

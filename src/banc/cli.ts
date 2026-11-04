@@ -1,5 +1,6 @@
 /**
- * Ligne de commande du banc : `npm run banc:chat -- --moteur <nom> [--lot dev|test] [--modele m] [--url u]`.
+ * Ligne de commande du banc : `npm run banc:chat -- --moteur <nom> [--lot dev|test] [--modele m] [--url u] [--corpus f]`.
+ * `--corpus <fichier>` remplace le corpus du dépôt par un export de la fenêtre d'inspection (5.7) ou un fichier JSONL.
  * Le lot `test` exige `--lot test` explicite (il ne sert pas au réglage des règles). Détail ligne par
  * ligne dans `.banc/<moteur>-<lot>.json`.
  */
@@ -8,6 +9,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { lancerBanc, type RapportBanc, type Score, type ScoreAction } from './banc';
+import { versCorpus } from '../chat/inspection';
 import type { LigneCorpus } from './comparateur';
 import { fabriquesDuMoteur } from './moteurs';
 
@@ -21,11 +23,29 @@ export function lireCorpus(chemin: string = CHEMIN_CORPUS): LigneCorpus[] {
     .map((l) => JSON.parse(l) as LigneCorpus);
 }
 
+/**
+ * Corpus d'un fichier choisi : un export de la fenêtre d'inspection (document JSON, toutes ses lignes
+ * versées au lot demandé) ou un fichier JSONL au format du corpus du dépôt.
+ */
+export function lireCorpusFichier(chemin: string, lot: 'dev' | 'test'): LigneCorpus[] {
+  const texte = readFileSync(chemin, 'utf-8');
+  let document: unknown;
+  try {
+    document = JSON.parse(texte);
+  } catch {
+    document = null;
+  }
+  const estExport = typeof document === 'object' && document !== null && 'format' in document;
+  return estExport ? versCorpus(texte, lot) : lireCorpus(chemin);
+}
+
 export interface Arguments {
   readonly moteur: string;
   readonly lot: 'dev' | 'test';
   readonly modele?: string;
   readonly url?: string;
+  /** Fichier de corpus à la place de celui du dépôt. */
+  readonly corpus?: string;
 }
 
 /** Analyse les arguments ; lève une erreur au message lisible si invalides. Lot `dev` par défaut. */
@@ -37,6 +57,7 @@ export function analyserArguments(argv: readonly string[]): Arguments {
       lot: { type: 'string' },
       modele: { type: 'string' },
       url: { type: 'string' },
+      corpus: { type: 'string' },
     },
     strict: true,
   });
@@ -48,6 +69,7 @@ export function analyserArguments(argv: readonly string[]): Arguments {
     lot,
     ...(values.modele === undefined ? {} : { modele: values.modele }),
     ...(values.url === undefined ? {} : { url: values.url }),
+    ...(values.corpus === undefined ? {} : { corpus: values.corpus }),
   };
 }
 
@@ -86,7 +108,7 @@ export async function main(argv: readonly string[]): Promise<number> {
     args = analyserArguments(argv);
   } catch (e) {
     console.error(`banc:chat : ${message(e)}`);
-    console.error('Usage : npm run banc:chat -- --moteur <nom> [--lot dev|test] [--modele <m>] [--url <u>]');
+    console.error('Usage : npm run banc:chat -- --moteur <nom> [--lot dev|test] [--modele <m>] [--url <u>] [--corpus <fichier>]');
     return 2;
   }
   let fabriques;
@@ -100,10 +122,17 @@ export async function main(argv: readonly string[]): Promise<number> {
     ...(args.url === undefined ? {} : { urlOllama: args.url }),
     ...(args.modele === undefined ? {} : { modele: args.modele }),
   };
-  const rapport = await lancerBanc(lireCorpus(), args.lot, { moteur: args.moteur, fabriques, options });
+  let corpus: LigneCorpus[];
+  try {
+    corpus = args.corpus === undefined ? lireCorpus() : lireCorpusFichier(args.corpus, args.lot);
+  } catch (e) {
+    console.error(`banc:chat : corpus illisible : ${message(e)}`);
+    return 2;
+  }
+  const rapport = await lancerBanc(corpus, args.lot, { moteur: args.moteur, fabriques, options });
   const dossier = resolve(RACINE, '.banc');
   mkdirSync(dossier, { recursive: true });
-  const fichier = resolve(dossier, `${args.moteur}-${args.lot}.json`);
+  const fichier = resolve(dossier, `${args.moteur}${args.corpus === undefined ? '' : '-corpus'}-${args.lot}.json`);
   writeFileSync(fichier, JSON.stringify(rapport, null, 2), 'utf-8');
   console.log(formaterRapport(rapport));
   console.log(`\nDétail : ${fichier}`);
