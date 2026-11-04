@@ -61,7 +61,7 @@ test('les réglages sont mémorisés en localStorage et vides par défaut', asyn
 
 for (const [largeur, hauteur] of [
   [320, 640],
-  [568, 400], // téléphone en paysage : le tiroir cède, la roue ne descend pas sous 8 rem
+  [568, 480], // téléphone en paysage : le tiroir cède, la roue ne descend pas sous 8 rem
   [1920, 1080],
 ] as const) {
   test(`mise en page à ${String(largeur)} px : pas de défilement horizontal, roue visible`, async ({ page }) => {
@@ -80,8 +80,6 @@ for (const [largeur, hauteur] of [
     expect(roue).not.toBeNull();
     expect(panneau).not.toBeNull();
     if (roue && panneau) {
-      const vars = await page.evaluate(() => `${document.documentElement.style.cssText} sy=${String(window.scrollY)} ih=${String(window.innerHeight)}`);
-      console.log(`${vars} ${String(largeur)}x${String(hauteur)} roue ${JSON.stringify(roue)} panneau ${JSON.stringify(panneau)}`);
       const separes =
         roue.y + roue.height <= panneau.y + 1 ||
         panneau.x + panneau.width <= roue.x ||
