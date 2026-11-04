@@ -27,9 +27,9 @@ const resultat = (decision: Decision, confiance?: number): ResultatEtage => ({
 const LANCER: Decision = { action: 'lancer', params: {} };
 
 describe('cascade', () => {
-  it('seuls decision et SLM sont enregistrés (inactifs sans modèle) et le refus est « incompris »', async () => {
-    expect(ETAGES_ENREGISTRES.map((f) => f({}).nom)).toEqual(['decision', 'slm']);
-    const r = await decider('lance', etat, signal);
+  it('les règles, la décision puis le SLM (inactifs sans modèle) sont enregistrés et le refus est « incompris »', async () => {
+    expect(ETAGES_ENREGISTRES.map((f) => f({}).nom)).toEqual(['regles', 'decision', 'slm']);
+    const r = await decider('xyzzy plugh', etat, signal);
     expect(r.decision).toEqual(REFUS_INCOMPRIS);
     expect(r.etage).toBeNull();
     expect(REFUS_INCOMPRIS).toEqual({ action: 'refuser', code: 'incompris' });

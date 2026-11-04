@@ -9,6 +9,7 @@
  * - `slm` (5.6) : `[fabriqueSlm]` (lit `urlOllama` et `modele`)
  * - `decision` (5.10) : `[fabriqueDecision]`
  */
+import { fabriqueRegles } from '../chat/regles';
 import { creerEtageDecision } from '../chat/decision';
 import type { Etage, FabriqueEtage } from '../chat/types';
 
@@ -29,12 +30,12 @@ export const fabriqueDecisionBanc: FabriqueEtage = (options) =>
 
 export const MOTEURS: Readonly<Record<string, readonly FabriqueEtage[]>> = {
   'refuse-tout': [fabriqueRefuseTout],
+  regles: [fabriqueRegles],
   decision: [fabriqueDecisionBanc],
 };
 
 /** Moteurs prévus, pas encore livrés, avec la story qui les apporte. */
 export const MOTEURS_A_VENIR: Readonly<Record<string, string>> = {
-  regles: '5.3',
   slm: '5.6',
 };
 

@@ -11,12 +11,13 @@
  */
 import { creerEtageDecisionEnregistre } from './decision';
 import { creerEtageSlm } from './slm';
+import { fabriqueRegles } from './regles';
 import type { Decision, Etage, EtatChat, FabriqueEtage, OptionsEtages, ResultatCascade, TraceEtage } from './types';
 
 /** Fabriques des étages actifs, par ordre de priorité. Une ligne par étage. */
 export const ETAGES_ENREGISTRES: readonly FabriqueEtage[] = [
-  // 5.3 : `regles` s'insérera ici, en tête, avant `decision`
-  creerEtageDecisionEnregistre,
+  fabriqueRegles, // 5.3 : règles
+  creerEtageDecisionEnregistre, // 5.10 : décision
   creerEtageSlm,
 ];
 
