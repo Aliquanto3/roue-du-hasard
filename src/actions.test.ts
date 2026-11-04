@@ -154,10 +154,11 @@ describe('verrou F8 : toute action est refusée pendant une rotation', () => {
     basculerRendu: { mode: '2d' },
     couperSon: { coupe: true },
     exporter: {},
+    afficherCadeauSuivant: {},
     importer: { etat: etatInitial() },
   };
   // Réglages d'affichage et de son : permis pendant une rotation (testés plus bas).
-  const REGLAGES: readonly NomAction[] = ['basculerRendu', 'couperSon'];
+  const REGLAGES: readonly NomAction[] = ['basculerRendu', 'couperSon', 'afficherCadeauSuivant'];
 
   for (const nom of (Object.keys(params) as NomAction[]).filter((n) => !REGLAGES.includes(n))) {
     it(`${nom} renvoie rotation-en-cours et ne change rien`, () => {
@@ -241,5 +242,25 @@ describe('rendu, son, export et import', () => {
     const importe: Etat = { ...etatInitial(), cadeaux: ['Livre'], relief: false, sonCoupe: true };
     expect(b.actions.executer('importer', { etat: importe })).toEqual({ ok: true });
     expect(b.actions.magasin.lire()).toBe(importe);
+  });
+});
+
+describe('afficherCadeauSuivant', () => {
+  it('rend le prochain cadeau sans modifier l’état, même pendant une rotation', () => {
+    const b = banc();
+    b.actions.executer('coller', { texte: 'Ana,Bob' });
+    b.actions.executer('collerCadeaux', { texte: 'bougie,plaid' });
+    const avant = b.actions.magasin.lire();
+    expect(b.actions.executer('afficherCadeauSuivant', {})).toEqual({
+      ok: true,
+      cadeauSuivant: { numero: 1, total: 2, nom: 'bougie' },
+    });
+    b.rotation.active = true;
+    expect(b.actions.executer('afficherCadeauSuivant', {})).toMatchObject({ ok: true });
+    expect(b.actions.magasin.lire()).toBe(avant);
+  });
+
+  it('rend null sans cadeau', () => {
+    expect(banc().actions.executer('afficherCadeauSuivant', {})).toEqual({ ok: true, cadeauSuivant: null });
   });
 });

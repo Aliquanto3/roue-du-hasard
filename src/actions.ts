@@ -19,6 +19,7 @@ import {
   effacerHistorique,
   enregistrerTirage,
   etatInitial,
+  libelleCadeau,
   raisonLancementInterdit,
   recommencerAttributions,
   reinitialiserCouleurs,
@@ -28,6 +29,7 @@ import {
   supprimer,
   supprimerCadeau,
   type Etat,
+  type LibelleCadeau,
 } from './domain/etat';
 import { decouper, normaliserNom } from './domain/normalisation';
 import { couleursParDefaut } from './domain/palette';
@@ -68,7 +70,10 @@ export interface ControleAnnonce {
 
 const annonceAbsente: ControleAnnonce = { ouverte: () => false, ouvrir: () => undefined, fermer: () => undefined };
 
-export type Resultat = { readonly ok: true } | { readonly ok: false; readonly code: CodeRefus };
+/** `cadeauSuivant` n'est présent que pour `afficherCadeauSuivant` (`null` : plus de cadeau à attribuer). */
+export type Resultat =
+  | { readonly ok: true; readonly cadeauSuivant?: LibelleCadeau | null }
+  | { readonly ok: false; readonly code: CodeRefus };
 
 const OK: Resultat = { ok: true };
 const refus = (code: CodeRefus): Resultat => ({ ok: false, code });
@@ -137,6 +142,8 @@ export interface ParametresActions {
   couperSon: { readonly coupe: boolean };
   /** Télécharge l'état en fichier JSON (F15). */
   exporter: Record<string, never>;
+  /** Lecture seule : rend le prochain cadeau (`Resultat.cadeauSuivant`), sans modifier l'état. */
+  afficherCadeauSuivant: Record<string, never>;
   /** Remplace tout l'état par un état déjà lu et validé (`lireFichierImport`) ; la confirmation est demandée par l'interface. */
   importer: { readonly etat: Etat };
 }
@@ -418,6 +425,12 @@ export const ACTIONS: { readonly [N in NomAction]: Action<N> } = {
       return OK;
     },
   },
+  afficherCadeauSuivant: {
+    nom: 'afficherCadeauSuivant',
+    description: 'Rend le prochain cadeau à attribuer, sans rien modifier',
+    refusPossibles: [],
+    executer: (ctx) => ({ ok: true, cadeauSuivant: libelleCadeau(ctx.magasin.lire()) }),
+  },
   importer: {
     nom: 'importer',
     description: 'Remplace tout l’état par celui d’un fichier déjà validé',
@@ -453,8 +466,8 @@ function infoTirage(avant: Etat, apres: Etat, retraitPrevu: boolean): InfoAnnonc
   return { ordre: tirage.ordre, nom: tirage.nom, couleur, cadeau: tirage.cadeau, retraitPrevu };
 }
 
-/** Réglages d'affichage et de son : permis pendant une rotation (couper le son à ce moment est utile). */
-const SANS_VERROU: ReadonlySet<NomAction> = new Set<NomAction>(['basculerRendu', 'couperSon']);
+/** Réglages d'affichage et de son, et lecture seule : permis pendant une rotation (couper le son à ce moment est utile). */
+const SANS_VERROU: ReadonlySet<NomAction> = new Set<NomAction>(['basculerRendu', 'couperSon', 'afficherCadeauSuivant']);
 
 export interface Actions {
   /** Exécute une action ; refus avec code, jamais d'exception pour un refus attendu. */
