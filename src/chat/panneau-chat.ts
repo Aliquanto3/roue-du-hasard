@@ -102,7 +102,7 @@ export function creerPanneauChat(parent: HTMLElement, options: OptionsPanneauCha
     inspecter.setAttribute('aria-haspopup', 'dialog');
     inspecter.setAttribute('aria-keyshortcuts', RACCOURCI_INSPECTION);
     inspecter.addEventListener('click', () => {
-      fenetre.ouvrir();
+      fenetre.ouvrir(inspecter);
     });
   }
 
@@ -115,6 +115,7 @@ export function creerPanneauChat(parent: HTMLElement, options: OptionsPanneauCha
     bascule.setAttribute('aria-expanded', String(ouvert));
     bascule.textContent = ouvert ? TEXTES_CHAT.basculerFermer : TEXTES_CHAT.basculerOuvrir;
     if (!ouvert) controleur.fermer();
+    ajusterRoue();
   };
 
   const rendre = (): void => {
@@ -196,8 +197,46 @@ export function creerPanneauChat(parent: HTMLElement, options: OptionsPanneauCha
     if (!corps.hidden) saisie.focus();
   });
 
+  /**
+   * Écran étroit, tiroir ouvert : hauteur libre sous le haut de la roue, mesurée et non estimée.
+   * Les polices changent la hauteur de ce qui précède la roue ; seule la mesure évite le recouvrement.
+   */
+  const etroit = globalThis.matchMedia?.('(max-width: 51.99rem)');
+  const ajusterRoue = (): void => {
+    const cible = document.documentElement.style;
+    const roue = document.querySelector('.page__roue');
+    if (!etroit?.matches || racine.dataset['ouvert'] !== 'true' || !roue) {
+      cible.removeProperty('--roue-libre');
+      cible.removeProperty('--tiroir-max');
+      return;
+    }
+    const poser = (nom: string, valeur: string): void => {
+      if (cible.getPropertyValue(nom) !== valeur) cible.setProperty(nom, valeur);
+    };
+    const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    const haut = roue.getBoundingClientRect().top + window.scrollY;
+    // La zone de la roue contient aussi autre chose que le canvas (bandeau, boutons) : on le retranche.
+    const boite = roue.getBoundingClientRect().height;
+    const toile = roue.querySelector('canvas')?.getBoundingClientRect().height ?? boite;
+    const hors = boite - toile;
+    // La roue ne descend pas sous 8 rem (roue.css) : si l'espace manque, c'est le tiroir qui cède,
+    // jusqu'à un minimum qui garde la saisie visible ; au-delà il défile à l'intérieur.
+    const pourTiroir = Math.floor(window.innerHeight - haut - 8 * rem - hors - 8);
+    if (pourTiroir < window.innerHeight * 0.35) poser('--tiroir-max', `${String(Math.max(5 * rem, pourTiroir))}px`);
+    else cible.removeProperty('--tiroir-max');
+    const libre = Math.floor(window.innerHeight - racine.getBoundingClientRect().height - haut - hors - 8);
+    poser('--roue-libre', `${String(Math.max(0, libre))}px`);
+  };
+  if (typeof ResizeObserver !== 'undefined') {
+    const observateur = new ResizeObserver(ajusterRoue);
+    observateur.observe(racine);
+    observateur.observe(document.body);
+  }
+  window.addEventListener('resize', ajusterRoue);
+
   controleur.abonner(rendre);
   ouvrir(options.ouvert ?? false);
   rendre();
+  ajusterRoue();
   return racine;
 }
