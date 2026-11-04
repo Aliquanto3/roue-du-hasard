@@ -6,3 +6,4 @@ dist-harnais/
 test-results/
 playwright-report/
 .claude/worktrees/
+.banc/
