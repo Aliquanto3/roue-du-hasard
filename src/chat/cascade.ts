@@ -10,11 +10,12 @@
  * `incompris`. La forme des décisions est vérifiée plus loin, par `planifier`.
  */
 import { creerEtageSlm } from './slm';
+import { fabriqueRegles } from './regles';
 import type { Decision, Etage, EtatChat, FabriqueEtage, OptionsEtages, ResultatCascade, TraceEtage } from './types';
 
 /** Fabriques des étages actifs, par ordre de priorité. Une ligne par étage. */
 export const ETAGES_ENREGISTRES: readonly FabriqueEtage[] = [
-  // 5.3 : règles ; 5.10 : décision
+  fabriqueRegles, // 5.3 : règles (5.10 : décision)
   creerEtageSlm,
 ];
 

@@ -9,6 +9,7 @@
  * - `slm` (5.6) : `[fabriqueSlm]` (lit `urlOllama` et `modele`)
  * - `decision` (5.10) : `[fabriqueDecision]`
  */
+import { fabriqueRegles } from '../chat/regles';
 import type { Etage, FabriqueEtage } from '../chat/types';
 
 /** Moteur factice : refuse toujours. Son score est le plancher de référence du corpus. */
@@ -24,11 +25,11 @@ export const fabriqueRefuseTout: FabriqueEtage = (): Etage => ({
 
 export const MOTEURS: Readonly<Record<string, readonly FabriqueEtage[]>> = {
   'refuse-tout': [fabriqueRefuseTout],
+  regles: [fabriqueRegles],
 };
 
 /** Moteurs prévus, pas encore livrés, avec la story qui les apporte. */
 export const MOTEURS_A_VENIR: Readonly<Record<string, string>> = {
-  regles: '5.3',
   slm: '5.6',
   decision: '5.10',
 };
