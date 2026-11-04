@@ -62,7 +62,9 @@ async function nomSousPointeur(page: Page): Promise<string | null> {
       const ecart = rgb.reduce((s, c, i) => s + Math.abs(c - (p[i] ?? 0)), 0);
       if (!meilleur || ecart < meilleur.ecart) meilleur = { nom, ecart };
     }
-    return meilleur && meilleur.ecart <= 12 ? meilleur.nom : null;
+    // Les couleurs choisies sont à plus de 200 d'écart entre elles ; le relief assombrit le secteur
+    // (jaune lu à 247,247,0 sous WebKit macOS, écart 16).
+    return meilleur && meilleur.ecart <= 40 ? meilleur.nom : null;
   });
 }
 
