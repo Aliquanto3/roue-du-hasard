@@ -46,7 +46,14 @@ test('le raccourci Alt+Maj+I ouvre et ferme ; Espace et Entrée restent à la ro
   await page.locator('body').click({ position: { x: 1, y: 1 } });
   await page.keyboard.press('Alt+Shift+KeyI');
   await expect(fenetre(page)).toBeVisible();
-  await page.keyboard.press('Alt+Shift+KeyI');
+  // Touche maintenue (répétition automatique) : un seul basculement.
+  await page.keyboard.down('Alt');
+  await page.keyboard.down('Shift');
+  await page.keyboard.down('KeyI');
+  await page.keyboard.down('KeyI');
+  await page.keyboard.up('KeyI');
+  await page.keyboard.up('Shift');
+  await page.keyboard.up('Alt');
   await expect(fenetre(page)).toBeHidden();
   await page.keyboard.press('Space');
   await page.keyboard.press('Enter');

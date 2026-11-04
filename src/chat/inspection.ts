@@ -21,6 +21,8 @@ import {
 export const LIMITE_JETONS = 4096;
 /** Nombre maximal de messages gardés : au-delà, les plus anciens sont oubliés. */
 export const MAX_ENTREES = 500;
+/** Taille sérialisée maximale gardée en `localStorage` (caractères, ~1,5 Mo) : au-delà, les plus anciennes entrées sont retirées. */
+export const MAX_OCTETS = 1_500_000;
 export const CLE_INSPECTION = 'roue-du-hasard:chat:inspection';
 export const FORMAT_EXPORT = 'roue-inspection';
 export const VERSION_EXPORT = 1;
@@ -95,6 +97,8 @@ export interface EntreeInspection extends DonneesEntree {
   readonly verdict: Verdict | null;
   /** Décision attendue, précisée par l'utilisateur (facultatif). */
   readonly attendu: Decision | null;
+  /** Décision et plan de la clarification, quand la décision ci-dessus est celle corrigée par le choix de l'utilisateur. */
+  readonly clarification?: { readonly decision: Decision; readonly plan: PlanInspecte };
 }
 
 // --- Construction ----------------------------------------------------------------
@@ -358,21 +362,64 @@ type Stockage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 const verdictValide = (v: unknown): v is Verdict =>
   estObjet(v) && (v['valeur'] === 'juste' || v['valeur'] === 'erreur') && (v['cause'] === undefined || v['cause'] === 'ecoute' || v['cause'] === 'decision');
 
+const EXECUTIONS: readonly string[] = ['execute', 'attente-confirmation', 'attente-precision', 'non-execute', 'annule', 'perime'];
+const ETAGES: readonly string[] = ['regles', 'decision', 'slm'];
+const estTexte = (v: unknown): v is string => typeof v === 'string';
+const estNombre = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+const tableauDe = (v: unknown, test: (x: unknown) => boolean): boolean => Array.isArray(v) && (v as unknown[]).every(test);
+
+const planValide = (p: unknown): boolean =>
+  estObjet(p) && ['etapes', 'clarifier', 'refuser'].includes(p['genre'] as string) && estTexte(p['detail']) && typeof p['confirmation'] === 'boolean';
+
+const contexteValide = (c: unknown): boolean =>
+  c === null ||
+  (estObjet(c) &&
+    estNombre(c['jetons']) &&
+    estNombre(c['limite']) &&
+    tableauDe(c['coupes'], estTexte) &&
+    tableauDe(c['messages'], (m) => estObjet(m) && estTexte(m['role']) && estTexte(m['content'])));
+
+const etageValide = (x: unknown): boolean =>
+  estObjet(x) &&
+  ETAGES.includes(x['etage'] as string) &&
+  estNombre(x['dureeMs']) &&
+  (x['raison'] === null || estTexte(x['raison'])) &&
+  (x['erreur'] === null || estTexte(x['erreur'])) &&
+  (x['regle'] === null || estTexte(x['regle'])) &&
+  (x['sortie'] === null || estTexte(x['sortie'])) &&
+  (x['probabilites'] === null || estObjet(x['probabilites'])) &&
+  tableauDe(x['appelsOutils'], (a) => estObjet(a) && estTexte(a['nom'])) &&
+  estTexte(x['validation']) &&
+  contexteValide(x['contexte']);
+
+/** Validation en profondeur : une entrée altérée dans le stockage est écartée, jamais rendue. */
 const entreeValide = (v: unknown): v is EntreeInspection =>
   estObjet(v) &&
-  typeof v['id'] === 'string' &&
-  typeof v['commande'] === 'string' &&
+  estTexte(v['id']) &&
+  estTexte(v['horodatage']) &&
+  estTexte(v['commande']) &&
   estObjet(v['etat']) &&
-  estObjet(v['decision']) &&
-  Array.isArray(v['etages']) &&
-  estObjet(v['plan']) &&
-  (v['verdict'] === null || verdictValide(v['verdict']));
+  tableauDe(v['etat']['noms'], estTexte) &&
+  typeof v['etat']['rotation'] === 'boolean' &&
+  formeValide(v['decision']) &&
+  (v['etage'] === null || ETAGES.includes(v['etage'] as string)) &&
+  (v['confiance'] === null || estNombre(v['confiance'])) &&
+  tableauDe(v['etages'], etageValide) &&
+  planValide(v['plan']) &&
+  EXECUTIONS.includes(v['execution'] as string) &&
+  estNombre(v['latenceMs']) &&
+  (v['verdict'] === null || verdictValide(v['verdict'])) &&
+  (v['attendu'] === null || formeValide(v['attendu'])) &&
+  (v['clarification'] === undefined ||
+    (estObjet(v['clarification']) && formeValide(v['clarification']['decision']) && planValide(v['clarification']['plan'])));
 
 export interface Inspection {
   /** Du plus ancien au plus récent. */
   entrees(): readonly EntreeInspection[];
   ajouter(donnees: DonneesEntree): string;
   mettreAJour(id: string, execution: Execution): void;
+  /** Remplace la décision et le plan par ceux réellement exécutés après une clarification ; garde les premiers dans `clarification`. */
+  corriger(id: string, decision: Decision, plan: PlanInspecte): void;
   /** `null` retire le verdict. */
   poserVerdict(id: string, verdict: Verdict | null, attendu?: Decision | null): void;
   effacer(): void;
@@ -386,10 +433,13 @@ export interface OptionsInspection {
   readonly stockage: () => Stockage;
   readonly maintenant?: () => Date;
   readonly plafond?: number;
+  /** Taille sérialisée maximale (tests). */
+  readonly maxOctets?: number;
 }
 
 export function creerInspection(options: OptionsInspection): Inspection {
   const plafond = options.plafond ?? MAX_ENTREES;
+  const maxOctets = options.maxOctets ?? MAX_OCTETS;
   const maintenant = options.maintenant ?? (() => new Date());
   let liste: EntreeInspection[] = [];
   let disponible = true;
@@ -408,7 +458,13 @@ export function creerInspection(options: OptionsInspection): Inspection {
 
   const ecrire = (): void => {
     try {
-      options.stockage().setItem(CLE_INSPECTION, JSON.stringify(liste));
+      let texte = JSON.stringify(liste);
+      // Plafond en taille (quota du stockage) : les entrées les plus anciennes partent d'abord, la dernière reste.
+      while (texte.length > maxOctets && liste.length > 1) {
+        liste = liste.slice(1);
+        texte = JSON.stringify(liste);
+      }
+      options.stockage().setItem(CLE_INSPECTION, texte);
       disponible = true;
     } catch {
       disponible = false;
@@ -435,6 +491,13 @@ export function creerInspection(options: OptionsInspection): Inspection {
       return id;
     },
     mettreAJour: (id, execution) => remplacer(id, (e) => ({ ...e, execution })),
+    corriger: (id, decision, plan) =>
+      remplacer(id, (e) => ({
+        ...e,
+        decision,
+        plan,
+        clarification: e.clarification ?? { decision: e.decision, plan: e.plan },
+      })),
     poserVerdict: (id, verdict, attendu = null) =>
       remplacer(id, (e) => ({
         ...e,

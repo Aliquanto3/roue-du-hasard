@@ -369,7 +369,7 @@ export function creerFenetreInspection(
   };
   // Alt+Maj+I : ni Espace ni Entrée (roue), ni Ctrl+Maj+I (outils du navigateur).
   document.addEventListener('keydown', (ev) => {
-    if (ev.altKey && ev.shiftKey && !ev.ctrlKey && !ev.metaKey && ev.code === 'KeyI') {
+    if (!ev.repeat && ev.altKey && ev.shiftKey && !ev.ctrlKey && !ev.metaKey && ev.code === 'KeyI') {
       ev.preventDefault();
       basculer();
     }

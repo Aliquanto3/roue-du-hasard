@@ -549,6 +549,32 @@ describe('enregistrement pour la fenêtre d’inspection (5.7)', () => {
     expect(inspection.entrees()[0]?.execution).toBe('perime');
   });
 
+  it('clarification : l’entrée porte la décision et le plan réellement exécutés, la clarification est gardée', async () => {
+    const { c, inspection } = avecInspection({ 'supprime Mari': appel('supprimer', { nom: 'Mari' }) }, ['Marie', 'Marion']);
+    await c.envoyer('supprime Mari');
+    expect(inspection.entrees()[0]).toMatchObject({ execution: 'attente-precision', plan: { genre: 'clarifier' } });
+    c.choisir('Marion');
+    const e = inspection.entrees()[0];
+    expect(inspection.entrees()).toHaveLength(1);
+    expect(e).toMatchObject({
+      decision: { action: 'supprimer', params: { nom: 'Marion' } },
+      plan: { genre: 'etapes', detail: '1 étape(s)', confirmation: false },
+      execution: 'execute',
+      clarification: { decision: { action: 'supprimer', params: { nom: 'Mari' } }, plan: { genre: 'clarifier' } },
+    });
+    expect(e?.clarification?.plan.detail).toBe('clarifier : Marie, Marion');
+  });
+
+  it('nouvelle commande pendant une précision attendue : l’entrée est annulée', async () => {
+    const { c, inspection } = avecInspection(
+      { 'supprime Mari': appel('supprimer', { nom: 'Mari' }), 'ajoute Léo': appel('ajouter', { nom: 'Léo' }) },
+      ['Marie', 'Marion'],
+    );
+    await c.envoyer('supprime Mari');
+    await c.envoyer('ajoute Léo');
+    expect(inspection.entrees().map((e) => e.execution)).toEqual(['annule', 'execute']);
+  });
+
   it('panneau fermé pendant une confirmation : entrée annulée', async () => {
     const { c, inspection } = avecInspection({ 'vide tout': appel('effacerHistorique') }, ['Ana']);
     await c.envoyer('vide tout');

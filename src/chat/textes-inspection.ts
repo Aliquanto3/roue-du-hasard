@@ -50,7 +50,6 @@ export const TEXTES_INSPECTION = {
   attenduLibelle: 'Décision attendue (JSON, facultatif)',
   attenduInvalide: 'La décision attendue n’est pas une décision valide : elle n’est pas enregistrée.',
   enregistrerAttendu: 'Enregistrer',
-  retirerVerdict: 'Retirer le verdict',
   verdictJuste: 'verdict : juste',
   verdictErreurDecision: 'verdict : erreur de décision',
   verdictErreurEcoute: 'verdict : erreur d’écoute',
@@ -78,5 +77,4 @@ export const TEXTES_INSPECTION = {
   action: (libelle: string): string => `Action : ${libelle}`,
   execution: (e: Execution): string => EXECUTIONS[e],
   etatEnvoye: 'État vu par le chat',
-  ouvertAuClavier: 'Ouvrir ou replier le détail',
 } as const;

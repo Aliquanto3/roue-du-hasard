@@ -7,7 +7,7 @@
 import type { Actions } from '../actions';
 import type { Cascade } from './cascade';
 import { SEUIL_DECISION_DEFAUT } from './decision';
-import { construireEntree, type Execution, type Inspection } from './inspection';
+import { construireEntree, decrirePlan, type Execution, type Inspection } from './inspection';
 import { executerPlan, planifier, type Etape, type Plan } from './outils';
 import { TEXTES_CHAT } from './textes';
 import { estClarifier, estEtapes, type Decision, type DecisionAction, type EtatChat, type Etage,
@@ -41,7 +41,7 @@ export interface DepsControleur {
   readonly actions: Actions;
   readonly enRotation: () => boolean;
   /** Fenêtre d'inspection (5.7) : une entrée par commande décidée. Absente, rien n'est enregistré. */
-  readonly inspection?: Pick<Inspection, 'ajouter' | 'mettreAJour'>;
+  readonly inspection?: Pick<Inspection, 'ajouter' | 'mettreAJour' | 'corriger'>;
   /** Seuil de l'étage décision, rapporté dans la validation de l'inspection. */
   readonly seuilDecision?: number;
 }
@@ -232,10 +232,8 @@ export function creerControleur(deps: DepsControleur): Controleur {
     async envoyer(texte) {
       const commande = texte.trim();
       if (commande === '') return;
-      if (attente?.genre === 'confirmer') {
-        majInspection(entreeAttente, 'annule');
-        dire('chat', TEXTES_CHAT.confirmationAbandonnee);
-      }
+      if (attente !== null) majInspection(entreeAttente, 'annule');
+      if (attente?.genre === 'confirmer') dire('chat', TEXTES_CHAT.confirmationAbandonnee);
       courant?.abort();
       const controle = new AbortController();
       courant = controle;
@@ -299,7 +297,11 @@ export function creerControleur(deps: DepsControleur): Controleur {
       if (corrigee === null) {
         repondre(commande, TEXTES_CHAT.ambigu);
         majInspection(id, 'non-execute');
-      } else suivre(commande, corrigee.decision, corrigee.plan, id);
+      } else {
+        // L'entrée porte la décision réellement exécutée ; la clarification initiale est gardée à part.
+        if (id !== null) deps.inspection?.corriger(id, corrigee.decision, decrirePlan(corrigee.plan));
+        suivre(commande, corrigee.decision, corrigee.plan, id);
+      }
       notifier();
     },
     confirmer() {

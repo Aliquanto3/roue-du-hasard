@@ -13,6 +13,7 @@ import {
   CLE_INSPECTION,
   LIMITE_JETONS,
   MAX_ENTREES,
+  MAX_OCTETS,
   calculerTableau,
   construireEntree,
   creerInspection,
@@ -490,5 +491,88 @@ describe('export relu par le banc', () => {
     } finally {
       console.error = ancienne;
     }
+  });
+});
+
+describe('robustesse du stockage et plafond en taille', () => {
+  const entreeComplete = (): DonneesEntree =>
+    base({
+      etages: [
+        {
+          etage: 'slm',
+          dureeMs: 3,
+          raison: null,
+          erreur: null,
+          regle: null,
+          contexte: { messages: [{ role: 'system', content: 'x' }], jetons: 1, limite: LIMITE_JETONS, coupes: [] },
+          sortie: null,
+          probabilites: null,
+          appelsOutils: [],
+          validation: 'ok',
+        },
+      ],
+    });
+
+  it('entrée altérée en profondeur : écartée au chargement, la bonne reste, la fenêtre peut s’ouvrir', () => {
+    const s = stockage();
+    const i = creerInspection({ stockage: () => s });
+    i.ajouter(entreeComplete());
+    const bonne = JSON.parse(s.donnees.get(CLE_INSPECTION) ?? '[]') as Record<string, unknown>[];
+    const copie = (modif: (e: Record<string, unknown>) => void): Record<string, unknown> => {
+      const e = structuredClone(bonne[0]) as Record<string, unknown>;
+      modif(e);
+      return e;
+    };
+    const alterees = [
+      copie((e) => (e['etages'] = [{ etage: 'slm' }])),
+      copie((e) => (e['etages'] = [null])),
+      copie((e) => (e['plan'] = { genre: 'x' })),
+      copie((e) => (e['decision'] = { action: 5 })),
+      copie((e) => (e['etat'] = { noms: 'Ana', rotation: false })),
+      copie((e) => (e['execution'] = 'inconnue')),
+      copie((e) => (e['latenceMs'] = 'vite')),
+      copie((e) => (e['horodatage'] = 3)),
+      copie((e) => (e['attendu'] = { action: 7 })),
+    ];
+    s.setItem(CLE_INSPECTION, JSON.stringify([...alterees, bonne[0]]));
+    const j = creerInspection({ stockage: () => s });
+    expect(j.entrees()).toHaveLength(1);
+    expect(j.entrees()[0]?.id).toBe(bonne[0]?.['id']);
+    expect(() => calculerTableau(j.entrees())).not.toThrow();
+    // Effacement toujours possible.
+    j.effacer();
+    expect(j.entrees()).toEqual([]);
+  });
+
+  it('plafond en taille sérialisée : les plus anciennes partent d’abord, la dernière reste', () => {
+    expect(MAX_OCTETS).toBe(1_500_000);
+    const s = stockage();
+    const i = creerInspection({ stockage: () => s, maxOctets: 3000 });
+    const gros = 'x'.repeat(900);
+    for (let n = 1; n <= 6; n++) i.ajouter(base({ commande: `c${String(n)}-${gros}` }));
+    const stocke = s.donnees.get(CLE_INSPECTION) ?? '';
+    expect(stocke.length).toBeLessThanOrEqual(3000);
+    const commandes = i.entrees().map((e) => e.commande.slice(0, 2));
+    expect(commandes.at(-1)).toBe('c6');
+    expect(commandes.length).toBeLessThan(6);
+    expect(commandes).toEqual(['c1', 'c2', 'c3', 'c4', 'c5', 'c6'].slice(6 - commandes.length));
+    expect((JSON.parse(stocke) as unknown[]).length).toBe(commandes.length);
+    // Une entrée plus grosse que la limite reste seule (jamais vidée).
+    const k = creerInspection({ stockage: () => stockage(), maxOctets: 10 });
+    k.ajouter(base());
+    k.ajouter(base({ commande: 'dernière' }));
+    expect(k.entrees().map((e) => e.commande)).toEqual(['dernière']);
+  });
+
+  it('clarification et décision corrigée : relues du stockage', () => {
+    const s = stockage();
+    const i = creerInspection({ stockage: () => s });
+    const id = i.ajouter(base({ decision: { action: 'supprimer', params: { nom: 'Mari' } } }));
+    i.corriger(id, { action: 'supprimer', params: { nom: 'Marion' } }, { genre: 'etapes', detail: '1 étape(s)', confirmation: false });
+    i.corriger(id, { action: 'supprimer', params: { nom: 'Marie' } }, { genre: 'etapes', detail: '1 étape(s)', confirmation: false });
+    const relue = creerInspection({ stockage: () => s }).entrees()[0];
+    expect(relue?.decision).toEqual({ action: 'supprimer', params: { nom: 'Marie' } });
+    // La clarification initiale n'est écrite qu'une fois.
+    expect(relue?.clarification?.decision).toEqual({ action: 'supprimer', params: { nom: 'Mari' } });
   });
 });
